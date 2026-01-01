@@ -5,6 +5,7 @@ import { useCardStore } from '@/stores/cards'
 import { useDrag } from '@/composables/useDrag'
 import { useHover } from '@/composables/useHover'
 import type { DragTarget } from '@/types'
+import { CARD_BACK_COL, CARD_BACK_ROW } from '@/types'
 
 const canvasRef = ref<HTMLElement | null>(null)
 const deckRef = ref<HTMLElement | null>(null)
@@ -83,8 +84,8 @@ const startStackDrag = (index: number) => {
   drag.startDrag(
     { pointerId: 0, clientX: x, clientY: y } as PointerEvent,
     index,
-    stack.anchorX,
-    stack.anchorY,
+    offsetX,
+    offsetY,
     canvasRef,
     target,
   )
@@ -160,6 +161,33 @@ const onCardPointerDown = (event: PointerEvent, index: number) => {
 // Prevent context menu on right-click drag
 const onCardContextMenu = (event: Event) => {
   event.preventDefault()
+}
+
+// Double-click to flip card
+const onCardDoubleClick = (event: MouseEvent, index: number) => {
+  event.preventDefault()
+  const card = cardStore.cards[index]
+  if (!card) return
+
+  if (event.button === 2 && card.stackId !== null) {
+    // Right double-click on stacked card = flip entire stack
+    cardStore.flipStack(card.stackId)
+  } else {
+    // Left double-click = flip single card (top of stack if stacked)
+    cardStore.flipCard(card.id)
+  }
+}
+
+// Get the sprite column for a card (face or back)
+const getCardCol = (index: number) => {
+  const card = cardStore.cards[index]
+  return card?.faceUp ? card.col : CARD_BACK_COL
+}
+
+// Get the sprite row for a card (face or back)
+const getCardRow = (index: number) => {
+  const card = cardStore.cards[index]
+  return card?.faceUp ? card.row : CARD_BACK_ROW
 }
 
 const onCardPointerMove = (event: PointerEvent) => {
@@ -269,10 +297,11 @@ onBeforeUnmount(() => {
         dragging: drag.activeIndex.value === index,
         'in-deck': card.isInDeck,
         'stack-target': hover.state.ready && hover.state.cardId === card.id,
+        'face-down': !card.faceUp,
       }"
       :style="{
-        '--col': card.col,
-        '--row': card.row,
+        '--col': getCardCol(index),
+        '--row': getCardRow(index),
         transform: `translate3d(${card.x}px, ${card.y}px, 0)`,
         zIndex: getCardZ(index),
       }"
@@ -281,6 +310,7 @@ onBeforeUnmount(() => {
       @pointerup="onCardPointerUp"
       @pointercancel="onCardPointerUp"
       @contextmenu="onCardContextMenu"
+      @dblclick="onCardDoubleClick($event, index)"
     />
 
     <div ref="deckRef" class="deck" aria-hidden="true">

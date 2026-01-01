@@ -20,6 +20,7 @@ A single playing card that can be moved, stacked, and organized.
 | `z`        | `number`         | Base z-index for rendering order            |
 | `stackId`  | `number \| null` | ID of stack this card belongs to, or `null` |
 | `isInDeck` | `boolean`        | Whether card is part of any stack           |
+| `faceUp`   | `boolean`        | Whether card face is visible                |
 
 ### Stack
 
@@ -70,6 +71,8 @@ A designated drop target for organizing cards.
 | **Move Stack**   | Right-click + drag    | Long press + drag     | Drag entire stack    |
 | **Create Stack** | Hover 250ms + release | Hover 250ms + release | Form stack at target |
 | **Add to Stack** | Drop on stack         | Drop on stack         | Instant add to top   |
+| **Flip Card**    | Double-click          | Double-tap            | Toggle face up/down  |
+| **Flip Stack**   | Right double-click    | —                     | Toggle all in stack  |
 
 ### Card → Canvas
 
@@ -137,6 +140,8 @@ Cards are rendered with the following z-index priority (highest on top):
 | `LONG_PRESS_MS`  | `500` | Time to hold before stack drag initiates (ms) |
 | `STACK_OFFSET_X` | `1.5` | Horizontal offset per card in stack (px)      |
 | `STACK_OFFSET_Y` | `2`   | Vertical offset per card in stack (px)        |
+| `CARD_BACK_COL`  | `6`   | Tilemap column for card back sprite           |
+| `CARD_BACK_ROW`  | `4`   | Tilemap row for card back sprite              |
 
 ---
 
@@ -150,6 +155,7 @@ Cards are rendered with the following z-index priority (highest on top):
 | Dragging     | `.dragging`     | Grabbing cursor, elevated z-index             |
 | In Stack     | `.in-deck`      | Part of a stack                               |
 | Stack Target | `.stack-target` | Yellow outline + glow (hover-ready indicator) |
+| Face Down    | `.face-down`    | Shows card back sprite                        |
 
 ---
 

@@ -30,5 +30,5 @@ export const STACK_OFFSET_X = 1.5
 export const STACK_OFFSET_Y = 2
 
 // Card back sprite position in tilemap
-export const CARD_BACK_COL = 6
-export const CARD_BACK_ROW = 4
+export const CARD_BACK_COL = 13
+export const CARD_BACK_ROW = 1
