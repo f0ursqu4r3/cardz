@@ -1,0 +1,21 @@
+:root {
+  --tile-w: 42px;
+  --tile-h: 60px;
+  --pad-x: 11px;
+  --pad-y: 2px;
+  --gap-x: 22px;
+  --gap-y: 4px;
+  --atlas: url('/cardsLarge_tilemap_packed.png');
+}
+
+body {
+  width: 100vw;
+  height: 100vh;
+  padding: 0;
+  margin: 0;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+}
