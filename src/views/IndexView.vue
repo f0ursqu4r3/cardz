@@ -1,237 +1,264 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import Card from '@/components/CardComp.vue'
-
-type CardData = {
-  id: number
-  col: number
-  row: number
-  x: number
-  y: number
-  isInDeck: boolean
-}
+import { useCardStore } from '@/stores/cards'
+import { useDrag } from '@/composables/useDrag'
+import { useHover } from '@/composables/useHover'
+import type { DragTarget } from '@/types'
 
 const canvasRef = ref<HTMLElement | null>(null)
 const deckRef = ref<HTMLElement | null>(null)
-const cards = ref<CardData[]>([])
-const activeIndex = ref<number | null>(null)
-const deckOrder = ref<number[]>([])
-const dragState = {
-  pointerId: null as number | null,
-  offsetX: 0,
-  offsetY: 0,
-  pendingX: 0,
-  pendingY: 0,
-  rafId: 0,
-}
 
-const createCards = (count = 10) => {
-  const rect = canvasRef.value?.getBoundingClientRect()
-  const maxLeft = Math.max(0, (rect?.width ?? window.innerWidth) - 100)
-  const maxTop = Math.max(0, (rect?.height ?? window.innerHeight) - 150)
+const cardStore = useCardStore()
+const drag = useDrag()
+const hover = useHover()
 
-  cards.value = Array.from({ length: count }, (_, i) => ({
-    id: i + 1,
-    col: Math.floor(Math.random() * 5),
-    row: Math.floor(Math.random() * 5),
-    x: Math.random() * maxLeft,
-    y: Math.random() * maxTop,
-    isInDeck: false,
-  }))
-}
-
-const getCanvasPoint = (event: PointerEvent) => {
-  const rect = canvasRef.value?.getBoundingClientRect()
-  const x = rect ? event.clientX - rect.left : event.clientX
-  const y = rect ? event.clientY - rect.top : event.clientY
-
-  return { x, y }
-}
-
-const deckAnchor = () => {
+// Deck anchor helper
+const getDeckAnchor = (): { x: number; y: number } | null => {
   const deckRect = deckRef.value?.getBoundingClientRect()
   const canvasRect = canvasRef.value?.getBoundingClientRect()
-  if (!deckRect || !canvasRect) {
-    return null
-  }
-
+  if (!deckRect || !canvasRect) return null
   return {
     x: deckRect.left - canvasRect.left + 8,
     y: deckRect.top - canvasRect.top + 8,
   }
 }
 
-const updateDeckPositions = () => {
-  const anchor = deckAnchor()
-  if (!anchor) {
-    return
-  }
+// Computed z-index for cards
+const getCardZ = (index: number) => {
+  const card = cardStore.cards[index]
+  if (!card) return 0
 
-  deckOrder.value.forEach((id, idx) => {
-    const card = cards.value.find((item) => item.id === id)
-    if (!card) {
-      return
-    }
+  const draggingStackId = drag.target.value?.type === 'stack' ? drag.target.value.stackId : null
 
-    card.isInDeck = true
-    card.x = anchor.x + idx * 1.5
-    card.y = anchor.y + idx * 2
-  })
+  return cardStore.cardZ(card, index, drag.activeIndex.value, draggingStackId)
 }
 
-const removeFromDeck = (id: number) => {
-  const card = cards.value.find((item) => item.id === id)
-  if (card) {
-    card.isInDeck = false
-  }
-
-  deckOrder.value = deckOrder.value.filter((value) => value !== id)
-  updateDeckPositions()
-}
-
-const addToDeck = (id: number) => {
-  removeFromDeck(id)
-  deckOrder.value.push(id)
-  updateDeckPositions()
-}
-
-const isInDeckArea = (event: PointerEvent) => {
-  const rect = deckRef.value?.getBoundingClientRect()
-  if (!rect) {
-    return false
-  }
-
-  return (
-    event.clientX >= rect.left &&
-    event.clientX <= rect.right &&
-    event.clientY >= rect.top &&
-    event.clientY <= rect.bottom
-  )
-}
-
-const deckLayer = (id: number) => {
-  const idx = deckOrder.value.indexOf(id)
-  return idx === -1 ? 10 : 500 + idx
-}
-
+// Apply pending position during drag
 const applyPendingPosition = () => {
-  const index = activeIndex.value
-  if (index === null) {
+  if (!drag.isDragging.value || !drag.target.value) return
+
+  const { x, y } = drag.getDelta()
+
+  if (drag.target.value.type === 'stack') {
+    const stackId = drag.target.value.stackId
+    const stack = cardStore.stacks.find((item) => item.id === stackId)
+    if (!stack) return
+
+    stack.anchorX = x
+    stack.anchorY = y
+    cardStore.updateStackPositions(stack, getDeckAnchor)
     return
   }
 
-  const card = cards.value[index]
-  if (!card) {
-    return
-  }
+  const card = cardStore.cards[drag.target.value.index]
+  if (!card) return
 
-  card.x = dragState.pendingX - dragState.offsetX
-  card.y = dragState.pendingY - dragState.offsetY
+  card.x = x
+  card.y = y
 }
 
-const schedulePositionUpdate = () => {
-  if (dragState.rafId) {
-    return
-  }
+// Start dragging a stack (long press)
+const startStackDrag = (index: number) => {
+  if (drag.isDragging.value) return
 
-  dragState.rafId = window.requestAnimationFrame(() => {
-    dragState.rafId = 0
-    applyPendingPosition()
-  })
+  const card = cardStore.cards[index]
+  if (!card || card.stackId === null) return
+
+  const stack = cardStore.stacks.find((item) => item.id === card.stackId)
+  if (!stack) return
+
+  const { x, y } = drag.getPending()
+  const target: DragTarget = { type: 'stack', stackId: stack.id, index }
+
+  drag.target.value = target
+  drag.activeIndex.value = index
+  drag.isDragging.value = true
+
+  // Calculate offset from stack anchor
+  const offsetX = x - stack.anchorX
+  const offsetY = y - stack.anchorY
+
+  // Manually set internal state for offset
+  drag.startDrag(
+    { pointerId: 0, clientX: x, clientY: y } as PointerEvent,
+    index,
+    stack.anchorX,
+    stack.anchorY,
+    canvasRef,
+    target,
+  )
+
+  hover.reset()
+  drag.schedulePositionUpdate(applyPendingPosition)
 }
 
+// Start dragging a single card
+const startCardDrag = (index: number): boolean => {
+  if (drag.isDragging.value) return false
+
+  const card = cardStore.cards[index]
+  if (!card) return false
+
+  // If card is in a stack, only allow dragging from top
+  if (card.stackId !== null) {
+    const stack = cardStore.stacks.find((item) => item.id === card.stackId)
+    if (!stack) return false
+
+    const topId = stack.cardIds[stack.cardIds.length - 1]
+    if (topId !== card.id) return false
+
+    cardStore.removeFromStack(card.id)
+  }
+
+  const { x, y } = drag.getPending()
+  const target: DragTarget = { type: 'card', index }
+
+  drag.startDrag(
+    { pointerId: 0, clientX: x, clientY: y } as PointerEvent,
+    index,
+    card.x,
+    card.y,
+    canvasRef,
+    target,
+  )
+
+  hover.reset()
+  drag.schedulePositionUpdate(applyPendingPosition)
+  return true
+}
+
+// Pointer event handlers
 const onCardPointerDown = (event: PointerEvent, index: number) => {
-  if (event.button !== 0) {
-    return
-  }
+  if (event.button !== 0) return
 
   event.preventDefault()
-  const target = event.currentTarget as HTMLElement | null
-  target?.setPointerCapture(event.pointerId)
+  const targetEl = event.currentTarget as HTMLElement | null
+  targetEl?.setPointerCapture(event.pointerId)
 
-  const card = cards.value[index]
-  if (!card) {
-    return
+  drag.initPointer(event, canvasRef)
+
+  const card = cardStore.cards[index]
+  if (card && card.stackId !== null) {
+    drag.setLongPressTimer(() => startStackDrag(index))
+  } else {
+    startCardDrag(index)
   }
-
-  if (card.isInDeck) {
-    const deckIdx = deckOrder.value.indexOf(card.id)
-    if (deckIdx !== deckOrder.value.length - 1) {
-      return
-    }
-
-    removeFromDeck(card.id)
-  }
-
-  const { x, y } = getCanvasPoint(event)
-  activeIndex.value = index
-  dragState.pointerId = event.pointerId
-  dragState.offsetX = x - card.x
-  dragState.offsetY = y - card.y
-  dragState.pendingX = x
-  dragState.pendingY = y
-  schedulePositionUpdate()
 }
 
 const onCardPointerMove = (event: PointerEvent) => {
-  if (event.pointerId !== dragState.pointerId || activeIndex.value === null) {
-    return
-  }
+  if (!drag.isValidPointer(event.pointerId)) return
 
-  const { x, y } = getCanvasPoint(event)
-  dragState.pendingX = x
-  dragState.pendingY = y
-  schedulePositionUpdate()
-}
+  drag.updatePending(event, canvasRef)
 
-const onCardPointerUp = (event: PointerEvent) => {
-  if (event.pointerId !== dragState.pointerId) {
-    return
-  }
-
-  const target = event.currentTarget as HTMLElement | null
-  target?.releasePointerCapture(event.pointerId)
-
-  applyPendingPosition()
-  if (activeIndex.value !== null) {
-    const card = cards.value[activeIndex.value]
-    if (card && isInDeckArea(event)) {
-      addToDeck(card.id)
+  // Try to start card drag if not already dragging
+  if (!drag.isDragging.value && drag.activeIndex.value !== null) {
+    const card = cardStore.cards[drag.activeIndex.value]
+    if (card && card.stackId !== null) {
+      if (startCardDrag(drag.activeIndex.value)) {
+        drag.clearLongPressTimer()
+      }
     }
   }
 
-  activeIndex.value = null
-  dragState.pointerId = null
+  if (!drag.isDragging.value) return
 
-  if (dragState.rafId) {
-    window.cancelAnimationFrame(dragState.rafId)
-    dragState.rafId = 0
+  // Update hover target for card drags
+  if (drag.target.value?.type === 'card') {
+    const draggingId =
+      drag.activeIndex.value !== null ? (cardStore.cards[drag.activeIndex.value]?.id ?? -1) : -1
+    const { x, y } = drag.getPending()
+    hover.update(x, y, cardStore.cards, draggingId, (card, idx) =>
+      cardStore.cardZ(card, idx, drag.activeIndex.value, null),
+    )
   }
+
+  drag.schedulePositionUpdate(applyPendingPosition)
+}
+
+const onCardPointerUp = (event: PointerEvent) => {
+  if (!drag.isValidPointer(event.pointerId)) return
+
+  const targetEl = event.currentTarget as HTMLElement | null
+  targetEl?.releasePointerCapture(event.pointerId)
+
+  drag.clearLongPressTimer()
+
+  if (!drag.isDragging.value) {
+    drag.reset()
+    hover.reset()
+    return
+  }
+
+  applyPendingPosition()
+
+  // Handle stack drop
+  if (drag.target.value?.type === 'stack') {
+    if (drag.isInBounds(event, deckRef)) {
+      const stackId = drag.target.value.stackId
+      const stack = cardStore.stacks.find((item) => item.id === stackId)
+      if (stack) {
+        const ids = [...stack.cardIds]
+        ids.forEach((id) => cardStore.addToDeckZone(id, getDeckAnchor))
+      }
+    }
+  }
+  // Handle card drop
+  else if (drag.activeIndex.value !== null) {
+    const card = cardStore.cards[drag.activeIndex.value]
+    if (card) {
+      let stacked = false
+
+      // Try to stack on hover target
+      if (hover.state.ready && hover.state.cardId) {
+        stacked = cardStore.stackCardOnTarget(card.id, hover.state.cardId)
+      }
+
+      // Try to add to deck zone
+      if (!stacked && drag.isInBounds(event, deckRef)) {
+        stacked = cardStore.addToDeckZone(card.id, getDeckAnchor)
+      }
+
+      // Reset card state if not stacked
+      if (!stacked) {
+        card.stackId = null
+        card.isInDeck = false
+        cardStore.bumpCardZ(card.id)
+      }
+    }
+  }
+
+  drag.reset()
+  hover.reset()
+  cardStore.updateAllStacks(getDeckAnchor)
 }
 
 onMounted(() => {
-  createCards()
-  updateDeckPositions()
+  const rect = canvasRef.value?.getBoundingClientRect()
+  cardStore.createCards(10, rect?.width, rect?.height)
+  cardStore.updateAllStacks(getDeckAnchor)
 })
 
 onBeforeUnmount(() => {
-  if (dragState.rafId) {
-    window.cancelAnimationFrame(dragState.rafId)
-  }
+  drag.cancelRaf()
 })
 </script>
 
 <template>
   <div ref="canvasRef" class="canvas">
     <Card
-      v-for="(card, index) in cards"
+      v-for="(card, index) in cardStore.cards"
       :key="card.id"
-      :class="{ dragging: activeIndex === index, 'in-deck': card.isInDeck }"
+      :class="{
+        dragging: drag.activeIndex.value === index,
+        'in-deck': card.isInDeck,
+        'stack-target': hover.state.ready && hover.state.cardId === card.id,
+      }"
       :style="{
         '--col': card.col,
         '--row': card.row,
         transform: `translate3d(${card.x}px, ${card.y}px, 0)`,
-        zIndex: activeIndex === index ? 1200 : deckLayer(card.id),
+        zIndex: getCardZ(index),
       }"
       @pointerdown="onCardPointerDown($event, index)"
       @pointermove="onCardPointerMove"
@@ -241,7 +268,7 @@ onBeforeUnmount(() => {
 
     <div ref="deckRef" class="deck" aria-hidden="true">
       <span class="deck__label">Deck</span>
-      <span class="deck__count">{{ deckOrder.length }}</span>
+      <span class="deck__count">{{ cardStore.deckCount }}</span>
     </div>
   </div>
 </template>
@@ -250,7 +277,14 @@ onBeforeUnmount(() => {
 .canvas {
   width: 100%;
   height: 100%;
-  background-color: green;
+  background:
+    radial-gradient(1200px 800px at 30% 25%, rgba(255, 255, 255, 0.08), transparent 55%),
+    radial-gradient(900px 700px at 70% 75%, rgba(0, 0, 0, 0.25), transparent 60%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.02) 0 2px, rgba(0, 0, 0, 0.02) 2px 4px),
+    linear-gradient(180deg, #1f7a3a 0%, #0f4f27 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.06),
+    inset 0 0 80px rgba(0, 0, 0, 0.35);
   position: relative;
   overflow: hidden;
   user-select: none;
@@ -285,5 +319,11 @@ onBeforeUnmount(() => {
 .deck__count {
   font-weight: 700;
   font-size: 14px;
+}
+
+.stack-target {
+  outline: 2px solid rgba(255, 255, 0, 0.9);
+  outline-offset: 2px;
+  box-shadow: 0 0 6px rgba(255, 255, 0, 0.7);
 }
 </style>

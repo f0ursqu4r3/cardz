@@ -20,7 +20,7 @@
   cursor: grab;
   will-change: transform;
 
-  box-shadow: 2px 2px 2px rgba(0, 0, 0, 0.5);
+  box-shadow: 0px 1px 6px rgba(0, 0, 0, 0.25);
 }
 
 .card.dragging {
