@@ -65,14 +65,20 @@ A designated drop target for organizing cards.
 
 ### Input Methods
 
-| Action           | Mouse                 | Touch                 | Result               |
-| ---------------- | --------------------- | --------------------- | -------------------- |
-| **Move Card**    | Left-click + drag     | Tap + drag            | Drag single card     |
-| **Move Stack**   | Right-click + drag    | Long press + drag     | Drag entire stack    |
-| **Create Stack** | Hover 250ms + release | Hover 250ms + release | Form stack at target |
-| **Add to Stack** | Drop on stack         | Drop on stack         | Instant add to top   |
-| **Flip Card**    | Double-click          | Double-tap            | Toggle face up/down  |
-| **Flip Stack**   | Right double-click    | —                     | Toggle all in stack  |
+| Action              | Mouse                   | Touch                   | Result                       |
+| ------------------- | ----------------------- | ----------------------- | ---------------------------- |
+| **Move Card**       | Left-click + drag       | Tap + drag              | Drag single card             |
+| **Move Stack**      | Right-click + drag      | Long press + drag       | Drag entire stack            |
+| **Create Stack**    | Hover 250ms + release   | Hover 250ms + release   | Form stack at target         |
+| **Add to Stack**    | Drop on stack           | Drop on stack           | Instant add to top           |
+| **Flip Card**       | Double-click            | Double-tap              | Toggle face up/down          |
+| **Flip Stack**      | Right double-click      | —                       | Toggle all in stack          |
+| **Toggle Select**   | Ctrl+click              | Two-finger tap          | Add/remove from selection    |
+| **Move Selection**  | Drag any selected card  | Drag any selected card  | Move all selected together   |
+| **Clear Selection** | Click unselected/canvas | Tap unselected/canvas   | Deselect all                 |
+| **Shake to Stack**  | Shake selection rapidly | Shake selection rapidly | Combine selection into stack |
+
+> **Note:** Multi-select only works on free cards (not cards in stacks).
 
 ### Card → Canvas
 
@@ -132,16 +138,19 @@ Cards are rendered with the following z-index priority (highest on top):
 
 ## Constants
 
-| Name             | Value | Description                                   |
-| ---------------- | ----- | --------------------------------------------- |
-| `CARD_W`         | `42`  | Card width in pixels                          |
-| `CARD_H`         | `60`  | Card height in pixels                         |
-| `STACK_HOVER_MS` | `250` | Time to hover before stack-ready (ms)         |
-| `LONG_PRESS_MS`  | `500` | Time to hold before stack drag initiates (ms) |
-| `STACK_OFFSET_X` | `1.5` | Horizontal offset per card in stack (px)      |
-| `STACK_OFFSET_Y` | `2`   | Vertical offset per card in stack (px)        |
-| `CARD_BACK_COL`  | `6`   | Tilemap column for card back sprite           |
-| `CARD_BACK_ROW`  | `4`   | Tilemap row for card back sprite              |
+| Name              | Value | Description                                   |
+| ----------------- | ----- | --------------------------------------------- |
+| `CARD_W`          | `42`  | Card width in pixels                          |
+| `CARD_H`          | `60`  | Card height in pixels                         |
+| `STACK_HOVER_MS`  | `250` | Time to hover before stack-ready (ms)         |
+| `LONG_PRESS_MS`   | `500` | Time to hold before stack drag initiates (ms) |
+| `STACK_OFFSET_X`  | `0`   | Horizontal offset per card in stack (px)      |
+| `STACK_OFFSET_Y`  | `-1`  | Vertical offset per card in stack (px)        |
+| `CARD_BACK_COL`   | `13`  | Tilemap column for card back sprite           |
+| `CARD_BACK_ROW`   | `1`   | Tilemap row for card back sprite              |
+| `SHAKE_THRESHOLD` | `15`  | Min movement (px) to register direction       |
+| `SHAKE_REVERSALS` | `3`   | Direction changes needed to trigger shake     |
+| `SHAKE_WINDOW_MS` | `500` | Time window for shake detection (ms)          |
 
 ---
 
@@ -156,6 +165,7 @@ Cards are rendered with the following z-index priority (highest on top):
 | In Stack     | `.in-deck`      | Part of a stack                               |
 | Stack Target | `.stack-target` | Yellow outline + glow (hover-ready indicator) |
 | Face Down    | `.face-down`    | Shows card back sprite                        |
+| Selected     | `.selected`     | Blue outline + glow                           |
 
 ---
 

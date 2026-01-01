@@ -7,6 +7,7 @@ export const useCardStore = defineStore('cards', () => {
   const cards = ref<CardData[]>([])
   const stacks = ref<Stack[]>([])
   const deckStackId = ref<number | null>(null)
+  const selectedIds = ref<Set<number>>(new Set())
 
   let nextStackId = 1
   let zCounter = 100
@@ -213,12 +214,81 @@ export const useCardStore = defineStore('cards', () => {
     })
   }
 
+  // Selection management
+  const isSelected = (cardId: number) => selectedIds.value.has(cardId)
+
+  const toggleSelect = (cardId: number) => {
+    if (selectedIds.value.has(cardId)) {
+      selectedIds.value.delete(cardId)
+    } else {
+      // Only allow selecting free cards (not in stacks)
+      const card = cards.value.find((c) => c.id === cardId)
+      if (card && card.stackId === null) {
+        selectedIds.value.add(cardId)
+      }
+    }
+  }
+
+  const clearSelection = () => {
+    selectedIds.value.clear()
+  }
+
+  const hasSelection = computed(() => selectedIds.value.size > 0)
+
+  const selectionCount = computed(() => selectedIds.value.size)
+
+  // Move all selected cards by delta
+  const moveSelection = (deltaX: number, deltaY: number) => {
+    selectedIds.value.forEach((id) => {
+      const card = cards.value.find((c) => c.id === id)
+      if (card) {
+        card.x += deltaX
+        card.y += deltaY
+      }
+    })
+  }
+
+  // Bump z-index of all selected cards
+  const bumpSelectionZ = () => {
+    selectedIds.value.forEach((id) => {
+      const card = cards.value.find((c) => c.id === id)
+      if (card) {
+        card.z = ++zCounter
+      }
+    })
+  }
+
+  // Get selected card IDs as array
+  const getSelectedIds = () => Array.from(selectedIds.value)
+
+  // Stack all selected cards at a position
+  const stackSelection = (anchorX: number, anchorY: number) => {
+    if (selectedIds.value.size < 2) return null
+
+    const stack = createStackAt(anchorX, anchorY, 'free')
+    const ids = Array.from(selectedIds.value)
+
+    ids.forEach((id) => {
+      const card = cards.value.find((c) => c.id === id)
+      if (card) {
+        stack.cardIds.push(id)
+        card.stackId = stack.id
+        card.isInDeck = true
+      }
+    })
+
+    updateStackPositions(stack)
+    clearSelection()
+    return stack
+  }
+
   return {
     cards,
     stacks,
     deckStackId,
     deckStack,
     deckCount,
+    selectedIds,
     createCards,
     updateStackPositions,
     updateAllStacks,
@@ -232,5 +302,14 @@ export const useCardStore = defineStore('cards', () => {
     bumpCardZ,
     flipCard,
     flipStack,
+    isSelected,
+    toggleSelect,
+    clearSelection,
+    hasSelection,
+    selectionCount,
+    moveSelection,
+    bumpSelectionZ,
+    getSelectedIds,
+    stackSelection,
   }
 })

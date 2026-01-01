@@ -4,6 +4,7 @@ import Card from '@/components/CardComp.vue'
 import { useCardStore } from '@/stores/cards'
 import { useDrag } from '@/composables/useDrag'
 import { useHover } from '@/composables/useHover'
+import { useShake } from '@/composables/useShake'
 import type { DragTarget } from '@/types'
 import { CARD_BACK_COL, CARD_BACK_ROW } from '@/types'
 
@@ -13,6 +14,7 @@ const deckRef = ref<HTMLElement | null>(null)
 const cardStore = useCardStore()
 const drag = useDrag()
 const hover = useHover()
+const shake = useShake()
 
 // Deck anchor helper
 const getDeckAnchor = (): { x: number; y: number } | null => {
@@ -49,6 +51,24 @@ const applyPendingPosition = () => {
     stack.anchorX = x
     stack.anchorY = y
     cardStore.updateStackPositions(stack, getDeckAnchor)
+    return
+  }
+
+  if (drag.target.value.type === 'selection') {
+    // Move all selected cards relative to their start positions
+    const { x: currentX, y: currentY } = drag.getPending()
+    if (!selectionDragStart.value) return
+
+    const deltaX = currentX - selectionDragStart.value.x
+    const deltaY = currentY - selectionDragStart.value.y
+
+    selectionStartPositions.value.forEach((startPos, id) => {
+      const card = cardStore.cards.find((c) => c.id === id)
+      if (card) {
+        card.x = startPos.x + deltaX
+        card.y = startPos.y + deltaY
+      }
+    })
     return
   }
 
@@ -129,6 +149,43 @@ const startCardDrag = (index: number): boolean => {
   return true
 }
 
+// Start dragging multiple selected cards
+const startSelectionDrag = (index: number): boolean => {
+  if (drag.isDragging.value) return false
+
+  const card = cardStore.cards[index]
+  if (!card) return false
+
+  const { x, y } = drag.getPending()
+  const target: DragTarget = { type: 'selection' }
+
+  drag.startDrag(
+    { pointerId: 0, clientX: x, clientY: y } as PointerEvent,
+    index,
+    card.x,
+    card.y,
+    canvasRef,
+    target,
+  )
+
+  // Store initial positions for all selected cards
+  selectionStartPositions.value = new Map()
+  cardStore.getSelectedIds().forEach((id) => {
+    const c = cardStore.cards.find((card) => card.id === id)
+    if (c) {
+      selectionStartPositions.value.set(id, { x: c.x, y: c.y })
+    }
+  })
+
+  hover.reset()
+  drag.schedulePositionUpdate(applyPendingPosition)
+  return true
+}
+
+// Track selection start positions for smooth dragging
+const selectionStartPositions = ref<Map<number, { x: number; y: number }>>(new Map())
+const selectionDragStart = ref<{ x: number; y: number } | null>(null)
+
 // Pointer event handlers
 const onCardPointerDown = (event: PointerEvent, index: number) => {
   // Left-click (0) or right-click (2) only
@@ -143,6 +200,30 @@ const onCardPointerDown = (event: PointerEvent, index: number) => {
 
   const card = cardStore.cards[index]
   const isInStack = card && card.stackId !== null
+
+  // Ctrl+click (mouse) or two-finger tap detection for selection toggle
+  // For touch: we detect multi-touch via event.isPrimary being false or checking touches
+  const isMultiTouch = !event.isPrimary
+  const isCtrlClick = event.ctrlKey || event.metaKey
+
+  if ((isCtrlClick || isMultiTouch) && !isInStack && event.button === 0 && card) {
+    // Toggle selection
+    cardStore.toggleSelect(card.id)
+    return
+  }
+
+  // If clicking on a selected card, drag the entire selection
+  if (card && cardStore.isSelected(card.id) && event.button === 0) {
+    const { x, y } = drag.getPending()
+    selectionDragStart.value = { x, y }
+    startSelectionDrag(index)
+    return
+  }
+
+  // Clicking on unselected card clears selection (unless Ctrl held)
+  if (!isCtrlClick && cardStore.hasSelection) {
+    cardStore.clearSelection()
+  }
 
   // Right-click on stacked card = immediate stack drag
   if (event.button === 2 && isInStack) {
@@ -207,6 +288,25 @@ const onCardPointerMove = (event: PointerEvent) => {
 
   if (!drag.isDragging.value) return
 
+  // Detect shake gesture during selection drag
+  if (drag.target.value?.type === 'selection') {
+    const { x, y } = drag.getPending()
+    if (shake.update(x, y)) {
+      // Shake detected! Stack the selection at current position
+      const anchorCard = cardStore.cards[drag.activeIndex.value!]
+      if (anchorCard) {
+        cardStore.stackSelection(anchorCard.x, anchorCard.y)
+        // Clean up drag state
+        selectionStartPositions.value.clear()
+        selectionDragStart.value = null
+        drag.reset()
+        shake.reset()
+        cardStore.updateAllStacks(getDeckAnchor)
+        return
+      }
+    }
+  }
+
   // Update hover target for card drags
   if (drag.target.value?.type === 'card') {
     const draggingId =
@@ -247,6 +347,22 @@ const onCardPointerUp = (event: PointerEvent) => {
       }
     }
   }
+  // Handle selection drop
+  else if (drag.target.value?.type === 'selection') {
+    // If dropped on deck zone, add all selected to deck
+    if (drag.isInBounds(event, deckRef)) {
+      cardStore.getSelectedIds().forEach((id) => {
+        cardStore.addToDeckZone(id, getDeckAnchor)
+      })
+      cardStore.clearSelection()
+    } else {
+      // Bump z-index of all selected cards
+      cardStore.bumpSelectionZ()
+    }
+    selectionStartPositions.value.clear()
+    selectionDragStart.value = null
+    shake.reset()
+  }
   // Handle card drop
   else if (drag.activeIndex.value !== null) {
     const card = cardStore.cards[drag.activeIndex.value]
@@ -274,6 +390,7 @@ const onCardPointerUp = (event: PointerEvent) => {
 
   drag.reset()
   hover.reset()
+  shake.reset()
   cardStore.updateAllStacks(getDeckAnchor)
 }
 
@@ -298,6 +415,7 @@ onBeforeUnmount(() => {
         'in-deck': card.isInDeck,
         'stack-target': hover.state.ready && hover.state.cardId === card.id,
         'face-down': !card.faceUp,
+        selected: cardStore.isSelected(card.id),
       }"
       :style="{
         '--col': getCardCol(index),
@@ -316,6 +434,11 @@ onBeforeUnmount(() => {
     <div ref="deckRef" class="deck" aria-hidden="true">
       <span class="deck__label">Deck</span>
       <span class="deck__count">{{ cardStore.deckCount }}</span>
+    </div>
+
+    <!-- Selection count indicator -->
+    <div v-if="cardStore.hasSelection" class="selection-indicator">
+      {{ cardStore.selectionCount }} selected
     </div>
   </div>
 </template>
@@ -372,5 +495,24 @@ onBeforeUnmount(() => {
   outline: 2px solid rgba(255, 255, 0, 0.9);
   outline-offset: 2px;
   box-shadow: 0 0 6px rgba(255, 255, 0, 0.7);
+}
+
+.selected {
+  outline: 2px solid rgba(0, 150, 255, 0.9);
+  outline-offset: 1px;
+  box-shadow: 0 0 8px rgba(0, 150, 255, 0.6);
+}
+
+.selection-indicator {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  pointer-events: none;
 }
 </style>
