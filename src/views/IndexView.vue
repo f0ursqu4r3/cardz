@@ -137,6 +137,7 @@ const onCardPointerDown = (event: PointerEvent, index: number) => {
   targetEl?.setPointerCapture(event.pointerId)
 
   drag.initPointer(event, canvasRef)
+  drag.activeIndex.value = index
 
   const card = cardStore.cards[index]
   if (card && card.stackId !== null) {

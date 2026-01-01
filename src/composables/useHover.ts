@@ -32,7 +32,8 @@ export function useHover() {
     if (state.cardId !== hit.card.id) {
       state.cardId = hit.card.id
       state.startedAt = performance.now()
-      state.ready = false
+      // Instant ready if target is already in a stack, otherwise wait for timer
+      state.ready = hit.card.stackId !== null
       return
     }
 

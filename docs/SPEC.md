@@ -78,11 +78,11 @@ A designated drop target for organizing cards.
 
 ### Card → Stack
 
-| Action           | Trigger                         | Result                                |
-| ---------------- | ------------------------------- | ------------------------------------- |
-| **Pull Top**     | Drag card that is top of stack  | Card removed from stack, becomes free |
-| **Pull Middle**  | Drag card not on top            | Blocked — only top card can be pulled |
-| **Add to Stack** | Hover + release on stacked card | Card added to top of existing stack   |
+| Action           | Trigger                        | Result                                       |
+| ---------------- | ------------------------------ | -------------------------------------------- |
+| **Pull Top**     | Drag card that is top of stack | Card removed from stack, becomes free        |
+| **Pull Middle**  | Drag card not on top           | Blocked — only top card can be pulled        |
+| **Add to Stack** | Release card over stacked card | Card added to top instantly (no hover delay) |
 
 ### Card → Deck Zone
 
