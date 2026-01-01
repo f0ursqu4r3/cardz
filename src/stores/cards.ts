@@ -33,6 +33,7 @@ export const useCardStore = defineStore('cards', () => {
       isInDeck: false,
       stackId: null,
       z: zCounter++,
+      faceUp: true,
     }))
   }
 
@@ -192,6 +193,26 @@ export const useCardStore = defineStore('cards', () => {
     }
   }
 
+  // Flip a single card
+  const flipCard = (cardId: number) => {
+    const card = cards.value.find((c) => c.id === cardId)
+    if (card) {
+      card.faceUp = !card.faceUp
+    }
+  }
+
+  // Flip all cards in a stack
+  const flipStack = (stackId: number) => {
+    const stack = stacks.value.find((s) => s.id === stackId)
+    if (!stack) return
+    stack.cardIds.forEach((id) => {
+      const card = cards.value.find((c) => c.id === id)
+      if (card) {
+        card.faceUp = !card.faceUp
+      }
+    })
+  }
+
   return {
     cards,
     stacks,
@@ -209,5 +230,7 @@ export const useCardStore = defineStore('cards', () => {
     addToDeckZone,
     cardZ,
     bumpCardZ,
+    flipCard,
+    flipStack,
   }
 })

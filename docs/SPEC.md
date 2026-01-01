@@ -62,6 +62,15 @@ A designated drop target for organizing cards.
 
 ## Interactions
 
+### Input Methods
+
+| Action           | Mouse                 | Touch                 | Result               |
+| ---------------- | --------------------- | --------------------- | -------------------- |
+| **Move Card**    | Left-click + drag     | Tap + drag            | Drag single card     |
+| **Move Stack**   | Right-click + drag    | Long press + drag     | Drag entire stack    |
+| **Create Stack** | Hover 250ms + release | Hover 250ms + release | Form stack at target |
+| **Add to Stack** | Drop on stack         | Drop on stack         | Instant add to top   |
+
 ### Card → Canvas
 
 | Action   | Trigger              | Result                                       |
@@ -80,7 +89,7 @@ A designated drop target for organizing cards.
 
 | Action           | Trigger                        | Result                                       |
 | ---------------- | ------------------------------ | -------------------------------------------- |
-| **Pull Top**     | Drag card that is top of stack | Card removed from stack, becomes free        |
+| **Pull Top**     | Left-click/tap + drag top card | Card removed from stack, becomes free        |
 | **Pull Middle**  | Drag card not on top           | Blocked — only top card can be pulled        |
 | **Add to Stack** | Release card over stacked card | Card added to top instantly (no hover delay) |
 
@@ -92,10 +101,10 @@ A designated drop target for organizing cards.
 
 ### Stack → Canvas
 
-| Action         | Trigger                                              | Result                                |
-| -------------- | ---------------------------------------------------- | ------------------------------------- |
-| **Drag Stack** | Long press (`LONG_PRESS_MS` = 500ms) on stacked card | Entire stack follows pointer          |
-| **Drop Stack** | Release on canvas                                    | Stack anchor updated to drop position |
+| Action         | Trigger                                                       | Result                                |
+| -------------- | ------------------------------------------------------------- | ------------------------------------- |
+| **Drag Stack** | Right-click + drag (mouse) OR long press 500ms + drag (touch) | Entire stack follows pointer          |
+| **Drop Stack** | Release on canvas                                             | Stack anchor updated to drop position |
 
 ### Stack → Deck Zone
 
@@ -149,13 +158,17 @@ Cards are rendered with the following z-index priority (highest on top):
 ```mermaid
 flowchart TD
     subgraph DOWN["POINTER DOWN"]
-        D1[Pointer down on card] --> D2{Card in stack?}
-        D2 -->|Yes| D3[Start long-press timer]
-        D2 -->|No| D4[Start CARD DRAG]
-        D3 --> D5{Timer fires?}
-        D5 -->|Yes| D6[Start STACK DRAG]
-        D5 -->|No - moved| D7[Cancel timer]
-        D7 --> D4
+        D1[Pointer down on card] --> D2{Button type?}
+        D2 -->|Right-click| D3{Card in stack?}
+        D3 -->|Yes| D4[Start STACK DRAG]
+        D3 -->|No| D5[Ignore]
+        D2 -->|Left-click| D6{Card in stack?}
+        D6 -->|Yes| D7[Start long-press timer]
+        D6 -->|No| D8[Start CARD DRAG]
+        D7 --> D9{Timer fires?}
+        D9 -->|Yes| D4
+        D9 -->|No - moved| D10[Cancel timer]
+        D10 --> D8
     end
 
     subgraph MOVE["POINTER MOVE"]

@@ -7,6 +7,7 @@ export type CardData = {
   isInDeck: boolean
   stackId: number | null
   z: number
+  faceUp: boolean
 }
 
 export type Stack = {
@@ -27,3 +28,7 @@ export const STACK_HOVER_MS = 250
 export const LONG_PRESS_MS = 500
 export const STACK_OFFSET_X = 1.5
 export const STACK_OFFSET_Y = 2
+
+// Card back sprite position in tilemap
+export const CARD_BACK_COL = 6
+export const CARD_BACK_ROW = 4

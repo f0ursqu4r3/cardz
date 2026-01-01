@@ -130,7 +130,8 @@ const startCardDrag = (index: number): boolean => {
 
 // Pointer event handlers
 const onCardPointerDown = (event: PointerEvent, index: number) => {
-  if (event.button !== 0) return
+  // Left-click (0) or right-click (2) only
+  if (event.button !== 0 && event.button !== 2) return
 
   event.preventDefault()
   const targetEl = event.currentTarget as HTMLElement | null
@@ -140,11 +141,25 @@ const onCardPointerDown = (event: PointerEvent, index: number) => {
   drag.activeIndex.value = index
 
   const card = cardStore.cards[index]
-  if (card && card.stackId !== null) {
+  const isInStack = card && card.stackId !== null
+
+  // Right-click on stacked card = immediate stack drag
+  if (event.button === 2 && isInStack) {
+    startStackDrag(index)
+    return
+  }
+
+  // Left-click on stacked card = long-press for stack, move for card
+  if (isInStack) {
     drag.setLongPressTimer(() => startStackDrag(index))
   } else {
     startCardDrag(index)
   }
+}
+
+// Prevent context menu on right-click drag
+const onCardContextMenu = (event: Event) => {
+  event.preventDefault()
 }
 
 const onCardPointerMove = (event: PointerEvent) => {
@@ -265,6 +280,7 @@ onBeforeUnmount(() => {
       @pointermove="onCardPointerMove"
       @pointerup="onCardPointerUp"
       @pointercancel="onCardPointerUp"
+      @contextmenu="onCardContextMenu"
     />
 
     <div ref="deckRef" class="deck" aria-hidden="true">
