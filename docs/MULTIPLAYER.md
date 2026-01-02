@@ -812,6 +812,101 @@ For responsive feel:
 
 ---
 
+## Recommended Tech Stack
+
+### Runtime & Framework
+
+| Component | Choice | Rationale |
+|-----------|--------|-----------|
+| **Runtime** | Bun | Faster than Node, native TypeScript, built-in test runner |
+| **WebSocket** | uWebSockets.js | C++ backed, handles 1M+ connections, used by Discord |
+| **Validation** | Zod | Runtime type checking, shared with client |
+| **State Store** | Redis | Pub/sub for scaling, fast in-memory state |
+
+### Why TypeScript
+
+1. **Shared Types** - Protocol types work on both client and server
+2. **Ecosystem Familiarity** - Same tooling as the Vue client
+3. **Monorepo Friendly** - Share validation, constants, and types
+4. **Developer Velocity** - Faster iteration than Rust with good-enough performance
+
+### Project Structure
+
+```text
+cardz/
+├── src/                    # Vue client (existing)
+├── server-src/             # Game server
+│   ├── index.ts            # Entry point, uWS setup
+│   ├── room.ts             # Room management
+│   ├── game-state.ts       # Authoritative game state
+│   ├── handlers/           # Message handlers
+│   │   ├── card.ts
+│   │   ├── stack.ts
+│   │   ├── zone.ts
+│   │   ├── hand.ts
+│   │   └── room.ts
+│   ├── validation.ts       # Zod schemas for messages
+│   └── utils/
+│       ├── broadcast.ts    # Send to room/player helpers
+│       └── locks.ts        # Lock management with TTL
+├── shared/                 # Shared between client & server
+│   └── types.ts            # Protocol types (extract from docs)
+└── package.json            # Workspace config
+```
+
+### Scaling Architecture
+
+```text
+                    Load Balancer (sticky sessions by room)
+                                    │
+         ┌──────────────────────────┼──────────────────────────┐
+         ▼                          ▼                          ▼
+    ┌─────────┐                ┌─────────┐                ┌─────────┐
+    │Server 1 │                │Server 2 │                │Server N │
+    │ Rooms   │                │ Rooms   │                │ Rooms   │
+    │ A, B, C │                │ D, E, F │                │ G, H, I │
+    └────┬────┘                └────┬────┘                └────┬────┘
+         │                          │                          │
+         └──────────────────────────┼──────────────────────────┘
+                                    ▼
+                             ┌─────────────┐
+                             │    Redis    │
+                             │   Cluster   │
+                             ├─────────────┤
+                             │ • Pub/Sub   │
+                             │ • Room list │
+                             │ • Presence  │
+                             └─────────────┘
+```
+
+### Key Dependencies
+
+```json
+{
+  "dependencies": {
+    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.44.0",
+    "zod": "^3.22.0",
+    "redis": "^4.6.0",
+    "nanoid": "^5.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "@types/bun": "latest"
+  }
+}
+```
+
+### Performance Targets
+
+| Metric | Target | Notes |
+|--------|--------|-------|
+| Connections/server | 10,000+ | With uWebSockets.js |
+| Message latency | <50ms p99 | Same-region |
+| Rooms/server | 1,000+ | ~10 players/room avg |
+| Memory/connection | ~10KB | Excluding game state |
+
+---
+
 ## Future Considerations
 
 - [ ] **Spectator Mode**: Read-only observers
