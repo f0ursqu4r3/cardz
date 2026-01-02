@@ -92,6 +92,16 @@ export const useCardStore = defineStore('cards', () => {
     getDeckAnchor?: () => { x: number; y: number } | null,
   ) => {
     removeFromStack(cardId)
+
+    // Match faceUp value of existing cards in stack
+    const card = cards.value.find((c) => c.id === cardId)
+    if (card && stack.cardIds.length > 0) {
+      const firstCardInStack = cards.value.find((c) => c.id === stack.cardIds[0])
+      if (firstCardInStack) {
+        card.faceUp = firstCardInStack.faceUp
+      }
+    }
+
     if (!stack.cardIds.includes(cardId)) {
       stack.cardIds.push(cardId)
     }

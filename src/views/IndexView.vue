@@ -96,22 +96,10 @@ const startStackDrag = (index: number) => {
   drag.activeIndex.value = index
   drag.isDragging.value = true
 
-  // Calculate offset from stack anchor
-  const offsetX = x - stack.anchorX
-  const offsetY = y - stack.anchorY
-
-  // Manually set internal state for offset
-  drag.startDrag(
-    { pointerId: 0, clientX: x, clientY: y } as PointerEvent,
-    index,
-    offsetX,
-    offsetY,
-    canvasRef,
-    target,
-  )
+  // Set offset so that getDelta() returns current stack anchor (no initial movement)
+  drag.setOffset(x - stack.anchorX, y - stack.anchorY)
 
   hover.reset()
-  drag.schedulePositionUpdate(applyPendingPosition)
 }
 
 // Start dragging a single card
@@ -250,11 +238,11 @@ const onCardDoubleClick = (event: MouseEvent, index: number) => {
   const card = cardStore.cards[index]
   if (!card) return
 
-  if (event.button === 2 && card.stackId !== null) {
-    // Right double-click on stacked card = flip entire stack
+  if (card.stackId !== null) {
+    // Double-click on stacked card = flip entire stack
     cardStore.flipStack(card.stackId)
   } else {
-    // Left double-click = flip single card (top of stack if stacked)
+    // Double-click on free card = flip single card
     cardStore.flipCard(card.id)
   }
 }
