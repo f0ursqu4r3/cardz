@@ -2,6 +2,8 @@ import { computed, ref, type Ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { CardData, Stack, Zone } from '@/types'
 import {
+  CARD_W,
+  CARD_H,
   STACK_OFFSET_X,
   STACK_OFFSET_Y,
   ZONE_DEFAULT_WIDTH,
@@ -64,12 +66,17 @@ export const useCardStore = defineStore('cards', () => {
 
   // Stack position management
   const updateStackPositions = (stack: Stack) => {
-    // If stack belongs to a zone, update anchor from zone position
+    // If stack belongs to a zone, center cards within zone
     if (stack.kind === 'zone' && stack.zoneId !== undefined) {
       const zone = zones.value.find((z) => z.id === stack.zoneId)
       if (zone) {
-        stack.anchorX = zone.x + 8
-        stack.anchorY = zone.y + 8
+        // Calculate stack dimensions
+        const cardCount = stack.cardIds.length
+        const stackWidth = CARD_W + Math.max(0, cardCount - 1) * STACK_OFFSET_X
+        const stackHeight = CARD_H + Math.max(0, cardCount - 1) * Math.abs(STACK_OFFSET_Y)
+        // Center the stack within the zone
+        stack.anchorX = zone.x + (zone.width - stackWidth) / 2
+        stack.anchorY = zone.y + (zone.height - stackHeight) / 2
       }
     }
 
