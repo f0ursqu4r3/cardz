@@ -29,8 +29,10 @@ const handDragCard = computed(() => {
 
 // Check if ghost card is in reorder mode (inside hand zone)
 const isHandReordering = computed(() => {
-  return handCompRef.value?.handDropTargetIndex !== null &&
+  return (
+    handCompRef.value?.handDropTargetIndex !== null &&
     handCompRef.value?.handDragStartIndex !== null
+  )
 })
 
 const handDragPosition = computed(() => interaction.drag.position.value)
