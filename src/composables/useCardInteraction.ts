@@ -3,19 +3,17 @@ import { useCardStore } from '@/stores/cards'
 import { useDrag } from '@/composables/useDrag'
 import { useHover } from '@/composables/useHover'
 import { useShake } from '@/composables/useShake'
-import type { DragTarget } from '@/types'
-import { CARD_BACK_COL, CARD_BACK_ROW } from '@/types'
+import type { DragTarget, Zone } from '@/types'
+import { CARD_BACK_COL, CARD_BACK_ROW, CARD_W, CARD_H } from '@/types'
 
 interface CardInteractionOptions {
   onHandCardDrop?: (event: PointerEvent) => boolean
   addToHand?: (event: PointerEvent, cardId: number) => boolean
   handRef?: Ref<HTMLElement | null>
-  deckRef?: Ref<HTMLElement | null>
 }
 
 export function useCardInteraction(options: CardInteractionOptions = {}) {
   const canvasRef = ref<HTMLElement | null>(null)
-  const deckRef = options.deckRef ?? ref<HTMLElement | null>(null)
 
   const cardStore = useCardStore()
   const drag = useDrag()
@@ -36,15 +34,27 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     handCardDropHandler = handler
   }
 
-  // Deck anchor helper
-  const getDeckAnchor = (): { x: number; y: number } | null => {
-    const deckRect = deckRef.value?.getBoundingClientRect()
-    const canvasRect = canvasRef.value?.getBoundingClientRect()
-    if (!deckRect || !canvasRect) return null
-    return {
-      x: deckRect.left - canvasRect.left + 8,
-      y: deckRect.top - canvasRect.top + 8,
+  // Zone hit detection helper
+  const findZoneAtPoint = (x: number, y: number): Zone | null => {
+    // Check zones in reverse order (top-most first)
+    for (let i = cardStore.zones.length - 1; i >= 0; i--) {
+      const zone = cardStore.zones[i]
+      if (zone && x >= zone.x && x <= zone.x + zone.width && y >= zone.y && y <= zone.y + zone.height) {
+        return zone
+      }
     }
+    return null
+  }
+
+  // Check if point is in resize handle (bottom-right corner)
+  const isInResizeHandle = (x: number, y: number, zone: Zone): boolean => {
+    const handleSize = 16
+    return (
+      x >= zone.x + zone.width - handleSize &&
+      x <= zone.x + zone.width &&
+      y >= zone.y + zone.height - handleSize &&
+      y <= zone.y + zone.height
+    )
   }
 
   // Apply pending position during drag
@@ -52,15 +62,34 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     if (!drag.isDragging.value || !drag.target.value) return
 
     const { x, y } = drag.getDelta()
+    const target = drag.target.value
 
-    if (drag.target.value.type === 'stack') {
-      const stackId = drag.target.value.stackId
+    if (target.type === 'zone') {
+      const zone = cardStore.zones.find((z) => z.id === target.zoneId)
+      if (!zone) return
+      cardStore.updateZone(zone.id, { x, y })
+      return
+    }
+
+    if (target.type === 'zone-resize') {
+      const zone = cardStore.zones.find((z) => z.id === target.zoneId)
+      if (!zone) return
+      const { x: pendingX, y: pendingY } = drag.getPending()
+      cardStore.updateZone(zone.id, {
+        width: pendingX - zone.x,
+        height: pendingY - zone.y,
+      })
+      return
+    }
+
+    if (target.type === 'stack') {
+      const stackId = target.stackId
       const stack = cardStore.stacks.find((item) => item.id === stackId)
       if (!stack) return
 
       stack.anchorX = x
       stack.anchorY = y
-      cardStore.updateStackPositions(stack, getDeckAnchor)
+      cardStore.updateStackPositions(stack)
       return
     }
 
@@ -82,11 +111,13 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       return
     }
 
-    const card = cardStore.cards[drag.target.value.index]
-    if (!card) return
+    if (target.type === 'card' || target.type === 'hand-card') {
+      const card = cardStore.cards[target.index]
+      if (!card) return
 
-    card.x = x
-    card.y = y
+      card.x = x
+      card.y = y
+    }
   }
 
   // Start dragging a stack (long press)
@@ -323,7 +354,7 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
               const offsetY = y - newStack.anchorY
               drag.setOffset(offsetX, offsetY)
             }
-            cardStore.updateAllStacks(getDeckAnchor)
+            cardStore.updateAllStacks()
           }
           return
         }
@@ -382,9 +413,16 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
 
     applyPendingPosition()
 
+    const { x: dropX, y: dropY } = drag.getPending()
+
+    // Handle zone drag/resize drop (just finalize position)
+    if (drag.target.value?.type === 'zone' || drag.target.value?.type === 'zone-resize') {
+      // Position already updated in applyPendingPosition
+    }
     // Handle stack drop
-    if (drag.target.value?.type === 'stack') {
+    else if (drag.target.value?.type === 'stack') {
       const stackId = drag.target.value.stackId
+      const stack = cardStore.stacks.find((item) => item.id === stackId)
       let handled = false
 
       // Try to merge with another stack (hover target)
@@ -403,19 +441,18 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
         }
       }
 
-      // Try to add to deck zone
-      if (!handled && drag.isInBounds(event, deckRef)) {
-        const stack = cardStore.stacks.find((item) => item.id === stackId)
-        if (stack) {
+      // Try to add to a zone
+      if (!handled && stack) {
+        const zone = findZoneAtPoint(dropX, dropY)
+        if (zone) {
           const ids = [...stack.cardIds]
-          ids.forEach((id) => cardStore.addToDeckZone(id, getDeckAnchor))
+          ids.forEach((id) => cardStore.addToZone(id, zone.id))
           handled = true
         }
       }
 
       // Try to add stack to hand zone
       if (!handled && handRef && drag.isInBounds(event, handRef)) {
-        const stack = cardStore.stacks.find((item) => item.id === stackId)
         if (stack) {
           cardStore.addStackToHand(stackId)
           handled = true
@@ -424,10 +461,11 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     }
     // Handle selection drop
     else if (drag.target.value?.type === 'selection') {
-      // If dropped on deck zone, add all selected to deck
-      if (drag.isInBounds(event, deckRef)) {
+      // Check if dropped on a zone
+      const zone = findZoneAtPoint(dropX, dropY)
+      if (zone) {
         cardStore.getSelectedIds().forEach((id) => {
-          cardStore.addToDeckZone(id, getDeckAnchor)
+          cardStore.addToZone(id, zone.id)
         })
         cardStore.clearSelection()
       } else {
@@ -453,9 +491,12 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
           stacked = cardStore.stackCardOnTarget(card.id, hover.state.cardId)
         }
 
-        // Try to add to deck zone
-        if (!stacked && drag.isInBounds(event, deckRef)) {
-          stacked = cardStore.addToDeckZone(card.id, getDeckAnchor)
+        // Try to add to a zone
+        if (!stacked) {
+          const zone = findZoneAtPoint(dropX, dropY)
+          if (zone) {
+            stacked = cardStore.addToZone(card.id, zone.id)
+          }
         }
 
         // Try to add to hand zone
@@ -476,23 +517,83 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     hover.reset()
     shake.reset()
     isOverHand.value = false
-    cardStore.updateAllStacks(getDeckAnchor)
+    cardStore.updateAllStacks()
+  }
+
+  // Zone interaction handlers
+  const onZonePointerDown = (event: PointerEvent, zoneId: number) => {
+    if (event.button !== 0) return
+
+    event.preventDefault()
+    event.stopPropagation()
+    const targetEl = event.currentTarget as HTMLElement | null
+    targetEl?.setPointerCapture(event.pointerId)
+
+    const zone = cardStore.zones.find((z) => z.id === zoneId)
+    if (!zone) return
+
+    drag.initPointer(event, canvasRef)
+
+    const { x, y } = drag.getPending()
+
+    // Check if clicking on resize handle
+    if (isInResizeHandle(x, y, zone)) {
+      const target: DragTarget = { type: 'zone-resize', zoneId, handle: 'se' }
+      drag.target.value = target
+      drag.isDragging.value = true
+      drag.setOffset(0, 0)
+    } else {
+      // Regular zone drag
+      const target: DragTarget = { type: 'zone', zoneId }
+      drag.target.value = target
+      drag.isDragging.value = true
+      drag.setOffset(x - zone.x, y - zone.y)
+    }
+  }
+
+  const onZonePointerMove = (event: PointerEvent) => {
+    if (!drag.isValidPointer(event.pointerId)) return
+    drag.updatePending(event, canvasRef)
+    drag.schedulePositionUpdate(applyPendingPosition)
+  }
+
+  const onZonePointerUp = (event: PointerEvent) => {
+    if (!drag.isValidPointer(event.pointerId)) return
+
+    const targetEl = event.currentTarget as HTMLElement | null
+    targetEl?.releasePointerCapture(event.pointerId)
+
+    applyPendingPosition()
+    drag.reset()
+  }
+
+  const onZoneDoubleClick = (event: MouseEvent, zoneId: number) => {
+    event.preventDefault()
+    event.stopPropagation()
+    // Enter edit mode for zone label
+    cardStore.editingZoneId = zoneId
   }
 
   const initCards = (count: number, externalCanvasRef?: Ref<HTMLElement | null>) => {
     const canvas = externalCanvasRef?.value ?? canvasRef.value
+    canvasRef.value = canvas
     const rect = canvas?.getBoundingClientRect()
     cardStore.createCards(count, rect?.width, rect?.height)
-    cardStore.updateAllStacks(getDeckAnchor)
+
+    // Create default deck zone in bottom-right
+    if (cardStore.zones.length === 0 && rect) {
+      cardStore.createZone(rect.width - 90, rect.height - 180, 'Deck', false)
+    }
+
+    cardStore.updateAllStacks()
   }
 
   return {
     canvasRef,
-    deckRef,
     drag,
     hover,
     isOverHand,
-    getDeckAnchor,
+    findZoneAtPoint,
     getCardCol,
     getCardRow,
     getCardZ,
@@ -501,6 +602,10 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     onCardPointerUp,
     onCardContextMenu,
     onCardDoubleClick,
+    onZonePointerDown,
+    onZonePointerMove,
+    onZonePointerUp,
+    onZoneDoubleClick,
     initCards,
     setHandCardDropHandler,
   }

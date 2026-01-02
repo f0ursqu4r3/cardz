@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Card from '@/components/CardComp.vue'
 import { useCardStore } from '@/stores/cards'
 import { useCardInteraction } from '@/composables/useCardInteraction'
@@ -9,13 +9,12 @@ const cardStore = useCardStore()
 
 // Create refs for template binding
 const canvasRef = ref<HTMLElement | null>(null)
-const deckRef = ref<HTMLElement | null>(null)
 const handRef = ref<HTMLElement | null>(null)
+const zoneLabelInputRef = ref<HTMLInputElement | null>(null)
 
 // Set up card interaction first (to get shared drag instance)
 const interaction = useCardInteraction({
   handRef: handRef,
-  deckRef: deckRef,
 })
 
 // Set up hand management with shared drag instance
@@ -34,6 +33,52 @@ const onHandCardPointerUp = (event: PointerEvent) => {
   onPointerUp(event)
 }
 
+// Zone label editing
+const finishZoneLabelEdit = () => {
+  cardStore.editingZoneId = null
+}
+
+const onZoneLabelKeydown = (event: KeyboardEvent, zoneId: number) => {
+  if (event.key === 'Enter') {
+    finishZoneLabelEdit()
+  } else if (event.key === 'Escape') {
+    finishZoneLabelEdit()
+  }
+}
+
+const onZoneLabelInput = (event: Event, zoneId: number) => {
+  const target = event.target as HTMLInputElement
+  cardStore.updateZone(zoneId, { label: target.value })
+}
+
+// Toggle zone face up/down
+const toggleZoneFaceUp = (zoneId: number) => {
+  const zone = cardStore.zones.find((z) => z.id === zoneId)
+  if (zone) {
+    cardStore.updateZone(zoneId, { faceUp: !zone.faceUp })
+  }
+}
+
+// Create new zone
+const createNewZone = () => {
+  const rect = canvasRef.value?.getBoundingClientRect()
+  if (rect) {
+    cardStore.createZone(rect.width / 2 - 33, rect.height / 2 - 42, 'New Zone', false)
+  }
+}
+
+// Focus input when editing zone
+watch(
+  () => cardStore.editingZoneId,
+  async (zoneId) => {
+    if (zoneId !== null) {
+      await nextTick()
+      zoneLabelInputRef.value?.focus()
+      zoneLabelInputRef.value?.select()
+    }
+  },
+)
+
 onMounted(() => {
   interaction.initCards(10, canvasRef)
 })
@@ -44,7 +89,56 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="canvasRef" class="canvas">
+  <div ref="canvasRef" class="canvas" @dblclick="createNewZone">
+    <!-- Zones (deck areas) -->
+    <div
+      v-for="zone in cardStore.zones"
+      :key="zone.id"
+      class="zone"
+      :class="{
+        'zone--dragging':
+          interaction.drag.target.value?.type === 'zone' &&
+          interaction.drag.target.value.zoneId === zone.id,
+        'zone--face-down': !zone.faceUp,
+      }"
+      :style="{
+        transform: `translate3d(${zone.x}px, ${zone.y}px, 0)`,
+        width: `${zone.width}px`,
+        height: `${zone.height}px`,
+      }"
+      @pointerdown="interaction.onZonePointerDown($event, zone.id)"
+      @pointermove="interaction.onZonePointerMove"
+      @pointerup="interaction.onZonePointerUp"
+      @pointercancel="interaction.onZonePointerUp"
+      @dblclick.stop="interaction.onZoneDoubleClick($event, zone.id)"
+      @contextmenu.prevent
+    >
+      <div class="zone__header">
+        <input
+          v-if="cardStore.editingZoneId === zone.id"
+          ref="zoneLabelInputRef"
+          type="text"
+          class="zone__label-input"
+          :value="zone.label"
+          @input="onZoneLabelInput($event, zone.id)"
+          @keydown="onZoneLabelKeydown($event, zone.id)"
+          @blur="finishZoneLabelEdit"
+          @pointerdown.stop
+        />
+        <span v-else class="zone__label">{{ zone.label }}</span>
+        <span class="zone__count">{{ cardStore.getZoneCardCount(zone.id) }}</span>
+      </div>
+      <button
+        class="zone__face-toggle"
+        :title="zone.faceUp ? 'Cards face up' : 'Cards face down'"
+        @click.stop="toggleZoneFaceUp(zone.id)"
+        @pointerdown.stop
+      >
+        {{ zone.faceUp ? '👁' : '🂠' }}
+      </button>
+      <div class="zone__resize-handle" />
+    </div>
+
     <Card
       v-for="(card, index) in cardStore.cards"
       v-show="!card.inHand"
@@ -69,11 +163,6 @@ onBeforeUnmount(() => {
       @contextmenu="interaction.onCardContextMenu"
       @dblclick="interaction.onCardDoubleClick($event, index)"
     />
-
-    <div ref="deckRef" class="deck" aria-hidden="true">
-      <span class="deck__label">Deck</span>
-      <span class="deck__count">{{ cardStore.deckCount }}</span>
-    </div>
 
     <!-- Player hand zone -->
     <div
@@ -138,34 +227,102 @@ onBeforeUnmount(() => {
   touch-action: none;
 }
 
-.deck {
+.zone {
   position: absolute;
-  right: 24px;
-  bottom: 24px;
-  width: calc(var(--tile-w) + 24px);
-  height: calc(var(--tile-h) + 24px);
   border: 2px dashed rgba(255, 255, 255, 0.7);
   border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 6px 10px;
   color: #f0f0f0;
   background-color: rgba(0, 0, 0, 0.15);
-  pointer-events: none;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2) inset;
+  cursor: grab;
+  touch-action: none;
 }
 
-.deck__label {
-  font-size: 12px;
+.zone--dragging {
+  cursor: grabbing;
+  opacity: 0.8;
+}
+
+.zone--face-down {
+  border-color: rgba(255, 200, 100, 0.7);
+}
+
+.zone__header {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.zone__label {
+  font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.deck__count {
+.zone__label-input {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  color: #f0f0f0;
+  padding: 1px 4px;
+  width: 100%;
+  outline: none;
+  pointer-events: auto;
+}
+
+.zone__count {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.zone__face-toggle {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #f0f0f0;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.zone__face-toggle:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.zone__resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: se-resize;
+  background: linear-gradient(
+    135deg,
+    transparent 50%,
+    rgba(255, 255, 255, 0.3) 50%
+  );
+  border-radius: 0 0 6px 0;
 }
 
 .stack-target {

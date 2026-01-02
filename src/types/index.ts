@@ -17,6 +17,18 @@ export type Stack = {
   anchorX: number
   anchorY: number
   kind: 'zone' | 'free'
+  zoneId?: number // Reference to parent zone if in a zone
+}
+
+export type Zone = {
+  id: number
+  x: number
+  y: number
+  width: number
+  height: number
+  label: string
+  faceUp: boolean // Cards dropped here default to this orientation
+  stackId: number | null // Associated stack
 }
 
 export type DragTarget =
@@ -24,6 +36,8 @@ export type DragTarget =
   | { type: 'stack'; stackId: number; index: number }
   | { type: 'selection' }
   | { type: 'hand-card'; index: number }
+  | { type: 'zone'; zoneId: number }
+  | { type: 'zone-resize'; zoneId: number; handle: 'se' }
 
 export const CARD_W = 42
 export const CARD_H = 60
@@ -44,3 +58,9 @@ export const SHAKE_WINDOW_MS = 500 // Time window for shake detection
 // Hand layout
 export const HAND_CARD_OVERLAP = 28 // Horizontal overlap between cards in hand
 export const HAND_PADDING = 16 // Padding around hand zone
+
+// Zone defaults
+export const ZONE_DEFAULT_WIDTH = 66 // Default zone width (card + padding)
+export const ZONE_DEFAULT_HEIGHT = 84 // Default zone height (card + padding)
+export const ZONE_MIN_WIDTH = 50
+export const ZONE_MIN_HEIGHT = 70

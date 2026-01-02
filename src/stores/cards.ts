@@ -1,16 +1,25 @@
 import { computed, ref, type Ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { CardData, Stack } from '@/types'
-import { STACK_OFFSET_X, STACK_OFFSET_Y } from '@/types'
+import type { CardData, Stack, Zone } from '@/types'
+import {
+  STACK_OFFSET_X,
+  STACK_OFFSET_Y,
+  ZONE_DEFAULT_WIDTH,
+  ZONE_DEFAULT_HEIGHT,
+  ZONE_MIN_WIDTH,
+  ZONE_MIN_HEIGHT,
+} from '@/types'
 
 export const useCardStore = defineStore('cards', () => {
   const cards = ref<CardData[]>([])
   const stacks = ref<Stack[]>([])
-  const deckStackId = ref<number | null>(null)
+  const zones = ref<Zone[]>([])
   const selectedIds = ref<Set<number>>(new Set())
   const handCardIds = ref<number[]>([])
+  const editingZoneId = ref<number | null>(null)
 
   let nextStackId = 1
+  let nextZoneId = 1
   let zCounter = 100
 
   // Hand helpers
@@ -22,13 +31,17 @@ export const useCardStore = defineStore('cards', () => {
   )
   const handCount = computed(() => handCardIds.value.length)
 
-  // Deck stack helper
-  const deckStack = computed(() => {
-    if (deckStackId.value === null) return null
-    return stacks.value.find((stack) => stack.id === deckStackId.value) ?? null
-  })
+  // Zone helpers
+  const getZoneStack = (zoneId: number) => {
+    const zone = zones.value.find((z) => z.id === zoneId)
+    if (!zone || zone.stackId === null) return null
+    return stacks.value.find((s) => s.id === zone.stackId) ?? null
+  }
 
-  const deckCount = computed(() => deckStack.value?.cardIds.length ?? 0)
+  const getZoneCardCount = (zoneId: number) => {
+    const stack = getZoneStack(zoneId)
+    return stack?.cardIds.length ?? 0
+  }
 
   // Card creation
   const createCards = (count = 10, canvasWidth?: number, canvasHeight?: number) => {
@@ -50,15 +63,13 @@ export const useCardStore = defineStore('cards', () => {
   }
 
   // Stack position management
-  const updateStackPositions = (
-    stack: Stack,
-    getDeckAnchor?: () => { x: number; y: number } | null,
-  ) => {
-    if (stack.kind === 'zone' && getDeckAnchor) {
-      const anchor = getDeckAnchor()
-      if (anchor) {
-        stack.anchorX = anchor.x
-        stack.anchorY = anchor.y
+  const updateStackPositions = (stack: Stack) => {
+    // If stack belongs to a zone, update anchor from zone position
+    if (stack.kind === 'zone' && stack.zoneId !== undefined) {
+      const zone = zones.value.find((z) => z.id === stack.zoneId)
+      if (zone) {
+        stack.anchorX = zone.x + 8
+        stack.anchorY = zone.y + 8
       }
     }
 
@@ -72,9 +83,15 @@ export const useCardStore = defineStore('cards', () => {
     })
   }
 
-  const updateAllStacks = (getDeckAnchor?: () => { x: number; y: number } | null) => {
+  const updateAllStacks = () => {
     stacks.value = stacks.value.filter((stack) => stack.cardIds.length > 0)
-    stacks.value.forEach((stack) => updateStackPositions(stack, getDeckAnchor))
+    // Update zone stackId references for empty stacks
+    zones.value.forEach((zone) => {
+      if (zone.stackId !== null && !stacks.value.find((s) => s.id === zone.stackId)) {
+        zone.stackId = null
+      }
+    })
+    stacks.value.forEach((stack) => updateStackPositions(stack))
   }
 
   // Stack operations
@@ -90,23 +107,29 @@ export const useCardStore = defineStore('cards', () => {
 
     stack.cardIds = stack.cardIds.filter((value) => value !== cardId)
     if (stack.cardIds.length === 0) {
-      if (deckStackId.value === stack.id) {
-        deckStackId.value = null
+      // Clear zone reference if this was a zone stack
+      if (stack.zoneId !== undefined) {
+        const zone = zones.value.find((z) => z.id === stack.zoneId)
+        if (zone) zone.stackId = null
       }
       stacks.value = stacks.value.filter((item) => item.id !== stack.id)
     }
   }
 
-  const addCardToStack = (
-    cardId: number,
-    stack: Stack,
-    getDeckAnchor?: () => { x: number; y: number } | null,
-  ) => {
+  const addCardToStack = (cardId: number, stack: Stack) => {
     removeFromStack(cardId)
 
-    // Match faceUp value of existing cards in stack
     const card = cards.value.find((c) => c.id === cardId)
-    if (card && stack.cardIds.length > 0) {
+    if (!card) return
+
+    // If stack belongs to a zone, use zone's faceUp setting for first card
+    if (stack.cardIds.length === 0 && stack.zoneId !== undefined) {
+      const zone = zones.value.find((z) => z.id === stack.zoneId)
+      if (zone) {
+        card.faceUp = zone.faceUp
+      }
+    } else if (stack.cardIds.length > 0) {
+      // Match faceUp value of existing cards in stack
       const firstCardInStack = cards.value.find((c) => c.id === stack.cardIds[0])
       if (firstCardInStack) {
         card.faceUp = firstCardInStack.faceUp
@@ -116,36 +139,104 @@ export const useCardStore = defineStore('cards', () => {
     if (!stack.cardIds.includes(cardId)) {
       stack.cardIds.push(cardId)
     }
-    updateStackPositions(stack, getDeckAnchor)
+    updateStackPositions(stack)
   }
 
-  const createStackAt = (anchorX: number, anchorY: number, kind: Stack['kind'] = 'free'): Stack => {
-    const stack: Stack = { id: nextStackId++, anchorX, anchorY, cardIds: [], kind }
+  const createStackAt = (
+    anchorX: number,
+    anchorY: number,
+    kind: Stack['kind'] = 'free',
+    zoneId?: number,
+  ): Stack => {
+    const stack: Stack = { id: nextStackId++, anchorX, anchorY, cardIds: [], kind, zoneId }
     stacks.value.push(stack)
     return stack
   }
 
-  const ensureDeckStack = (getDeckAnchor: () => { x: number; y: number } | null): Stack | null => {
-    const anchor = getDeckAnchor()
-    if (!anchor) return null
+  // Zone operations
+  const createZone = (
+    x: number,
+    y: number,
+    label = 'Deck',
+    faceUp = false,
+    width = ZONE_DEFAULT_WIDTH,
+    height = ZONE_DEFAULT_HEIGHT,
+  ): Zone => {
+    const zone: Zone = {
+      id: nextZoneId++,
+      x,
+      y,
+      width,
+      height,
+      label,
+      faceUp,
+      stackId: null,
+    }
+    zones.value.push(zone)
+    return zone
+  }
 
-    let stack = deckStack.value
-    if (!stack) {
-      stack = {
-        id: nextStackId++,
-        anchorX: anchor.x,
-        anchorY: anchor.y,
-        cardIds: [],
-        kind: 'zone',
+  const deleteZone = (zoneId: number) => {
+    const zone = zones.value.find((z) => z.id === zoneId)
+    if (!zone) return
+
+    // Remove associated stack and scatter cards
+    if (zone.stackId !== null) {
+      const stack = stacks.value.find((s) => s.id === zone.stackId)
+      if (stack) {
+        stack.cardIds.forEach((cardId) => {
+          const card = cards.value.find((c) => c.id === cardId)
+          if (card) {
+            card.stackId = null
+            card.isInDeck = false
+          }
+        })
+        stacks.value = stacks.value.filter((s) => s.id !== zone.stackId)
       }
-      stacks.value.push(stack)
-      deckStackId.value = stack.id
-    } else {
-      stack.anchorX = anchor.x
-      stack.anchorY = anchor.y
     }
 
+    zones.value = zones.value.filter((z) => z.id !== zoneId)
+  }
+
+  const updateZone = (zoneId: number, updates: Partial<Omit<Zone, 'id' | 'stackId'>>) => {
+    const zone = zones.value.find((z) => z.id === zoneId)
+    if (!zone) return
+
+    if (updates.x !== undefined) zone.x = updates.x
+    if (updates.y !== undefined) zone.y = updates.y
+    if (updates.width !== undefined) zone.width = Math.max(ZONE_MIN_WIDTH, updates.width)
+    if (updates.height !== undefined) zone.height = Math.max(ZONE_MIN_HEIGHT, updates.height)
+    if (updates.label !== undefined) zone.label = updates.label
+    if (updates.faceUp !== undefined) zone.faceUp = updates.faceUp
+
+    // Update stack positions if zone moved
+    if (zone.stackId !== null) {
+      const stack = stacks.value.find((s) => s.id === zone.stackId)
+      if (stack) {
+        updateStackPositions(stack)
+      }
+    }
+  }
+
+  const ensureZoneStack = (zoneId: number): Stack | null => {
+    const zone = zones.value.find((z) => z.id === zoneId)
+    if (!zone) return null
+
+    if (zone.stackId !== null) {
+      return stacks.value.find((s) => s.id === zone.stackId) ?? null
+    }
+
+    // Create new stack for zone
+    const stack = createStackAt(zone.x + 8, zone.y + 8, 'zone', zoneId)
+    zone.stackId = stack.id
     return stack
+  }
+
+  const addToZone = (cardId: number, zoneId: number): boolean => {
+    const stack = ensureZoneStack(zoneId)
+    if (!stack) return false
+    addCardToStack(cardId, stack)
+    return true
   }
 
   const stackCardOnTarget = (sourceId: number, targetId: number): boolean => {
@@ -166,16 +257,6 @@ export const useCardStore = defineStore('cards', () => {
     }
 
     addCardToStack(source.id, stack)
-    return true
-  }
-
-  const addToDeckZone = (
-    cardId: number,
-    getDeckAnchor: () => { x: number; y: number } | null,
-  ): boolean => {
-    const stack = ensureDeckStack(getDeckAnchor)
-    if (!stack) return false
-    addCardToStack(cardId, stack, getDeckAnchor)
     return true
   }
 
@@ -404,9 +485,8 @@ export const useCardStore = defineStore('cards', () => {
   return {
     cards,
     stacks,
-    deckStackId,
-    deckStack,
-    deckCount,
+    zones,
+    editingZoneId,
     selectedIds,
     createCards,
     updateStackPositions,
@@ -414,9 +494,16 @@ export const useCardStore = defineStore('cards', () => {
     removeFromStack,
     addCardToStack,
     createStackAt,
-    ensureDeckStack,
     stackCardOnTarget,
-    addToDeckZone,
+    // Zone operations
+    getZoneStack,
+    getZoneCardCount,
+    createZone,
+    deleteZone,
+    updateZone,
+    ensureZoneStack,
+    addToZone,
+    // Card operations
     cardZ,
     bumpCardZ,
     flipCard,
