@@ -102,7 +102,7 @@ defineExpose({ openModal })
       <span class="zone__label">{{ zone.label }}</span>
       <span class="zone__count">{{ cardStore.getZoneCardCount(zone.id) }}</span>
     </div>
-    <div class="zone__controls" :class="{ 'zone__controls--locked': zone.locked }">
+    <div class="zone__controls" :class="{ 'zone__controls--locked': zone.locked }" @dblclick.stop>
       <button
         class="zone__lock-toggle"
         :title="zone.locked ? 'Locked (click to unlock)' : 'Unlocked (click to lock)'"
@@ -245,10 +245,12 @@ defineExpose({ openModal })
 
 .zone__controls--locked {
   opacity: 0;
+  pointer-events: auto;
   transition: opacity 0.15s ease;
 }
 
-.zone:hover .zone__controls--locked {
+.zone__controls--locked:hover,
+.zone__controls--locked:focus-within {
   opacity: 1;
 }
 
@@ -292,7 +294,7 @@ defineExpose({ openModal })
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 10000;
 }
 
 .zone-modal__content {

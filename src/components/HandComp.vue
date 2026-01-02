@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { type Ref } from 'vue'
+import { computed, type Ref } from 'vue'
 import Card from '@/components/CardComp.vue'
 import { useCardStore } from '@/stores/cards'
 import { useHand } from '@/composables/useHand'
 import type { useDrag } from '@/composables/useDrag'
 
 const props = defineProps<{
-  canvasRef: Ref<HTMLElement | null> | null
+  canvasRef: HTMLElement | null
   drag: ReturnType<typeof useDrag>
   isDropTarget: boolean
 }>()
@@ -17,9 +17,10 @@ const emit = defineEmits<{
 
 const cardStore = useCardStore()
 const handRef = defineModel<HTMLElement | null>('handRef', { required: true })
+const canvasRef = computed<HTMLElement | null>(() => props.canvasRef)
 
 // Use the hand composable
-const hand = useHand(props.canvasRef, handRef as Ref<HTMLElement | null>, props.drag)
+const hand = useHand(canvasRef, handRef as Ref<HTMLElement | null>, props.drag)
 
 // Check if a specific card is being dragged from hand
 const isDraggingCard = (cardId: number) => {

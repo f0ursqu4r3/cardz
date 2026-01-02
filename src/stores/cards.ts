@@ -215,6 +215,7 @@ export const useCardStore = defineStore('cards', () => {
     if (updates.height !== undefined) zone.height = Math.max(ZONE_MIN_HEIGHT, updates.height)
     if (updates.label !== undefined) zone.label = updates.label
     if (updates.faceUp !== undefined) zone.faceUp = updates.faceUp
+    if (updates.locked !== undefined) zone.locked = updates.locked
 
     // Update stack positions if zone moved
     if (zone.stackId !== null) {
