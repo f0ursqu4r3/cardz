@@ -60,7 +60,7 @@ export const HAND_CARD_OVERLAP = 28 // Horizontal overlap between cards in hand
 export const HAND_PADDING = 16 // Padding around hand zone
 
 // Zone defaults
-export const ZONE_DEFAULT_WIDTH = 66 // Default zone width (card + padding)
-export const ZONE_DEFAULT_HEIGHT = 84 // Default zone height (card + padding)
-export const ZONE_MIN_WIDTH = 50
-export const ZONE_MIN_HEIGHT = 70
+export const ZONE_MIN_WIDTH = CARD_W * 1.5
+export const ZONE_MIN_HEIGHT = CARD_H * 1.5
+export const ZONE_DEFAULT_WIDTH = ZONE_MIN_WIDTH // Default zone width (card + padding)
+export const ZONE_DEFAULT_HEIGHT = ZONE_MIN_HEIGHT // Default zone height (card + padding)

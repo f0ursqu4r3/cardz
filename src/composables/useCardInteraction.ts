@@ -39,7 +39,13 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     // Check zones in reverse order (top-most first)
     for (let i = cardStore.zones.length - 1; i >= 0; i--) {
       const zone = cardStore.zones[i]
-      if (zone && x >= zone.x && x <= zone.x + zone.width && y >= zone.y && y <= zone.y + zone.height) {
+      if (
+        zone &&
+        x >= zone.x &&
+        x <= zone.x + zone.width &&
+        y >= zone.y &&
+        y <= zone.y + zone.height
+      ) {
         return zone
       }
     }
