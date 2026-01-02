@@ -136,6 +136,16 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     const stack = cardStore.stacks.find((item) => item.id === card.stackId)
     if (!stack) return
 
+    // Detach stack from its zone so it can be moved out (e.g., right-click drag)
+    if (stack.kind === 'zone' && stack.zoneId !== undefined) {
+      const zone = cardStore.zones.find((z) => z.id === stack.zoneId)
+      if (zone && zone.stackId === stack.id) {
+        zone.stackId = null
+      }
+      stack.zoneId = undefined
+      stack.kind = 'free'
+    }
+
     const { x, y } = drag.getPending()
     const target: DragTarget = { type: 'stack', stackId: stack.id, index }
 
