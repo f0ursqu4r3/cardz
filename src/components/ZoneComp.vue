@@ -102,24 +102,26 @@ defineExpose({ openModal })
       <span class="zone__label">{{ zone.label }}</span>
       <span class="zone__count">{{ cardStore.getZoneCardCount(zone.id) }}</span>
     </div>
-    <button
-      class="zone__lock-toggle"
-      :title="zone.locked ? 'Locked (click to unlock)' : 'Unlocked (click to lock)'"
-      @click.stop="toggleLocked"
-      @pointerdown.stop
-    >
-      <Lock v-if="zone.locked" :size="12" />
-      <LockOpen v-else :size="12" />
-    </button>
-    <button
-      v-if="!zone.locked"
-      class="zone__settings"
-      title="Zone settings"
-      @click.stop="openModal"
-      @pointerdown.stop
-    >
-      <Settings :size="12" />
-    </button>
+    <div class="zone__controls" :class="{ 'zone__controls--locked': zone.locked }">
+      <button
+        class="zone__lock-toggle"
+        :title="zone.locked ? 'Locked (click to unlock)' : 'Unlocked (click to lock)'"
+        @click.stop="toggleLocked"
+        @pointerdown.stop
+      >
+        <Lock v-if="zone.locked" :size="12" />
+        <LockOpen v-else :size="12" />
+      </button>
+      <button
+        v-if="!zone.locked"
+        class="zone__settings"
+        title="Zone settings"
+        @click.stop="openModal"
+        @pointerdown.stop
+      >
+        <Settings :size="12" />
+      </button>
+    </div>
     <div v-if="!zone.locked" class="zone__resize-handle" />
   </div>
 
@@ -233,10 +235,25 @@ defineExpose({ openModal })
   flex-shrink: 0;
 }
 
-.zone__lock-toggle,
-.zone__settings {
+.zone__controls {
   position: absolute;
   bottom: 4px;
+  left: 4px;
+  display: flex;
+  gap: 4px;
+}
+
+.zone__controls--locked {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.zone:hover .zone__controls--locked {
+  opacity: 1;
+}
+
+.zone__lock-toggle,
+.zone__settings {
   width: 20px;
   height: 20px;
   border: none;
@@ -249,14 +266,6 @@ defineExpose({ openModal })
   align-items: center;
   justify-content: center;
   padding: 0;
-}
-
-.zone__lock-toggle {
-  left: 4px;
-}
-
-.zone__settings {
-  left: 28px;
 }
 
 .zone__lock-toggle:hover,
