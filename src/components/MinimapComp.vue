@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref } from 'vue'
 import { useCardStore } from '@/stores/cards'
 import type { useViewport } from '@/composables/useViewport'
+import { ZoomIn, ZoomOut, Home, Maximize2, Map } from 'lucide-vue-next'
 
 const props = defineProps<{
   viewport: ReturnType<typeof useViewport>
@@ -12,6 +13,7 @@ const props = defineProps<{
 const cardStore = useCardStore()
 const minimapRef = ref<HTMLElement | null>(null)
 const isDragging = ref(false)
+const isCollapsed = ref(false)
 
 // Minimap dimensions
 const MINIMAP_WIDTH = 180
@@ -140,73 +142,206 @@ const onPointerUp = (event: PointerEvent) => {
   isDragging.value = false
   ;(event.target as HTMLElement)?.releasePointerCapture(event.pointerId)
 }
+
+// View controls
+const handleZoomIn = (event: Event) => {
+  event.stopPropagation()
+  props.viewport.zoomIn()
+}
+
+const handleZoomOut = (event: Event) => {
+  event.stopPropagation()
+  props.viewport.zoomOut()
+}
+
+const handleReset = (event: Event) => {
+  event.stopPropagation()
+  props.viewport.resetViewport()
+}
+
+const handleFitAll = (event: Event) => {
+  event.stopPropagation()
+  props.viewport.fitAll(worldBounds.value)
+}
+
+const toggleCollapsed = () => {
+  isCollapsed.value = !isCollapsed.value
+}
 </script>
 
 <template>
-  <div
-    ref="minimapRef"
-    class="minimap"
-    :style="{ width: `${MINIMAP_WIDTH}px`, height: `${MINIMAP_HEIGHT}px` }"
-    @pointerdown="onPointerDown"
-    @pointermove="onPointerMove"
-    @pointerup="onPointerUp"
-    @pointercancel="onPointerUp"
-  >
-    <!-- Zones -->
-    <div
-      v-for="zone in minimapZones"
-      :key="`zone-${zone.id}`"
-      class="minimap__zone"
-      :style="{
-        left: `${zone.x}px`,
-        top: `${zone.y}px`,
-        width: `${zone.width}px`,
-        height: `${zone.height}px`,
-      }"
-    />
+  <div class="minimap-container">
+    <!-- Collapsed state: just a button -->
+    <button
+      v-if="isCollapsed"
+      class="minimap-toggle minimap-toggle--collapsed"
+      @click="toggleCollapsed"
+      title="Show Minimap"
+    >
+      <Map :size="18" />
+    </button>
 
-    <!-- Cards -->
-    <div
-      v-for="card in minimapCards"
-      :key="`card-${card.id}`"
-      class="minimap__card"
-      :class="{ 'minimap__card--stacked': card.isInStack }"
-      :style="{
-        left: `${card.x}px`,
-        top: `${card.y}px`,
-        width: `${card.width}px`,
-        height: `${card.height}px`,
-      }"
-    />
+    <!-- Expanded state -->
+    <div v-else class="minimap-panel">
+      <!-- Controls bar -->
+      <div class="minimap-controls">
+        <button class="minimap-btn" @click="handleZoomOut" title="Zoom Out">
+          <ZoomOut :size="14" />
+        </button>
+        <span class="minimap-zoom">{{ Math.round(viewport.zoom.value * 100) }}%</span>
+        <button class="minimap-btn" @click="handleZoomIn" title="Zoom In">
+          <ZoomIn :size="14" />
+        </button>
+        <div class="minimap-separator" />
+        <button class="minimap-btn" @click="handleReset" title="Reset View (Home)">
+          <Home :size="14" />
+        </button>
+        <button class="minimap-btn" @click="handleFitAll" title="Fit All">
+          <Maximize2 :size="14" />
+        </button>
+        <div class="minimap-separator" />
+        <button class="minimap-btn" @click="toggleCollapsed" title="Hide Minimap">
+          <Map :size="14" />
+        </button>
+      </div>
 
-    <!-- Viewport indicator -->
-    <div
-      class="minimap__viewport"
-      :style="{
-        left: `${viewportRect.x}px`,
-        top: `${viewportRect.y}px`,
-        width: `${viewportRect.width}px`,
-        height: `${viewportRect.height}px`,
-      }"
-    />
+      <!-- Minimap display -->
+      <div
+        ref="minimapRef"
+        class="minimap"
+        :style="{ width: `${MINIMAP_WIDTH}px`, height: `${MINIMAP_HEIGHT}px` }"
+        @pointerdown="onPointerDown"
+        @pointermove="onPointerMove"
+        @pointerup="onPointerUp"
+        @pointercancel="onPointerUp"
+      >
+        <!-- Zones -->
+        <div
+          v-for="zone in minimapZones"
+          :key="`zone-${zone.id}`"
+          class="minimap__zone"
+          :style="{
+            left: `${zone.x}px`,
+            top: `${zone.y}px`,
+            width: `${zone.width}px`,
+            height: `${zone.height}px`,
+          }"
+        />
 
-    <!-- Zoom indicator -->
-    <span class="minimap__zoom">{{ Math.round(viewport.zoom.value * 100) }}%</span>
+        <!-- Cards -->
+        <div
+          v-for="card in minimapCards"
+          :key="`card-${card.id}`"
+          class="minimap__card"
+          :class="{ 'minimap__card--stacked': card.isInStack }"
+          :style="{
+            left: `${card.x}px`,
+            top: `${card.y}px`,
+            width: `${card.width}px`,
+            height: `${card.height}px`,
+          }"
+        />
+
+        <!-- Viewport indicator -->
+        <div
+          class="minimap__viewport"
+          :style="{
+            left: `${viewportRect.x}px`,
+            top: `${viewportRect.y}px`,
+            width: `${viewportRect.width}px`,
+            height: `${viewportRect.height}px`,
+          }"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.minimap {
-  position: absolute;
-  bottom: 100px;
-  right: 12px;
+.minimap-container {
+  /* Positioned by parent flex container */
+}
+
+.minimap-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: all 0.15s ease;
+}
+
+.minimap-toggle:hover {
+  background: rgba(0, 0, 0, 0.8);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+.minimap-panel {
+  display: flex;
+  flex-direction: column;
   background: rgba(0, 0, 0, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 6px;
   overflow: hidden;
-  cursor: crosshair;
-  z-index: 1000;
   backdrop-filter: blur(4px);
+}
+
+.minimap-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.minimap-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.minimap-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+}
+
+.minimap-btn:active {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.minimap-zoom {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  min-width: 36px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.minimap-separator {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 2px;
+}
+
+.minimap {
+  position: relative;
+  cursor: crosshair;
 }
 
 .minimap__zone {
@@ -233,15 +368,6 @@ const onPointerUp = (event: PointerEvent) => {
   border: 2px solid rgba(100, 200, 255, 0.8);
   background: rgba(100, 200, 255, 0.1);
   border-radius: 2px;
-  pointer-events: none;
-}
-
-.minimap__zoom {
-  position: absolute;
-  bottom: 4px;
-  right: 6px;
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.6);
   pointer-events: none;
 }
 </style>

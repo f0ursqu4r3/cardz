@@ -7,7 +7,7 @@ import MinimapComp from '@/components/MinimapComp.vue'
 import { useCardStore } from '@/stores/cards'
 import { useCardInteraction } from '@/composables/useCardInteraction'
 import { useViewport } from '@/composables/useViewport'
-import { SquarePlus, Home } from 'lucide-vue-next'
+import { SquarePlus } from 'lucide-vue-next'
 import { CARD_BACK_COL, CARD_BACK_ROW } from '@/types'
 
 const cardStore = useCardStore()
@@ -150,11 +150,15 @@ onBeforeUnmount(() => {
   >
     <!-- Table UI (fixed position, not affected by pan/zoom) -->
     <div class="table-ui">
+      <!-- Minimap -->
+      <MinimapComp
+        :viewport="viewport"
+        :canvas-width="canvasDimensions.width"
+        :canvas-height="canvasDimensions.height"
+      />
+
       <button class="table-ui__btn" @click="addZone" title="Add Zone">
         <SquarePlus class="table-ui__icon" />
-      </button>
-      <button class="table-ui__btn" @click="viewport.resetViewport" title="Reset View (Home)">
-        <Home class="table-ui__icon" />
       </button>
     </div>
 
@@ -234,13 +238,6 @@ onBeforeUnmount(() => {
     <div v-if="cardStore.hasSelection" class="selection-indicator">
       {{ cardStore.selectionCount }} selected
     </div>
-
-    <!-- Minimap -->
-    <MinimapComp
-      :viewport="viewport"
-      :canvas-width="canvasDimensions.width"
-      :canvas-height="canvasDimensions.height"
-    />
   </div>
 </template>
 

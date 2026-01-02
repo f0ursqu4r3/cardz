@@ -9,6 +9,7 @@ export interface ViewportState {
 const MIN_ZOOM = 0.25
 const MAX_ZOOM = 2
 const ZOOM_SENSITIVITY = 0.001
+const ZOOM_STEP = 1.25 // Multiplier for zoom in/out buttons
 
 export function useViewport(canvasRef: Ref<HTMLElement | null>) {
   const panX = ref(0)
@@ -122,6 +123,70 @@ export function useViewport(canvasRef: Ref<HTMLElement | null>) {
     zoom.value = 1
   }
 
+  // Zoom in by step amount, centered on viewport
+  const zoomIn = () => {
+    const rect = canvasRef.value?.getBoundingClientRect()
+    if (!rect) return
+
+    const centerX = rect.width / 2
+    const centerY = rect.height / 2
+
+    // Calculate world point at center
+    const worldX = (centerX - panX.value) / zoom.value
+    const worldY = (centerY - panY.value) / zoom.value
+
+    // Apply zoom
+    const newZoom = Math.min(MAX_ZOOM, zoom.value * ZOOM_STEP)
+
+    // Adjust pan to keep center point
+    panX.value = centerX - worldX * newZoom
+    panY.value = centerY - worldY * newZoom
+    zoom.value = newZoom
+  }
+
+  // Zoom out by step amount, centered on viewport
+  const zoomOut = () => {
+    const rect = canvasRef.value?.getBoundingClientRect()
+    if (!rect) return
+
+    const centerX = rect.width / 2
+    const centerY = rect.height / 2
+
+    // Calculate world point at center
+    const worldX = (centerX - panX.value) / zoom.value
+    const worldY = (centerY - panY.value) / zoom.value
+
+    // Apply zoom
+    const newZoom = Math.max(MIN_ZOOM, zoom.value / ZOOM_STEP)
+
+    // Adjust pan to keep center point
+    panX.value = centerX - worldX * newZoom
+    panY.value = centerY - worldY * newZoom
+    zoom.value = newZoom
+  }
+
+  // Fit all content in view with padding
+  const fitAll = (worldBounds: { x: number; y: number; width: number; height: number }) => {
+    const rect = canvasRef.value?.getBoundingClientRect()
+    if (!rect) return
+
+    const padding = 50 // Screen pixels padding
+
+    // Calculate zoom to fit bounds
+    const scaleX = (rect.width - padding * 2) / worldBounds.width
+    const scaleY = (rect.height - padding * 2) / worldBounds.height
+    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.min(scaleX, scaleY)))
+
+    // Center of world bounds
+    const worldCenterX = worldBounds.x + worldBounds.width / 2
+    const worldCenterY = worldBounds.y + worldBounds.height / 2
+
+    // Pan to center
+    panX.value = rect.width / 2 - worldCenterX * newZoom
+    panY.value = rect.height / 2 - worldCenterY * newZoom
+    zoom.value = newZoom
+  }
+
   // Pan to center a specific world point in the viewport
   const panToCenter = (worldX: number, worldY: number) => {
     const rect = canvasRef.value?.getBoundingClientRect()
@@ -156,6 +221,9 @@ export function useViewport(canvasRef: Ref<HTMLElement | null>) {
     screenToWorld,
     worldToScreen,
     zoomAt,
+    zoomIn,
+    zoomOut,
+    fitAll,
     onWheel,
     startPan,
     updatePan,
