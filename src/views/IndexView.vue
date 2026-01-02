@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
 import Card from '@/components/CardComp.vue'
 import { useCardStore } from '@/stores/cards'
 import { useCardInteraction } from '@/composables/useCardInteraction'
@@ -7,17 +7,26 @@ import { useHand } from '@/composables/useHand'
 
 const cardStore = useCardStore()
 
-// Set up card interaction (must be first to get canvasRef)
+// Create refs for template binding
+const canvasRef = ref<HTMLElement | null>(null)
+const deckRef = ref<HTMLElement | null>(null)
+const handRef = ref<HTMLElement | null>(null)
+
+// Set up card interaction first (to get shared drag instance)
 const interaction = useCardInteraction({
-  onHandCardDrop: (event) => hand.handleHandCardDrop(event),
+  handRef: handRef,
+  deckRef: deckRef,
 })
 
-// Set up hand management
-const hand = useHand(interaction.canvasRef)
+// Set up hand management with shared drag instance
+const hand = useHand(canvasRef, handRef, interaction.drag)
+
+// Wire up hand card drop handler
+interaction.setHandCardDropHandler((event) => hand.handleHandCardDrop(event))
 
 // Wrap pointer up to pass handRef
 const onPointerUp = (event: PointerEvent) => {
-  interaction.onCardPointerUp(event, hand.handRef)
+  interaction.onCardPointerUp(event, handRef)
 }
 
 // Wrap hand card pointer up
@@ -26,7 +35,7 @@ const onHandCardPointerUp = (event: PointerEvent) => {
 }
 
 onMounted(() => {
-  interaction.initCards(10)
+  interaction.initCards(10, canvasRef)
 })
 
 onBeforeUnmount(() => {
@@ -35,7 +44,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="interaction.canvasRef.value" class="canvas">
+  <div ref="canvasRef" class="canvas">
     <Card
       v-for="(card, index) in cardStore.cards"
       v-show="!card.inHand"
@@ -61,13 +70,18 @@ onBeforeUnmount(() => {
       @dblclick="interaction.onCardDoubleClick($event, index)"
     />
 
-    <div ref="interaction.deckRef.value" class="deck" aria-hidden="true">
+    <div ref="deckRef" class="deck" aria-hidden="true">
       <span class="deck__label">Deck</span>
       <span class="deck__count">{{ cardStore.deckCount }}</span>
     </div>
 
     <!-- Player hand zone -->
-    <div ref="hand.handRef.value" class="hand" :style="{ width: `${hand.handWidth.value}px` }">
+    <div
+      ref="handRef"
+      class="hand"
+      :class="{ 'hand--drop-target': interaction.isOverHand.value }"
+      :style="{ width: `${hand.handWidth.value}px` }"
+    >
       <div class="hand__cards">
         <!-- Drop placeholder -->
         <div
@@ -197,7 +211,16 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: width 0.2s ease-out;
+  transition:
+    width 0.2s ease-out,
+    box-shadow 0.2s ease-out;
+}
+
+.hand--drop-target {
+  box-shadow:
+    0 0 0 2px rgba(100, 200, 255, 0.7),
+    0 0 20px rgba(100, 200, 255, 0.4),
+    inset 0 0 30px rgba(100, 200, 255, 0.1);
 }
 
 .hand__cards {

@@ -387,6 +387,20 @@ export const useCardStore = defineStore('cards', () => {
     }
   }
 
+  // Add all cards from a stack to hand
+  const addStackToHand = (stackId: number) => {
+    const stack = stacks.value.find((s) => s.id === stackId)
+    if (!stack) return false
+
+    // Get all card IDs from the stack (copy to avoid mutation issues)
+    const cardIdsToAdd = [...stack.cardIds]
+
+    // Add each card to hand (addToHand handles removing from stack)
+    cardIdsToAdd.forEach((id) => addToHand(id))
+
+    return true
+  }
+
   return {
     cards,
     stacks,
@@ -424,5 +438,6 @@ export const useCardStore = defineStore('cards', () => {
     addToHand,
     removeFromHand,
     reorderHand,
+    addStackToHand,
   }
 })

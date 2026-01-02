@@ -1,13 +1,16 @@
-import { computed, ref, type Ref } from 'vue'
+import { computed, type Ref } from 'vue'
 import { useCardStore } from '@/stores/cards'
-import { useDrag } from '@/composables/useDrag'
+import type { useDrag } from '@/composables/useDrag'
 import type { DragTarget } from '@/types'
 import { CARD_W, HAND_CARD_OVERLAP } from '@/types'
+import { ref } from 'vue'
 
-export function useHand(canvasRef: Ref<HTMLElement | null>) {
-  const handRef = ref<HTMLElement | null>(null)
+export function useHand(
+  canvasRef: Ref<HTMLElement | null>,
+  handRef: Ref<HTMLElement | null>,
+  drag: ReturnType<typeof useDrag>,
+) {
   const cardStore = useCardStore()
-  const drag = useDrag()
 
   // Track original hand index for reordering
   const handDragStartIndex = ref<number | null>(null)
@@ -135,7 +138,6 @@ export function useHand(canvasRef: Ref<HTMLElement | null>) {
   }
 
   return {
-    handRef,
     handDragStartIndex,
     handDropTargetIndex,
     handWidth,

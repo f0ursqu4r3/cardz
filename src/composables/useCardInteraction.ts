@@ -9,11 +9,13 @@ import { CARD_BACK_COL, CARD_BACK_ROW } from '@/types'
 interface CardInteractionOptions {
   onHandCardDrop?: (event: PointerEvent) => boolean
   addToHand?: (event: PointerEvent, cardId: number) => boolean
+  handRef?: Ref<HTMLElement | null>
+  deckRef?: Ref<HTMLElement | null>
 }
 
 export function useCardInteraction(options: CardInteractionOptions = {}) {
   const canvasRef = ref<HTMLElement | null>(null)
-  const deckRef = ref<HTMLElement | null>(null)
+  const deckRef = options.deckRef ?? ref<HTMLElement | null>(null)
 
   const cardStore = useCardStore()
   const drag = useDrag()
@@ -23,6 +25,16 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
   // Track selection start positions for smooth dragging
   const selectionStartPositions = ref<Map<number, { x: number; y: number }>>(new Map())
   const selectionDragStart = ref<{ x: number; y: number } | null>(null)
+
+  // Track when dragging over hand zone
+  const isOverHand = ref(false)
+
+  // Mutable handler for hand card drop (set after hand composable is created)
+  let handCardDropHandler: ((event: PointerEvent) => boolean) | undefined = options.onHandCardDrop
+
+  const setHandCardDropHandler = (handler: (event: PointerEvent) => boolean) => {
+    handCardDropHandler = handler
+  }
 
   // Deck anchor helper
   const getDeckAnchor = (): { x: number; y: number } | null => {
@@ -344,6 +356,11 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       hover.update(x, y, cardStore.cards, draggingId, (card, idx) =>
         cardStore.cardZ(card, idx, drag.activeIndex.value, null),
       )
+
+      // Check if over hand zone
+      if (options.handRef) {
+        isOverHand.value = drag.isInBounds(event, options.handRef)
+      }
     }
 
     drag.schedulePositionUpdate(applyPendingPosition)
@@ -395,6 +412,15 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
           handled = true
         }
       }
+
+      // Try to add stack to hand zone
+      if (!handled && handRef && drag.isInBounds(event, handRef)) {
+        const stack = cardStore.stacks.find((item) => item.id === stackId)
+        if (stack) {
+          cardStore.addStackToHand(stackId)
+          handled = true
+        }
+      }
     }
     // Handle selection drop
     else if (drag.target.value?.type === 'selection') {
@@ -412,9 +438,9 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       selectionDragStart.value = null
       shake.reset()
     }
-    // Handle hand card drop (delegate to options callback)
+    // Handle hand card drop (delegate to handler)
     else if (drag.target.value?.type === 'hand-card') {
-      options.onHandCardDrop?.(event)
+      handCardDropHandler?.(event)
     }
     // Handle card drop
     else if (drag.activeIndex.value !== null) {
@@ -449,11 +475,13 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     drag.reset()
     hover.reset()
     shake.reset()
+    isOverHand.value = false
     cardStore.updateAllStacks(getDeckAnchor)
   }
 
-  const initCards = (count: number) => {
-    const rect = canvasRef.value?.getBoundingClientRect()
+  const initCards = (count: number, externalCanvasRef?: Ref<HTMLElement | null>) => {
+    const canvas = externalCanvasRef?.value ?? canvasRef.value
+    const rect = canvas?.getBoundingClientRect()
     cardStore.createCards(count, rect?.width, rect?.height)
     cardStore.updateAllStacks(getDeckAnchor)
   }
@@ -463,6 +491,7 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     deckRef,
     drag,
     hover,
+    isOverHand,
     getDeckAnchor,
     getCardCol,
     getCardRow,
@@ -473,5 +502,6 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     onCardContextMenu,
     onCardDoubleClick,
     initCards,
+    setHandCardDropHandler,
   }
 }
