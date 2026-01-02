@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:server": "bun run --watch server-src/index.ts",
+    "server": "bun run server-src/index.ts",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "test:unit": "vitest",

@@ -816,12 +816,12 @@ For responsive feel:
 
 ### Runtime & Framework
 
-| Component | Choice | Rationale |
-|-----------|--------|-----------|
-| **Runtime** | Bun | Faster than Node, native TypeScript, built-in test runner |
-| **WebSocket** | uWebSockets.js | C++ backed, handles 1M+ connections, used by Discord |
-| **Validation** | Zod | Runtime type checking, shared with client |
-| **State Store** | Redis | Pub/sub for scaling, fast in-memory state |
+| Component       | Choice         | Rationale                                                 |
+| --------------- | -------------- | --------------------------------------------------------- |
+| **Runtime**     | Bun            | Faster than Node, native TypeScript, built-in test runner |
+| **WebSocket**   | uWebSockets.js | C++ backed, handles 1M+ connections, used by Discord      |
+| **Validation**  | Zod            | Runtime type checking, shared with client                 |
+| **State Store** | Redis          | Pub/sub for scaling, fast in-memory state                 |
 
 ### Why TypeScript
 
@@ -898,12 +898,12 @@ cardz/
 
 ### Performance Targets
 
-| Metric | Target | Notes |
-|--------|--------|-------|
-| Connections/server | 10,000+ | With uWebSockets.js |
-| Message latency | <50ms p99 | Same-region |
-| Rooms/server | 1,000+ | ~10 players/room avg |
-| Memory/connection | ~10KB | Excluding game state |
+| Metric             | Target    | Notes                |
+| ------------------ | --------- | -------------------- |
+| Connections/server | 10,000+   | With uWebSockets.js  |
+| Message latency    | <50ms p99 | Same-region          |
+| Rooms/server       | 1,000+    | ~10 players/room avg |
+| Memory/connection  | ~10KB     | Excluding game state |
 
 ---
 
