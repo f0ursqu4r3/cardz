@@ -6,10 +6,11 @@ import { useDrag } from '@/composables/useDrag'
 import { useHover } from '@/composables/useHover'
 import { useShake } from '@/composables/useShake'
 import type { DragTarget } from '@/types'
-import { CARD_BACK_COL, CARD_BACK_ROW } from '@/types'
+import { CARD_BACK_COL, CARD_BACK_ROW, CARD_W, HAND_CARD_OVERLAP } from '@/types'
 
 const canvasRef = ref<HTMLElement | null>(null)
 const deckRef = ref<HTMLElement | null>(null)
+const handRef = ref<HTMLElement | null>(null)
 
 const cardStore = useCardStore()
 const drag = useDrag()
@@ -26,6 +27,21 @@ const getDeckAnchor = (): { x: number; y: number } | null => {
     y: deckRect.top - canvasRect.top + 8,
   }
 }
+
+// Hand card position calculation
+const getHandCardX = (index: number) => {
+  const totalCards = cardStore.handCount
+  const totalWidth = (totalCards - 1) * HAND_CARD_OVERLAP + CARD_W
+  const startX = -totalWidth / 2
+  return startX + index * HAND_CARD_OVERLAP
+}
+
+// Computed hand width based on card count
+const handWidth = computed(() => {
+  const count = cardStore.handCount
+  if (count === 0) return 120 // min-width when empty
+  return (count - 1) * HAND_CARD_OVERLAP + CARD_W + 48 // +48 for padding
+})
 
 // Computed z-index for cards
 const getCardZ = (index: number) => {
@@ -259,6 +275,36 @@ const getCardRow = (index: number) => {
   return card?.faceUp ? card.row : CARD_BACK_ROW
 }
 
+// Hand card event handlers
+const onHandCardPointerDown = (event: PointerEvent, cardId: number) => {
+  if (event.button !== 0) return
+
+  event.preventDefault()
+  const targetEl = event.currentTarget as HTMLElement | null
+  targetEl?.setPointerCapture(event.pointerId)
+
+  const index = cardStore.cards.findIndex((c) => c.id === cardId)
+  if (index === -1) return
+
+  drag.initPointer(event, canvasRef)
+
+  const target: DragTarget = { type: 'hand-card', index }
+  drag.target.value = target
+  drag.activeIndex.value = index
+  drag.isDragging.value = true
+  drag.setOffset(CARD_W / 2, 30) // Drag from center-ish of card
+}
+
+const onHandCardPointerMove = (event: PointerEvent) => {
+  if (!drag.isValidPointer(event.pointerId)) return
+  drag.updatePending(event, canvasRef)
+  // No position updates needed - hand cards don't move visually until dropped
+}
+
+const onHandCardPointerUp = (event: PointerEvent) => {
+  onCardPointerUp(event)
+}
+
 const onCardPointerMove = (event: PointerEvent) => {
   if (!drag.isValidPointer(event.pointerId)) return
 
@@ -404,6 +450,22 @@ const onCardPointerUp = (event: PointerEvent) => {
     selectionDragStart.value = null
     shake.reset()
   }
+  // Handle hand card drop
+  else if (drag.target.value?.type === 'hand-card') {
+    const card = cardStore.cards[drag.target.value.index]
+    if (card) {
+      // If dropped back on hand zone, keep in hand
+      if (drag.isInBounds(event, handRef)) {
+        // Card stays in hand, already there
+      } else {
+        // Remove from hand and place on canvas
+        cardStore.removeFromHand(card.id)
+        card.x = drag.getDelta().x
+        card.y = drag.getDelta().y
+        cardStore.bumpCardZ(card.id)
+      }
+    }
+  }
   // Handle card drop
   else if (drag.activeIndex.value !== null) {
     const card = cardStore.cards[drag.activeIndex.value]
@@ -418,6 +480,11 @@ const onCardPointerUp = (event: PointerEvent) => {
       // Try to add to deck zone
       if (!stacked && drag.isInBounds(event, deckRef)) {
         stacked = cardStore.addToDeckZone(card.id, getDeckAnchor)
+      }
+
+      // Try to add to hand zone
+      if (!stacked && drag.isInBounds(event, handRef)) {
+        stacked = cardStore.addToHand(card.id)
       }
 
       // Reset card state if not stacked
@@ -450,6 +517,7 @@ onBeforeUnmount(() => {
   <div ref="canvasRef" class="canvas">
     <Card
       v-for="(card, index) in cardStore.cards"
+      v-show="!card.inHand"
       :key="card.id"
       :class="{
         dragging: drag.activeIndex.value === index,
@@ -475,6 +543,33 @@ onBeforeUnmount(() => {
     <div ref="deckRef" class="deck" aria-hidden="true">
       <span class="deck__label">Deck</span>
       <span class="deck__count">{{ cardStore.deckCount }}</span>
+    </div>
+
+    <!-- Player hand zone -->
+    <div ref="handRef" class="hand" :style="{ width: `${handWidth}px` }">
+      <div class="hand__cards">
+        <Card
+          v-for="(card, handIndex) in cardStore.handCards"
+          :key="card.id"
+          class="hand__card"
+          :class="{
+            'hand__card--dragging':
+              drag.target.value?.type === 'hand-card' &&
+              cardStore.cards[drag.target.value.index]?.id === card.id,
+          }"
+          :style="{
+            '--col': card.col,
+            '--row': card.row,
+            transform: `translateX(${getHandCardX(handIndex)}px)`,
+            zIndex: handIndex,
+          }"
+          @pointerdown="onHandCardPointerDown($event, card.id)"
+          @pointermove="onHandCardPointerMove"
+          @pointerup="onHandCardPointerUp"
+          @pointercancel="onHandCardPointerUp"
+        />
+      </div>
+      <span v-if="cardStore.handCount === 0" class="hand__label">Hand</span>
     </div>
 
     <!-- Selection count indicator -->
@@ -555,6 +650,58 @@ onBeforeUnmount(() => {
   border-radius: 4px;
   font-size: 12px;
   font-weight: 500;
+  pointer-events: none;
+}
+
+.hand {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  height: calc(var(--tile-h) + 32px);
+  padding: 8px 24px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.4) 0%,
+    rgba(0, 0, 0, 0.2) 70%,
+    transparent 100%
+  );
+  border-radius: 12px 12px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: width 0.2s ease-out;
+}
+
+.hand__cards {
+  position: relative;
+  height: var(--tile-h);
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  justify-content: center;
+}
+
+.hand__card {
+  position: absolute;
+  cursor: grab;
+  transition: transform 0.15s ease-out;
+  pointer-events: auto;
+}
+
+.hand__card:hover {
+  transform: translateX(var(--hover-x, 0)) translateY(-8px) !important;
+}
+
+.hand__card--dragging {
+  opacity: 0.5;
+}
+
+.hand__label {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
   pointer-events: none;
 }
 

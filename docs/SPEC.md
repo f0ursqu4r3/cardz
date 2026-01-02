@@ -21,6 +21,7 @@ A single playing card that can be moved, stacked, and organized.
 | `stackId`  | `number \| null` | ID of stack this card belongs to, or `null` |
 | `isInDeck` | `boolean`        | Whether card is part of any stack           |
 | `faceUp`   | `boolean`        | Whether card face is visible                |
+| `inHand`   | `boolean`        | Whether card is in player's hand            |
 
 ### Stack
 
@@ -59,6 +60,22 @@ A designated drop target for organizing cards.
 | `width`  | `number` | Hit area width              |
 | `height` | `number` | Hit area height             |
 
+### Hand
+
+The player's personal hand zone, displayed at the bottom of the screen.
+
+| Property  | Type       | Description                            |
+| --------- | ---------- | -------------------------------------- |
+| `cardIds` | `number[]` | Ordered list of card IDs (left→right)  |
+| Position  | Fixed      | Centered at bottom of canvas           |
+| Layout    | Horizontal | Cards overlap with `HAND_CARD_OVERLAP` |
+
+**Hand Behavior:**
+
+- Cards in hand are always face-up to the player
+- Cards removed from stacks/selection when added to hand
+- Drag card out of hand zone to place on canvas
+
 ---
 
 ## Interactions
@@ -73,11 +90,14 @@ A designated drop target for organizing cards.
 | **Add to Stack**    | Drop on stack           | Drop on stack           | Instant add to top            |
 | **Merge Stacks**    | Drop stack on stack     | Drop stack on stack     | Combine stacks                |
 | **Flip Card**       | Double-click            | Double-tap              | Toggle face up/down           |
-| **Flip Stack**      | Right double-click      | —                       | Toggle all in stack           |
+| **Flip Stack**      | Double-click (stacked)  | Double-tap (stacked)    | Toggle all in stack           |
 | **Toggle Select**   | Ctrl+click              | Two-finger tap          | Add/remove from selection     |
 | **Move Selection**  | Drag any selected card  | Drag any selected card  | Move all selected together    |
 | **Clear Selection** | Click unselected/canvas | Tap unselected/canvas   | Deselect all                  |
 | **Shake to Stack**  | Shake selection rapidly | Shake selection rapidly | Combine selection, keep held  |
+| **Shuffle Stack**   | Shake held stack        | Shake held stack        | Randomize card order          |
+| **Add to Hand**     | Drop card on hand zone  | Drop card on hand zone  | Card moves to player's hand   |
+| **Play from Hand**  | Drag card out of hand   | Drag card out of hand   | Card placed on canvas         |
 | **Shuffle Stack**   | Shake held stack        | Shake held stack        | Randomize card order in stack |
 
 > **Note:** Multi-select only works on free cards (not cards in stacks).
@@ -147,19 +167,21 @@ Cards are rendered with the following z-index priority (highest on top):
 
 ## Constants
 
-| Name              | Value | Description                                   |
-| ----------------- | ----- | --------------------------------------------- |
-| `CARD_W`          | `42`  | Card width in pixels                          |
-| `CARD_H`          | `60`  | Card height in pixels                         |
-| `STACK_HOVER_MS`  | `250` | Time to hover before stack-ready (ms)         |
-| `LONG_PRESS_MS`   | `500` | Time to hold before stack drag initiates (ms) |
-| `STACK_OFFSET_X`  | `0`   | Horizontal offset per card in stack (px)      |
-| `STACK_OFFSET_Y`  | `-1`  | Vertical offset per card in stack (px)        |
-| `CARD_BACK_COL`   | `13`  | Tilemap column for card back sprite           |
-| `CARD_BACK_ROW`   | `1`   | Tilemap row for card back sprite              |
-| `SHAKE_THRESHOLD` | `15`  | Min movement (px) to register direction       |
-| `SHAKE_REVERSALS` | `3`   | Direction changes needed to trigger shake     |
-| `SHAKE_WINDOW_MS` | `500` | Time window for shake detection (ms)          |
+| Name                | Value | Description                                   |
+| ------------------- | ----- | --------------------------------------------- |
+| `CARD_W`            | `42`  | Card width in pixels                          |
+| `CARD_H`            | `60`  | Card height in pixels                         |
+| `STACK_HOVER_MS`    | `250` | Time to hover before stack-ready (ms)         |
+| `LONG_PRESS_MS`     | `500` | Time to hold before stack drag initiates (ms) |
+| `STACK_OFFSET_X`    | `0`   | Horizontal offset per card in stack (px)      |
+| `STACK_OFFSET_Y`    | `-1`  | Vertical offset per card in stack (px)        |
+| `CARD_BACK_COL`     | `13`  | Tilemap column for card back sprite           |
+| `CARD_BACK_ROW`     | `1`   | Tilemap row for card back sprite              |
+| `SHAKE_THRESHOLD`   | `15`  | Min movement (px) to register direction       |
+| `SHAKE_REVERSALS`   | `4`   | Direction changes needed to trigger shake     |
+| `SHAKE_WINDOW_MS`   | `500` | Time window for shake detection (ms)          |
+| `HAND_CARD_OVERLAP` | `28`  | Horizontal overlap between cards in hand (px) |
+| `HAND_PADDING`      | `16`  | Padding around hand zone (px)                 |
 
 ---
 

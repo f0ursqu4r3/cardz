@@ -8,9 +8,19 @@ export const useCardStore = defineStore('cards', () => {
   const stacks = ref<Stack[]>([])
   const deckStackId = ref<number | null>(null)
   const selectedIds = ref<Set<number>>(new Set())
+  const handCardIds = ref<number[]>([])
 
   let nextStackId = 1
   let zCounter = 100
+
+  // Hand helpers
+  const handCards = computed(
+    () =>
+      handCardIds.value
+        .map((id) => cards.value.find((c) => c.id === id))
+        .filter(Boolean) as CardData[],
+  )
+  const handCount = computed(() => handCardIds.value.length)
 
   // Deck stack helper
   const deckStack = computed(() => {
@@ -35,6 +45,7 @@ export const useCardStore = defineStore('cards', () => {
       stackId: null,
       z: zCounter++,
       faceUp: true,
+      inHand: false,
     }))
   }
 
@@ -334,6 +345,48 @@ export const useCardStore = defineStore('cards', () => {
     updateStackPositions(stack)
   }
 
+  // Hand operations
+  const addToHand = (cardId: number) => {
+    const card = cards.value.find((c) => c.id === cardId)
+    if (!card) return false
+
+    // Remove from stack if in one
+    removeFromStack(cardId)
+
+    // Remove from selection if selected
+    selectedIds.value.delete(cardId)
+
+    // Add to hand if not already there
+    if (!handCardIds.value.includes(cardId)) {
+      handCardIds.value.push(cardId)
+      card.inHand = true
+      card.faceUp = true // Cards in hand are always face up to the player
+    }
+    return true
+  }
+
+  const removeFromHand = (cardId: number) => {
+    const idx = handCardIds.value.indexOf(cardId)
+    if (idx === -1) return false
+
+    handCardIds.value.splice(idx, 1)
+    const card = cards.value.find((c) => c.id === cardId)
+    if (card) {
+      card.inHand = false
+    }
+    return true
+  }
+
+  const reorderHand = (fromIndex: number, toIndex: number) => {
+    if (fromIndex < 0 || fromIndex >= handCardIds.value.length) return
+    if (toIndex < 0 || toIndex >= handCardIds.value.length) return
+
+    const [cardId] = handCardIds.value.splice(fromIndex, 1)
+    if (cardId !== undefined) {
+      handCardIds.value.splice(toIndex, 0, cardId)
+    }
+  }
+
   return {
     cards,
     stacks,
@@ -365,5 +418,11 @@ export const useCardStore = defineStore('cards', () => {
     stackSelection,
     mergeStacks,
     shuffleStack,
+    handCardIds,
+    handCards,
+    handCount,
+    addToHand,
+    removeFromHand,
+    reorderHand,
   }
 })
