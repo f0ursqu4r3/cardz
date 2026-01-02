@@ -92,6 +92,11 @@ onBeforeUnmount(() => {
         left: `${card.x}px`,
         top: `${card.y}px`,
         zIndex: interaction.getCardZ(index),
+        transform:
+          interaction.drag.activeIndex.value === index ||
+          interaction.physics.throwingCardId.value === card.id
+            ? `rotate(${interaction.physics.tilt.value}deg)`
+            : undefined,
       }"
       @pointerdown="interaction.onCardPointerDown($event, index)"
       @pointermove="interaction.onCardPointerMove"

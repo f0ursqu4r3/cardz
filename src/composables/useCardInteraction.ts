@@ -3,6 +3,7 @@ import { useCardStore } from '@/stores/cards'
 import { useDrag } from '@/composables/useDrag'
 import { useHover } from '@/composables/useHover'
 import { useShake } from '@/composables/useShake'
+import { useCardPhysics } from '@/composables/useCardPhysics'
 import type { DragTarget, Zone } from '@/types'
 import { CARD_BACK_COL, CARD_BACK_ROW, CARD_W, CARD_H } from '@/types'
 
@@ -19,6 +20,7 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
   const drag = useDrag()
   const hover = useHover()
   const shake = useShake()
+  const physics = useCardPhysics()
 
   // Track selection start positions for smooth dragging
   const selectionStartPositions = ref<Map<number, { x: number; y: number }>>(new Map())
@@ -189,6 +191,9 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       target,
     )
 
+    // Pass grab offset (where on card user clicked)
+    const grabOffsetX = x - card.x
+    physics.startDrag(x, y, grabOffsetX)
     hover.reset()
     drag.schedulePositionUpdate(applyPendingPosition)
     return true
@@ -338,6 +343,12 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     }
 
     if (!drag.isDragging.value) return
+
+    // Update physics for tilt effect
+    if (drag.target.value?.type === 'card' || drag.target.value?.type === 'hand-card') {
+      const { x, y } = drag.getPending()
+      physics.updateVelocity(x, y)
+    }
 
     // Detect shake gesture during selection drag
     if (drag.target.value?.type === 'selection') {
@@ -520,11 +531,35 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
           stacked = cardStore.addToHand(card.id)
         }
 
-        // Reset card state if not stacked
+        // If not stacked, check for throw
         if (!stacked) {
           card.stackId = null
           card.isInDeck = false
           cardStore.bumpCardZ(card.id)
+
+          // Get throw velocity
+          const { vx, vy } = physics.endDrag()
+          const speed = Math.sqrt(vx * vx + vy * vy)
+
+          // Only throw if moving fast enough
+          if (speed > 3) {
+            physics.startThrow(
+              card.id,
+              card.x,
+              card.y,
+              vx,
+              vy,
+              (x, y) => {
+                card.x = x
+                card.y = y
+              },
+              () => {
+                // Throw complete - could check for landing on zone/stack here
+              },
+            )
+          }
+        } else {
+          physics.endDrag()
         }
       }
     }
@@ -604,6 +639,7 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     canvasRef,
     drag,
     hover,
+    physics,
     isOverHand,
     findZoneAtPoint,
     getCardCol,
