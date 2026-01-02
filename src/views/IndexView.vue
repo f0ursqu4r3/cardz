@@ -43,6 +43,51 @@ const handWidth = computed(() => {
   return (count - 1) * HAND_CARD_OVERLAP + CARD_W + 48 // +48 for padding
 })
 
+// Calculate hand index from screen X position (relative to hand center)
+const getHandIndexFromX = (screenX: number): number => {
+  const handEl = handRef.value
+  if (!handEl) return 0
+
+  const handRect = handEl.getBoundingClientRect()
+  const handCenterX = handRect.left + handRect.width / 2
+  const relativeX = screenX - handCenterX
+
+  const totalCards = cardStore.handCount
+  if (totalCards === 0) return 0
+
+  const totalWidth = (totalCards - 1) * HAND_CARD_OVERLAP + CARD_W
+  const startX = -totalWidth / 2
+
+  // Calculate index from position
+  const idx = Math.round((relativeX - startX) / HAND_CARD_OVERLAP)
+  return Math.max(0, Math.min(totalCards - 1, idx))
+}
+
+// Track original hand index for reordering
+const handDragStartIndex = ref<number | null>(null)
+const handDropTargetIndex = ref<number | null>(null)
+
+// Calculate offset for cards to make room for drop placeholder
+const getHandCardOffset = (handIndex: number): number => {
+  const start = handDragStartIndex.value
+  const target = handDropTargetIndex.value
+  if (start === null || target === null || start === target) return 0
+  if (handIndex === start) return 0 // Dragged card doesn't shift
+
+  if (start < target) {
+    // Dragging right: cards between start+1 and target shift left
+    if (handIndex > start && handIndex <= target) {
+      return -HAND_CARD_OVERLAP
+    }
+  } else {
+    // Dragging left: cards between target and start-1 shift right
+    if (handIndex >= target && handIndex < start) {
+      return HAND_CARD_OVERLAP
+    }
+  }
+  return 0
+}
+
 // Computed z-index for cards
 const getCardZ = (index: number) => {
   const card = cardStore.cards[index]
@@ -286,6 +331,9 @@ const onHandCardPointerDown = (event: PointerEvent, cardId: number) => {
   const index = cardStore.cards.findIndex((c) => c.id === cardId)
   if (index === -1) return
 
+  // Store the hand index for reordering
+  handDragStartIndex.value = cardStore.handCardIds.indexOf(cardId)
+
   drag.initPointer(event, canvasRef)
 
   const target: DragTarget = { type: 'hand-card', index }
@@ -298,7 +346,13 @@ const onHandCardPointerDown = (event: PointerEvent, cardId: number) => {
 const onHandCardPointerMove = (event: PointerEvent) => {
   if (!drag.isValidPointer(event.pointerId)) return
   drag.updatePending(event, canvasRef)
-  // No position updates needed - hand cards don't move visually until dropped
+
+  // Update drop target index for placeholder
+  if (drag.target.value?.type === 'hand-card' && drag.isInBounds(event, handRef)) {
+    handDropTargetIndex.value = getHandIndexFromX(event.clientX)
+  } else {
+    handDropTargetIndex.value = null
+  }
 }
 
 const onHandCardPointerUp = (event: PointerEvent) => {
@@ -454,9 +508,12 @@ const onCardPointerUp = (event: PointerEvent) => {
   else if (drag.target.value?.type === 'hand-card') {
     const card = cardStore.cards[drag.target.value.index]
     if (card) {
-      // If dropped back on hand zone, keep in hand
+      // If dropped back on hand zone, possibly reorder
       if (drag.isInBounds(event, handRef)) {
-        // Card stays in hand, already there
+        const targetIndex = getHandIndexFromX(event.clientX)
+        if (handDragStartIndex.value !== null && targetIndex !== handDragStartIndex.value) {
+          cardStore.reorderHand(handDragStartIndex.value, targetIndex)
+        }
       } else {
         // Remove from hand and place on canvas
         cardStore.removeFromHand(card.id)
@@ -465,6 +522,8 @@ const onCardPointerUp = (event: PointerEvent) => {
         cardStore.bumpCardZ(card.id)
       }
     }
+    handDragStartIndex.value = null
+    handDropTargetIndex.value = null
   }
   // Handle card drop
   else if (drag.activeIndex.value !== null) {
@@ -548,6 +607,12 @@ onBeforeUnmount(() => {
     <!-- Player hand zone -->
     <div ref="handRef" class="hand" :style="{ width: `${handWidth}px` }">
       <div class="hand__cards">
+        <!-- Drop placeholder -->
+        <div
+          v-if="handDropTargetIndex !== null && handDragStartIndex !== null"
+          class="hand__placeholder"
+          :style="{ '--hand-x': `${getHandCardX(handDropTargetIndex)}px` }"
+        />
         <Card
           v-for="(card, handIndex) in cardStore.handCards"
           :key="card.id"
@@ -560,7 +625,7 @@ onBeforeUnmount(() => {
           :style="{
             '--col': card.col,
             '--row': card.row,
-            transform: `translateX(${getHandCardX(handIndex)}px)`,
+            '--hand-x': `${getHandCardX(handIndex) + getHandCardOffset(handIndex)}px`,
             zIndex: handIndex,
           }"
           @pointerdown="onHandCardPointerDown($event, card.id)"
@@ -682,15 +747,27 @@ onBeforeUnmount(() => {
   justify-content: center;
 }
 
+.hand__placeholder {
+  position: absolute;
+  width: var(--tile-w);
+  height: var(--tile-h);
+  border: 2px dashed rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateX(var(--hand-x, 0));
+  pointer-events: none;
+}
+
 .hand__card {
   position: absolute;
   cursor: grab;
   transition: transform 0.15s ease-out;
   pointer-events: auto;
+  transform: translateX(var(--hand-x, 0));
 }
 
 .hand__card:hover {
-  transform: translateX(var(--hover-x, 0)) translateY(-8px) !important;
+  transform: translateX(var(--hand-x, 0)) translateY(-10px);
 }
 
 .hand__card--dragging {
