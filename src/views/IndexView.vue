@@ -82,11 +82,15 @@ onBeforeUnmount(() => {
         'stack-target': interaction.hover.state.ready && interaction.hover.state.cardId === card.id,
         'face-down': !card.faceUp,
         selected: cardStore.isSelected(card.id),
+        shuffling:
+          cardStore.shufflingStackId !== null && card.stackId === cardStore.shufflingStackId,
       }"
       :style="{
         '--col': interaction.getCardCol(index),
         '--row': interaction.getCardRow(index),
-        transform: `translate3d(${card.x}px, ${card.y}px, 0)`,
+        '--shuffle-seed': card.id % 10,
+        left: `${card.x}px`,
+        top: `${card.y}px`,
         zIndex: interaction.getCardZ(index),
       }"
       @pointerdown="interaction.onCardPointerDown($event, index)"
@@ -209,6 +213,40 @@ onBeforeUnmount(() => {
     box-shadow:
       0 0 0 2px rgba(255, 255, 255, 0.8),
       0 0 12px rgba(255, 255, 255, 0.4);
+  }
+}
+
+.shuffling {
+  --delay: calc(var(--shuffle-seed, 0) * 0.02s);
+  --dir: calc(1 - 2 * (var(--shuffle-seed, 0) - 5) / 5);
+  animation: shuffle-card 0.3s ease-out var(--delay);
+  transform-origin: center center;
+}
+
+@keyframes shuffle-card {
+  0% {
+    filter: brightness(1);
+    transform: rotate(0deg);
+  }
+  15% {
+    filter: brightness(1.3);
+    transform: rotate(calc(10deg * var(--dir, 1)));
+  }
+  35% {
+    filter: brightness(0.9);
+    transform: rotate(calc(-8deg * var(--dir, 1)));
+  }
+  55% {
+    filter: brightness(1.2);
+    transform: rotate(calc(5deg * var(--dir, 1)));
+  }
+  75% {
+    filter: brightness(1);
+    transform: rotate(calc(-2deg * var(--dir, 1)));
+  }
+  100% {
+    filter: brightness(1);
+    transform: rotate(0deg);
   }
 }
 </style>

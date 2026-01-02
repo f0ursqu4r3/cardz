@@ -18,6 +18,7 @@ export const useCardStore = defineStore('cards', () => {
   const zones = ref<Zone[]>([])
   const selectedIds = ref<Set<number>>(new Set())
   const handCardIds = ref<number[]>([])
+  const shufflingStackId = ref<number | null>(null)
 
   let nextStackId = 1
   let nextZoneId = 1
@@ -423,6 +424,9 @@ export const useCardStore = defineStore('cards', () => {
     const stack = stacks.value.find((s) => s.id === stackId)
     if (!stack || stack.cardIds.length < 2) return
 
+    // Set shuffling state for animation
+    shufflingStackId.value = stackId
+
     const arr = stack.cardIds
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
@@ -432,6 +436,11 @@ export const useCardStore = defineStore('cards', () => {
     }
 
     updateStackPositions(stack)
+
+    // Clear shuffling state after animation completes
+    setTimeout(() => {
+      shufflingStackId.value = null
+    }, 300)
   }
 
   // Hand operations
@@ -526,6 +535,7 @@ export const useCardStore = defineStore('cards', () => {
     stackSelection,
     mergeStacks,
     shuffleStack,
+    shufflingStackId,
     handCardIds,
     handCards,
     handCount,
