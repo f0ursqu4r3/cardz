@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue'
+import { ref, computed, type Ref } from 'vue'
 import type { DragTarget } from '@/types'
 import { LONG_PRESS_MS } from '@/types'
 
@@ -12,6 +12,10 @@ export function useDrag() {
   const isDragging = ref(false)
   const activeIndex = ref<number | null>(null)
   const target = ref<DragTarget | null>(null)
+
+  // Reactive position for UI binding
+  const dragX = ref(0)
+  const dragY = ref(0)
 
   const state = {
     pointerId: null as number | null,
@@ -80,6 +84,9 @@ export function useDrag() {
     const { x, y } = getCanvasPoint(event, canvasRef)
     state.pendingX = x
     state.pendingY = y
+    // Update reactive position for UI binding (e.g., ghost cards)
+    dragX.value = x - state.offsetX
+    dragY.value = y - state.offsetY
     return true
   }
 
@@ -121,10 +128,16 @@ export function useDrag() {
     cancelRaf()
   }
 
-  const getDelta = () => ({
-    x: state.pendingX - state.offsetX,
-    y: state.pendingY - state.offsetY,
-  })
+  const getDelta = () => {
+    const x = state.pendingX - state.offsetX
+    const y = state.pendingY - state.offsetY
+    dragX.value = x
+    dragY.value = y
+    return { x, y }
+  }
+
+  // Computed reactive position (updated via getDelta calls)
+  const position = computed(() => ({ x: dragX.value, y: dragY.value }))
 
   const getPending = () => ({
     x: state.pendingX,
@@ -142,6 +155,7 @@ export function useDrag() {
     isDragging,
     activeIndex,
     target,
+    position,
     getCanvasPoint,
     isInBounds,
     startDrag,

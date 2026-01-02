@@ -30,6 +30,17 @@ const isDraggingCard = (cardId: number) => {
   )
 }
 
+// Get the card being dragged for ghost display
+const draggedCard = computed(() => {
+  if (props.drag.target.value?.type !== 'hand-card') return null
+  return cardStore.cards[props.drag.target.value.index] ?? null
+})
+
+// Check if we're in reorder mode (dragging within hand)
+const isReordering = computed(() => {
+  return hand.handDropTargetIndex.value !== null && hand.handDragStartIndex.value !== null
+})
+
 const onCardPointerUp = (event: PointerEvent) => {
   emit('cardPointerUp', event)
 }
@@ -43,6 +54,10 @@ const onCardContextMenu = (event: Event) => {
 defineExpose({
   handleHandCardDrop: hand.handleHandCardDrop,
   resetHandDrag: hand.resetHandDrag,
+  drawFaceDown: hand.drawFaceDown,
+  handDropTargetIndex: hand.handDropTargetIndex,
+  handDragStartIndex: hand.handDragStartIndex,
+  getHandCardX: hand.getHandCardX,
 })
 </script>
 
@@ -54,18 +69,21 @@ defineExpose({
     :style="{ width: `${hand.handWidth.value}px` }"
   >
     <div class="hand__cards">
-      <!-- Drop placeholder -->
+      <!-- Placeholder when dragging card out of hand -->
       <div
-        v-if="hand.handDropTargetIndex.value !== null && hand.handDragStartIndex.value !== null"
+        v-if="draggedCard && !isReordering && hand.handDragStartIndex.value !== null"
         class="hand__placeholder"
-        :style="{ '--hand-x': `${hand.getHandCardX(hand.handDropTargetIndex.value)}px` }"
+        :style="{
+          '--hand-x': `${hand.getHandCardX(hand.handDragStartIndex.value)}px`,
+          zIndex: hand.handDragStartIndex.value,
+        }"
       />
       <Card
         v-for="(card, handIndex) in cardStore.handCards"
         :key="card.id"
         class="hand__card"
         :class="{
-          'hand__card--dragging': isDraggingCard(card.id),
+          'hand__card--hidden': isDraggingCard(card.id),
           'hand__card--face-down': isDraggingCard(card.id) && hand.drawFaceDown.value,
         }"
         :style="{
@@ -79,6 +97,17 @@ defineExpose({
         @pointerup="onCardPointerUp"
         @pointercancel="onCardPointerUp"
         @contextmenu="onCardContextMenu"
+      />
+      <!-- Ghost card for reordering -->
+      <Card
+        v-if="isReordering && draggedCard && hand.handDropTargetIndex.value !== null"
+        class="hand__ghost"
+        :style="{
+          '--col': draggedCard.col,
+          '--row': draggedCard.row,
+          '--hand-x': `${hand.getHandCardX(hand.handDropTargetIndex.value)}px`,
+          zIndex: 100,
+        }"
       />
     </div>
     <span v-if="cardStore.handCount === 0" class="hand__label">Hand</span>
@@ -123,17 +152,6 @@ defineExpose({
   pointer-events: none;
 }
 
-.hand__placeholder {
-  position: absolute;
-  width: var(--tile-w);
-  height: var(--tile-h);
-  border: 2px dashed rgba(255, 255, 255, 0.6);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  transform: translateX(var(--hand-x, 0));
-  pointer-events: none;
-}
-
 .hand__card {
   position: absolute;
   cursor: grab;
@@ -148,6 +166,29 @@ defineExpose({
 
 .hand__card--dragging {
   opacity: 0.5;
+}
+
+.hand__card--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hand__placeholder {
+  position: absolute;
+  width: var(--tile-w);
+  height: var(--tile-h);
+  border: 2px dashed rgba(255, 255, 255, 0.5);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateX(var(--hand-x, 0));
+  pointer-events: none;
+}
+
+.hand__ghost {
+  position: absolute;
+  transform: translateX(var(--hand-x, 0));
+  pointer-events: none;
+  opacity: 0.7;
 }
 
 .hand__label {

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import Card from '@/components/CardComp.vue'
 import ZoneComp from '@/components/ZoneComp.vue'
 import HandComp from '@/components/HandComp.vue'
 import { useCardStore } from '@/stores/cards'
 import { useCardInteraction } from '@/composables/useCardInteraction'
 import { SquarePlus } from 'lucide-vue-next'
+import { CARD_BACK_COL, CARD_BACK_ROW } from '@/types'
 
 const cardStore = useCardStore()
 
@@ -18,6 +19,21 @@ const handCompRef = ref<InstanceType<typeof HandComp> | null>(null)
 const interaction = useCardInteraction({
   handRef: handRef,
 })
+
+// Ghost card for hand dragging
+const handDragCard = computed(() => {
+  if (interaction.drag.target.value?.type !== 'hand-card') return null
+  const index = interaction.drag.target.value.index
+  return cardStore.cards[index] ?? null
+})
+
+// Check if ghost card is in reorder mode (inside hand zone)
+const isHandReordering = computed(() => {
+  return handCompRef.value?.handDropTargetIndex !== null &&
+    handCompRef.value?.handDragStartIndex !== null
+})
+
+const handDragPosition = computed(() => interaction.drag.position.value)
 
 // Wire up hand card drop handler
 interaction.setHandCardDropHandler((event) => handCompRef.value?.handleHandCardDrop(event) ?? false)
@@ -114,6 +130,19 @@ onBeforeUnmount(() => {
       :drag="interaction.drag"
       :is-drop-target="interaction.isOverHand.value"
       @card-pointer-up="onPointerUp"
+    />
+
+    <!-- Ghost card when dragging from hand -->
+    <Card
+      v-if="handDragCard && !isHandReordering"
+      class="hand-ghost"
+      :style="{
+        '--col': handCompRef?.drawFaceDown ? CARD_BACK_COL : handDragCard.col,
+        '--row': handCompRef?.drawFaceDown ? CARD_BACK_ROW : handDragCard.row,
+        left: `${handDragPosition.x}px`,
+        top: `${handDragPosition.y}px`,
+        zIndex: 2000,
+      }"
     />
 
     <!-- Selection count indicator -->
@@ -253,5 +282,10 @@ onBeforeUnmount(() => {
     filter: brightness(1);
     transform: rotate(0deg);
   }
+}
+
+.hand-ghost {
+  pointer-events: none;
+  cursor: grabbing;
 }
 </style>
