@@ -203,10 +203,11 @@ onBeforeUnmount(() => {
   padding: 8px 24px;
   background: linear-gradient(
     to top,
-    rgba(0, 0, 0, 0.4) 0%,
-    rgba(0, 0, 0, 0.2) 70%,
+    rgba(0, 0, 0, 0.2) 0%,
+    rgba(0, 0, 0, 0.05) 75%,
     transparent 100%
   );
+  box-shadow: inset 0px 0px 4px -2px rgba(255, 255, 255, 0.3);
   border-radius: 12px 12px 0 0;
   display: flex;
   align-items: center;
@@ -226,10 +227,8 @@ onBeforeUnmount(() => {
 .hand__cards {
   position: relative;
   height: var(--tile-h);
-  display: flex;
-  align-items: center;
+  width: 0;
   pointer-events: none;
-  justify-content: center;
 }
 
 .hand__placeholder {
