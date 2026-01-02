@@ -180,13 +180,13 @@ defineExpose({
   border: 2px dashed rgba(255, 255, 255, 0.5);
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.05);
-  transform: translateX(var(--hand-x, 0));
+  transform: translateX(var(--hand-x, 0)) translateY(-10px);
   pointer-events: none;
 }
 
 .hand__ghost {
   position: absolute;
-  transform: translateX(var(--hand-x, 0));
+  transform: translateX(var(--hand-x, 0)) translateY(-10px);
   pointer-events: none;
   opacity: 0.7;
 }
