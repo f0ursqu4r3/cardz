@@ -530,13 +530,16 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
   const onZonePointerDown = (event: PointerEvent, zoneId: number) => {
     if (event.button !== 0) return
 
+    const zone = cardStore.zones.find((z) => z.id === zoneId)
+    if (!zone) return
+
+    // If zone is locked, don't allow dragging or resizing
+    if (zone.locked) return
+
     event.preventDefault()
     event.stopPropagation()
     const targetEl = event.currentTarget as HTMLElement | null
     targetEl?.setPointerCapture(event.pointerId)
-
-    const zone = cardStore.zones.find((z) => z.id === zoneId)
-    if (!zone) return
 
     drag.initPointer(event, canvasRef)
 
@@ -573,13 +576,6 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     drag.reset()
   }
 
-  const onZoneDoubleClick = (event: MouseEvent, zoneId: number) => {
-    event.preventDefault()
-    event.stopPropagation()
-    // Enter edit mode for zone label
-    cardStore.editingZoneId = zoneId
-  }
-
   const initCards = (count: number, externalCanvasRef?: Ref<HTMLElement | null>) => {
     const canvas = externalCanvasRef?.value ?? canvasRef.value
     canvasRef.value = canvas
@@ -611,7 +607,6 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     onZonePointerDown,
     onZonePointerMove,
     onZonePointerUp,
-    onZoneDoubleClick,
     initCards,
     setHandCardDropHandler,
   }

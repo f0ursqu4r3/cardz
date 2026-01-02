@@ -6,7 +6,7 @@ import { CARD_W, HAND_CARD_OVERLAP } from '@/types'
 import { ref } from 'vue'
 
 export function useHand(
-  canvasRef: Ref<HTMLElement | null>,
+  canvasRef: Ref<HTMLElement | null> | null,
   handRef: Ref<HTMLElement | null>,
   drag: ReturnType<typeof useDrag>,
 ) {

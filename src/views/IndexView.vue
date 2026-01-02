@@ -62,7 +62,6 @@ onBeforeUnmount(() => {
       @pointerdown="interaction.onZonePointerDown($event, zone.id)"
       @pointermove="interaction.onZonePointerMove"
       @pointerup="interaction.onZonePointerUp"
-      @dblclick="interaction.onZoneDoubleClick($event, zone.id)"
     />
 
     <Card

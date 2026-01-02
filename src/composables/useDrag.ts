@@ -25,9 +25,9 @@ export function useDrag() {
 
   const getCanvasPoint = (
     event: PointerEvent,
-    canvasRef: Ref<HTMLElement | null>,
+    canvasRef: Ref<HTMLElement | null> | null,
   ): { x: number; y: number } => {
-    const rect = canvasRef.value?.getBoundingClientRect()
+    const rect = canvasRef?.value?.getBoundingClientRect()
     const x = rect ? event.clientX - rect.left : event.clientX
     const y = rect ? event.clientY - rect.top : event.clientY
     return { x, y }
@@ -65,7 +65,7 @@ export function useDrag() {
     return true
   }
 
-  const initPointer = (event: PointerEvent, canvasRef: Ref<HTMLElement | null>) => {
+  const initPointer = (event: PointerEvent, canvasRef: Ref<HTMLElement | null> | null) => {
     const { x, y } = getCanvasPoint(event, canvasRef)
     state.pointerId = event.pointerId
     state.pendingX = x
@@ -75,7 +75,7 @@ export function useDrag() {
     activeIndex.value = null
   }
 
-  const updatePending = (event: PointerEvent, canvasRef: Ref<HTMLElement | null>) => {
+  const updatePending = (event: PointerEvent, canvasRef: Ref<HTMLElement | null> | null) => {
     if (event.pointerId !== state.pointerId) return false
     const { x, y } = getCanvasPoint(event, canvasRef)
     state.pendingX = x

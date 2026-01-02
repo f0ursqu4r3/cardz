@@ -18,7 +18,6 @@ export const useCardStore = defineStore('cards', () => {
   const zones = ref<Zone[]>([])
   const selectedIds = ref<Set<number>>(new Set())
   const handCardIds = ref<number[]>([])
-  const editingZoneId = ref<number | null>(null)
 
   let nextStackId = 1
   let nextZoneId = 1
@@ -177,6 +176,7 @@ export const useCardStore = defineStore('cards', () => {
       height,
       label,
       faceUp,
+      locked: false,
       stackId: null,
     }
     zones.value.push(zone)
@@ -493,7 +493,6 @@ export const useCardStore = defineStore('cards', () => {
     cards,
     stacks,
     zones,
-    editingZoneId,
     selectedIds,
     createCards,
     updateStackPositions,

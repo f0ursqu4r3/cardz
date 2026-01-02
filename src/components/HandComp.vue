@@ -6,7 +6,7 @@ import { useHand } from '@/composables/useHand'
 import type { useDrag } from '@/composables/useDrag'
 
 const props = defineProps<{
-  canvasRef: Ref<HTMLElement | null>
+  canvasRef: Ref<HTMLElement | null> | null
   drag: ReturnType<typeof useDrag>
   isDropTarget: boolean
 }>()
