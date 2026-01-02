@@ -15,7 +15,8 @@
     calc(-1 * (var(--pad-y) + (var(--row) * (var(--tile-h) + var(--gap-y)))));
 
   contain: layout paint;
-  image-rendering: auto;
+  image-rendering: -webkit-optimize-contrast; /* Safari */
+  image-rendering: crisp-edges;
 
   cursor: grab;
   will-change: transform;

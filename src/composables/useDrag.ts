@@ -8,12 +8,15 @@ export interface DragCallbacks {
   onDragEnd?: () => void
 }
 
-export function useDrag() {
+// Viewport transform function type
+export type ScreenToWorldFn = (screenX: number, screenY: number) => { x: number; y: number }
+
+export function useDrag(screenToWorld?: ScreenToWorldFn) {
   const isDragging = ref(false)
   const activeIndex = ref<number | null>(null)
   const target = ref<DragTarget | null>(null)
 
-  // Reactive position for UI binding
+  // Reactive position for UI binding (screen coordinates)
   const dragX = ref(0)
   const dragY = ref(0)
 
@@ -27,10 +30,23 @@ export function useDrag() {
     timerId: null as number | null,
   }
 
+  // Store the screenToWorld function so it can be updated
+  let screenToWorldFn: ScreenToWorldFn | undefined = screenToWorld
+
+  const setScreenToWorld = (fn: ScreenToWorldFn | undefined) => {
+    screenToWorldFn = fn
+  }
+
   const getCanvasPoint = (
     event: PointerEvent,
     canvasRef: Ref<HTMLElement | null> | null,
   ): { x: number; y: number } => {
+    // If we have a viewport transform, use it to get world coordinates
+    if (screenToWorldFn) {
+      return screenToWorldFn(event.clientX, event.clientY)
+    }
+
+    // Fallback to simple canvas-relative coordinates
     const rect = canvasRef?.value?.getBoundingClientRect()
     const x = rect ? event.clientX - rect.left : event.clientX
     const y = rect ? event.clientY - rect.top : event.clientY
@@ -58,7 +74,10 @@ export function useDrag() {
   ) => {
     if (isDragging.value || state.pointerId === null) return false
 
-    const { x, y } = getCanvasPoint(event, canvasRef)
+    // Use pending coordinates (already in world space from initPointer)
+    // instead of re-transforming via getCanvasPoint
+    const x = state.pendingX
+    const y = state.pendingY
 
     target.value = dragTarget
     state.offsetX = x - cardX
@@ -169,6 +188,7 @@ export function useDrag() {
     getDelta,
     getPending,
     setOffset,
+    setScreenToWorld,
     isValidPointer,
   }
 }

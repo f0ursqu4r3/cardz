@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Card from '@/components/CardComp.vue'
 import ZoneComp from '@/components/ZoneComp.vue'
 import HandComp from '@/components/HandComp.vue'
+import MinimapComp from '@/components/MinimapComp.vue'
 import { useCardStore } from '@/stores/cards'
 import { useCardInteraction } from '@/composables/useCardInteraction'
-import { SquarePlus } from 'lucide-vue-next'
+import { useViewport } from '@/composables/useViewport'
+import { SquarePlus, Home } from 'lucide-vue-next'
 import { CARD_BACK_COL, CARD_BACK_ROW } from '@/types'
 
 const cardStore = useCardStore()
@@ -15,10 +17,23 @@ const canvasRef = ref<HTMLElement | null>(null)
 const handRef = ref<HTMLElement | null>(null)
 const handCompRef = ref<InstanceType<typeof HandComp> | null>(null)
 
+// Viewport for pan/zoom
+const viewport = useViewport(canvasRef)
+
+// Track if space is held for panning
+const spaceHeld = ref(false)
+
 // Set up card interaction
 const interaction = useCardInteraction({
   handRef: handRef,
 })
+
+// Wire viewport transform to drag system
+watch(
+  () => viewport.screenToWorld,
+  (fn) => interaction.drag.setScreenToWorld(fn),
+  { immediate: true },
+)
 
 // Ghost card for hand dragging
 const handDragCard = computed(() => {
@@ -53,78 +68,159 @@ const isZoneDragging = (zoneId: number) => {
   )
 }
 
-// Create new zone at center of canvas
+// Create new zone at center of viewport (in world coordinates)
 const addZone = () => {
+  const bounds = viewport.getVisibleBounds()
+  const centerX = bounds.x + bounds.width / 2 - 50
+  const centerY = bounds.y + bounds.height / 2 - 50
+  cardStore.createZone(centerX, centerY, 'New Zone', false)
+}
+
+// Canvas dimensions for minimap
+const canvasDimensions = computed(() => {
   const rect = canvasRef.value?.getBoundingClientRect()
-  if (rect) {
-    cardStore.createZone(rect.width / 2 - 50, rect.height / 2 - 50, 'New Zone', false)
+  return { width: rect?.width ?? 800, height: rect?.height ?? 600 }
+})
+
+// Keyboard handlers for panning
+const onKeyDown = (event: KeyboardEvent) => {
+  if (event.code === 'Space' && !event.repeat) {
+    spaceHeld.value = true
+    event.preventDefault()
+  }
+  // Reset viewport with Home key
+  if (event.code === 'Home') {
+    viewport.resetViewport()
+  }
+}
+
+const onKeyUp = (event: KeyboardEvent) => {
+  if (event.code === 'Space') {
+    spaceHeld.value = false
+    viewport.endPan()
+  }
+}
+
+// Canvas pointer handlers for panning
+const onCanvasPointerDown = (event: PointerEvent) => {
+  // Middle mouse button or space+left click for panning
+  if (event.button === 1 || (event.button === 0 && spaceHeld.value)) {
+    event.preventDefault()
+    viewport.startPan(event)
+    ;(event.target as HTMLElement)?.setPointerCapture(event.pointerId)
+  }
+}
+
+const onCanvasPointerMove = (event: PointerEvent) => {
+  if (viewport.isPanning.value) {
+    viewport.updatePan(event)
+  }
+}
+
+const onCanvasPointerUp = (event: PointerEvent) => {
+  if (viewport.isPanning.value) {
+    viewport.endPan()
+    ;(event.target as HTMLElement)?.releasePointerCapture(event.pointerId)
   }
 }
 
 onMounted(() => {
   interaction.initCards(10, canvasRef)
+  window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('keyup', onKeyUp)
 })
 
 onBeforeUnmount(() => {
   interaction.drag.cancelRaf()
+  window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('keyup', onKeyUp)
 })
 </script>
 
 <template>
-  <div ref="canvasRef" class="canvas">
-    <!-- Table UI -->
+  <div
+    ref="canvasRef"
+    class="canvas"
+    :class="{ 'canvas--panning': viewport.isPanning.value || spaceHeld }"
+    @wheel="viewport.onWheel"
+    @pointerdown="onCanvasPointerDown"
+    @pointermove="onCanvasPointerMove"
+    @pointerup="onCanvasPointerUp"
+    @pointercancel="onCanvasPointerUp"
+  >
+    <!-- Table UI (fixed position, not affected by pan/zoom) -->
     <div class="table-ui">
       <button class="table-ui__btn" @click="addZone" title="Add Zone">
         <SquarePlus class="table-ui__icon" />
       </button>
+      <button class="table-ui__btn" @click="viewport.resetViewport" title="Reset View (Home)">
+        <Home class="table-ui__icon" />
+      </button>
     </div>
 
-    <!-- Zones (deck areas) -->
-    <ZoneComp
-      v-for="zone in cardStore.zones"
-      :key="zone.id"
-      :zone="zone"
-      :is-dragging="isZoneDragging(zone.id)"
-      @pointerdown="interaction.onZonePointerDown($event, zone.id)"
-      @pointermove="interaction.onZonePointerMove"
-      @pointerup="interaction.onZonePointerUp"
-    />
+    <!-- World container (pan/zoom transform) -->
+    <div class="world" :style="{ transform: viewport.worldTransform.value }">
+      <!-- Zones (deck areas) -->
+      <ZoneComp
+        v-for="zone in cardStore.zones"
+        :key="zone.id"
+        :zone="zone"
+        :is-dragging="isZoneDragging(zone.id)"
+        @pointerdown="interaction.onZonePointerDown($event, zone.id)"
+        @pointermove="interaction.onZonePointerMove"
+        @pointerup="interaction.onZonePointerUp"
+      />
 
-    <Card
-      v-for="(card, index) in cardStore.cards"
-      v-show="!card.inHand"
-      :key="card.id"
-      :class="{
-        dragging: interaction.drag.activeIndex.value === index,
-        'in-deck': card.isInDeck,
-        'stack-target': interaction.hover.state.ready && interaction.hover.state.cardId === card.id,
-        'face-down': !card.faceUp,
-        selected: cardStore.isSelected(card.id),
-        shuffling:
-          cardStore.shufflingStackId !== null && card.stackId === cardStore.shufflingStackId,
-      }"
-      :style="{
-        '--col': interaction.getCardCol(index),
-        '--row': interaction.getCardRow(index),
-        '--shuffle-seed': card.id % 10,
-        left: `${card.x}px`,
-        top: `${card.y}px`,
-        zIndex: interaction.getCardZ(index),
-        transform:
-          interaction.drag.activeIndex.value === index ||
-          interaction.physics.throwingCardId.value === card.id
-            ? `rotate(${interaction.physics.tilt.value}deg)`
-            : undefined,
-      }"
-      @pointerdown="interaction.onCardPointerDown($event, index)"
-      @pointermove="interaction.onCardPointerMove"
-      @pointerup="onPointerUp"
-      @pointercancel="onPointerUp"
-      @contextmenu="interaction.onCardContextMenu"
-      @dblclick="interaction.onCardDoubleClick($event, index)"
-    />
+      <Card
+        v-for="(card, index) in cardStore.cards"
+        v-show="!card.inHand"
+        :key="card.id"
+        :class="{
+          dragging: interaction.drag.activeIndex.value === index,
+          'in-deck': card.isInDeck,
+          'stack-target':
+            interaction.hover.state.ready && interaction.hover.state.cardId === card.id,
+          'face-down': !card.faceUp,
+          selected: cardStore.isSelected(card.id),
+          shuffling:
+            cardStore.shufflingStackId !== null && card.stackId === cardStore.shufflingStackId,
+        }"
+        :style="{
+          '--col': interaction.getCardCol(index),
+          '--row': interaction.getCardRow(index),
+          '--shuffle-seed': card.id % 10,
+          left: `${card.x}px`,
+          top: `${card.y}px`,
+          zIndex: interaction.getCardZ(index),
+          transform:
+            interaction.drag.activeIndex.value === index ||
+            interaction.physics.throwingCardId.value === card.id
+              ? `rotate(${interaction.physics.tilt.value}deg)`
+              : undefined,
+        }"
+        @pointerdown="interaction.onCardPointerDown($event, index)"
+        @pointermove="interaction.onCardPointerMove"
+        @pointerup="onPointerUp"
+        @pointercancel="onPointerUp"
+        @contextmenu="interaction.onCardContextMenu"
+        @dblclick="interaction.onCardDoubleClick($event, index)"
+      />
 
-    <!-- Player hand -->
+      <!-- Ghost card when dragging from hand (in world space) -->
+      <Card
+        v-if="handDragCard && !isHandReordering"
+        class="hand-ghost"
+        :style="{
+          '--col': handCompRef?.drawFaceDown ? CARD_BACK_COL : handDragCard.col,
+          '--row': handCompRef?.drawFaceDown ? CARD_BACK_ROW : handDragCard.row,
+          left: `${handDragPosition.x}px`,
+          top: `${handDragPosition.y}px`,
+          zIndex: 2000,
+        }"
+      />
+    </div>
+
+    <!-- Player hand (fixed position) -->
     <HandComp
       ref="handCompRef"
       v-model:hand-ref="handRef"
@@ -134,23 +230,17 @@ onBeforeUnmount(() => {
       @card-pointer-up="onPointerUp"
     />
 
-    <!-- Ghost card when dragging from hand -->
-    <Card
-      v-if="handDragCard && !isHandReordering"
-      class="hand-ghost"
-      :style="{
-        '--col': handCompRef?.drawFaceDown ? CARD_BACK_COL : handDragCard.col,
-        '--row': handCompRef?.drawFaceDown ? CARD_BACK_ROW : handDragCard.row,
-        left: `${handDragPosition.x}px`,
-        top: `${handDragPosition.y}px`,
-        zIndex: 2000,
-      }"
-    />
-
     <!-- Selection count indicator -->
     <div v-if="cardStore.hasSelection" class="selection-indicator">
       {{ cardStore.selectionCount }} selected
     </div>
+
+    <!-- Minimap -->
+    <MinimapComp
+      :viewport="viewport"
+      :canvas-width="canvasDimensions.width"
+      :canvas-height="canvasDimensions.height"
+    />
   </div>
 </template>
 
@@ -170,6 +260,24 @@ onBeforeUnmount(() => {
   overflow: hidden;
   user-select: none;
   touch-action: none;
+}
+
+.canvas--panning {
+  cursor: grab;
+}
+
+.canvas--panning:active {
+  cursor: grabbing;
+}
+
+.world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+  image-rendering: -webkit-optimize-contrast; /* Safari */
+  image-rendering: crisp-edges;
 }
 
 .stack-target {
