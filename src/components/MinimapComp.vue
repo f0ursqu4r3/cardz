@@ -3,6 +3,9 @@ import { computed, ref } from 'vue'
 import { useCardStore } from '@/stores/cards'
 import type { useViewport } from '@/composables/useViewport'
 import { ZoomIn, ZoomOut, Home, Maximize2, Map } from 'lucide-vue-next'
+import TablePanel from '@/components/ui/TablePanel.vue'
+import TableButton from '@/components/ui/TableButton.vue'
+import TableToolbar from '@/components/ui/TableToolbar.vue'
 
 const props = defineProps<{
   viewport: ReturnType<typeof useViewport>
@@ -172,38 +175,35 @@ const toggleCollapsed = () => {
 <template>
   <div class="minimap-container">
     <!-- Collapsed state: just a button -->
-    <button
-      v-if="isCollapsed"
-      class="minimap-toggle minimap-toggle--collapsed"
-      @click="toggleCollapsed"
-      title="Show Minimap"
-    >
-      <Map :size="18" />
-    </button>
+    <TablePanel v-if="isCollapsed">
+      <TableButton title="Show Minimap" @click="toggleCollapsed">
+        <Map />
+      </TableButton>
+    </TablePanel>
 
     <!-- Expanded state -->
-    <div v-else class="minimap-panel">
+    <TablePanel v-else no-padding>
       <!-- Controls bar -->
-      <div class="minimap-controls">
-        <button class="minimap-btn" @click="handleZoomOut" title="Zoom Out">
-          <ZoomOut :size="14" />
-        </button>
-        <span class="minimap-zoom">{{ Math.round(viewport.zoom.value * 100) }}%</span>
-        <button class="minimap-btn" @click="handleZoomIn" title="Zoom In">
-          <ZoomIn :size="14" />
-        </button>
-        <div class="minimap-separator" />
-        <button class="minimap-btn" @click="handleReset" title="Reset View (Home)">
-          <Home :size="14" />
-        </button>
-        <button class="minimap-btn" @click="handleFitAll" title="Fit All">
-          <Maximize2 :size="14" />
-        </button>
-        <div class="minimap-separator" />
-        <button class="minimap-btn" @click="toggleCollapsed" title="Hide Minimap">
-          <Map :size="14" />
-        </button>
-      </div>
+      <TableToolbar border-bottom>
+        <TableButton size="sm" title="Zoom Out" @click="handleZoomOut">
+          <ZoomOut />
+        </TableButton>
+        <span class="label">{{ Math.round(viewport.zoom.value * 100) }}%</span>
+        <TableButton size="sm" title="Zoom In" @click="handleZoomIn">
+          <ZoomIn />
+        </TableButton>
+        <div class="separator" />
+        <TableButton size="sm" title="Reset View (Home)" @click="handleReset">
+          <Home />
+        </TableButton>
+        <TableButton size="sm" title="Fit All" @click="handleFitAll">
+          <Maximize2 />
+        </TableButton>
+        <div class="separator" />
+        <TableButton size="sm" title="Hide Minimap" @click="toggleCollapsed">
+          <Map />
+        </TableButton>
+      </TableToolbar>
 
       <!-- Minimap display -->
       <div
@@ -253,92 +253,11 @@ const toggleCollapsed = () => {
           }"
         />
       </div>
-    </div>
+    </TablePanel>
   </div>
 </template>
 
 <style scoped>
-.minimap-container {
-  /* Positioned by parent flex container */
-}
-
-.minimap-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  background: rgba(0, 0, 0, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  color: rgba(255, 255, 255, 0.8);
-  cursor: pointer;
-  backdrop-filter: blur(4px);
-  transition: all 0.15s ease;
-}
-
-.minimap-toggle:hover {
-  background: rgba(0, 0, 0, 0.8);
-  border-color: rgba(255, 255, 255, 0.3);
-  color: white;
-}
-
-.minimap-panel {
-  display: flex;
-  flex-direction: column;
-  background: rgba(0, 0, 0, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  overflow: hidden;
-  backdrop-filter: blur(4px);
-}
-
-.minimap-controls {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 4px 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.minimap-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  color: rgba(255, 255, 255, 0.7);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.minimap-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-}
-
-.minimap-btn:active {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.minimap-zoom {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.7);
-  min-width: 36px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-.minimap-separator {
-  width: 1px;
-  height: 16px;
-  background: rgba(255, 255, 255, 0.15);
-  margin: 0 2px;
-}
-
 .minimap {
   position: relative;
   cursor: crosshair;

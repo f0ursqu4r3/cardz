@@ -4,6 +4,8 @@ import Card from '@/components/CardComp.vue'
 import ZoneComp from '@/components/ZoneComp.vue'
 import HandComp from '@/components/HandComp.vue'
 import MinimapComp from '@/components/MinimapComp.vue'
+import TablePanel from '@/components/ui/TablePanel.vue'
+import TableButton from '@/components/ui/TableButton.vue'
 import { useCardStore } from '@/stores/cards'
 import { useCardInteraction } from '@/composables/useCardInteraction'
 import { useViewport } from '@/composables/useViewport'
@@ -157,9 +159,11 @@ onBeforeUnmount(() => {
         :canvas-height="canvasDimensions.height"
       />
 
-      <button class="table-ui__btn" @click="addZone" title="Add Zone">
-        <SquarePlus class="table-ui__icon" />
-      </button>
+      <TablePanel>
+        <TableButton title="Add Zone" @click="addZone">
+          <SquarePlus />
+        </TableButton>
+      </TablePanel>
     </div>
 
     <!-- World container (pan/zoom transform) -->
@@ -311,36 +315,6 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 8px;
   z-index: 1000;
-}
-
-.table-ui__btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  backdrop-filter: blur(8px);
-}
-
-.table-ui__btn:hover {
-  background: rgba(0, 0, 0, 0.75);
-  border-color: rgba(255, 255, 255, 0.25);
-}
-
-.table-ui__btn:active {
-  transform: scale(0.97);
-}
-
-.table-ui__icon {
-  width: 16px;
-  height: 16px;
 }
 
 @keyframes stack-glow {
