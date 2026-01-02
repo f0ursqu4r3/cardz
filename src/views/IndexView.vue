@@ -5,6 +5,7 @@ import ZoneComp from '@/components/ZoneComp.vue'
 import HandComp from '@/components/HandComp.vue'
 import { useCardStore } from '@/stores/cards'
 import { useCardInteraction } from '@/composables/useCardInteraction'
+import { SquarePlus } from 'lucide-vue-next'
 
 const cardStore = useCardStore()
 
@@ -34,11 +35,11 @@ const isZoneDragging = (zoneId: number) => {
   )
 }
 
-// Create new zone on double-click
-const createNewZone = () => {
+// Create new zone at center of canvas
+const addZone = () => {
   const rect = canvasRef.value?.getBoundingClientRect()
   if (rect) {
-    cardStore.createZone(rect.width / 2 - 33, rect.height / 2 - 42, 'New Zone', false)
+    cardStore.createZone(rect.width / 2 - 50, rect.height / 2 - 50, 'New Zone', false)
   }
 }
 
@@ -52,7 +53,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="canvasRef" class="canvas" @dblclick="createNewZone">
+  <div ref="canvasRef" class="canvas">
+    <!-- Table UI -->
+    <div class="table-ui">
+      <button class="table-ui__btn" @click="addZone" title="Add Zone">
+        <SquarePlus class="table-ui__icon" />
+      </button>
+    </div>
+
     <!-- Zones (deck areas) -->
     <ZoneComp
       v-for="zone in cardStore.zones"
@@ -148,6 +156,46 @@ onBeforeUnmount(() => {
   font-size: 12px;
   font-weight: 500;
   pointer-events: none;
+}
+
+.table-ui {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+}
+
+.table-ui__btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  backdrop-filter: blur(8px);
+}
+
+.table-ui__btn:hover {
+  background: rgba(0, 0, 0, 0.75);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.table-ui__btn:active {
+  transform: scale(0.97);
+}
+
+.table-ui__icon {
+  width: 16px;
+  height: 16px;
 }
 
 @keyframes stack-glow {

@@ -128,8 +128,8 @@ export const useCardStore = defineStore('cards', () => {
     const card = cards.value.find((c) => c.id === cardId)
     if (!card) return
 
-    // If stack belongs to a zone, use zone's faceUp setting for first card
-    if (stack.cardIds.length === 0 && stack.zoneId !== undefined) {
+    // If stack belongs to a zone, always use zone's faceUp setting
+    if (stack.zoneId !== undefined) {
       const zone = zones.value.find((z) => z.id === stack.zoneId)
       if (zone) {
         card.faceUp = zone.faceUp

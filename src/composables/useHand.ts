@@ -2,7 +2,7 @@ import { computed, type Ref } from 'vue'
 import { useCardStore } from '@/stores/cards'
 import type { useDrag } from '@/composables/useDrag'
 import type { DragTarget } from '@/types'
-import { CARD_W, HAND_CARD_OVERLAP } from '@/types'
+import { CARD_W, HAND_CARD_OVERLAP, LONG_PRESS_MS } from '@/types'
 import { ref } from 'vue'
 
 export function useHand(
@@ -15,6 +15,10 @@ export function useHand(
   // Track original hand index for reordering
   const handDragStartIndex = ref<number | null>(null)
   const handDropTargetIndex = ref<number | null>(null)
+  // Track if card should be drawn face-down (right-click or long-press on touch)
+  const drawFaceDown = ref(false)
+  // Long-press timer for touch face-down draw
+  let longPressTimer: number | null = null
 
   // Hand card position calculation
   const getHandCardX = (index: number): number => {
@@ -72,19 +76,20 @@ export function useHand(
     return 0
   }
 
-  // Hand card event handlers
-  const onHandCardPointerDown = (event: PointerEvent, cardId: number) => {
-    if (event.button !== 0) return
+  const clearLongPressTimer = () => {
+    if (longPressTimer !== null) {
+      window.clearTimeout(longPressTimer)
+      longPressTimer = null
+    }
+  }
 
-    event.preventDefault()
-    const targetEl = event.currentTarget as HTMLElement | null
-    targetEl?.setPointerCapture(event.pointerId)
-
+  const startHandCardDrag = (event: PointerEvent, cardId: number, faceDown: boolean) => {
     const index = cardStore.cards.findIndex((c) => c.id === cardId)
     if (index === -1) return
 
     // Store the hand index for reordering
     handDragStartIndex.value = cardStore.handCardIds.indexOf(cardId)
+    drawFaceDown.value = faceDown
 
     drag.initPointer(event, canvasRef)
 
@@ -95,9 +100,47 @@ export function useHand(
     drag.setOffset(CARD_W / 2, 30) // Drag from center-ish of card
   }
 
+  // Hand card event handlers
+  const onHandCardPointerDown = (event: PointerEvent, cardId: number) => {
+    // Accept left-click (0) or right-click (2)
+    if (event.button !== 0 && event.button !== 2) return
+
+    event.preventDefault()
+    const targetEl = event.currentTarget as HTMLElement | null
+    targetEl?.setPointerCapture(event.pointerId)
+
+    // Right-click: immediately start face-down drag
+    if (event.button === 2) {
+      startHandCardDrag(event, cardId, true)
+      return
+    }
+
+    // Left-click: start normal drag, but set up long-press for face-down (touch support)
+    // Detect touch by checking pointer type
+    const isTouch = event.pointerType === 'touch'
+
+    if (isTouch) {
+      // For touch: set up long-press timer for face-down draw
+      clearLongPressTimer()
+      longPressTimer = window.setTimeout(() => {
+        longPressTimer = null
+        // Convert to face-down drag
+        drawFaceDown.value = true
+      }, LONG_PRESS_MS)
+    }
+
+    startHandCardDrag(event, cardId, false)
+  }
+
   const onHandCardPointerMove = (event: PointerEvent) => {
     if (!drag.isValidPointer(event.pointerId)) return
     drag.updatePending(event, canvasRef)
+
+    // Clear long-press timer on significant movement (user is dragging, not long-pressing)
+    // Only clear if moving outside hand zone (reordering doesn't cancel long-press)
+    if (longPressTimer !== null && !drag.isInBounds(event, handRef)) {
+      clearLongPressTimer()
+    }
 
     // Update drop target index for placeholder
     if (drag.target.value?.type === 'hand-card' && drag.isInBounds(event, handRef)) {
@@ -108,6 +151,8 @@ export function useHand(
   }
 
   const handleHandCardDrop = (event: PointerEvent) => {
+    clearLongPressTimer()
+
     if (drag.target.value?.type !== 'hand-card') return false
 
     const card = cardStore.cards[drag.target.value.index]
@@ -124,20 +169,26 @@ export function useHand(
       cardStore.removeFromHand(card.id)
       card.x = drag.getDelta().x
       card.y = drag.getDelta().y
+      // Set face-down if right-click drag or long-press
+      card.faceUp = !drawFaceDown.value
       cardStore.bumpCardZ(card.id)
     }
 
     handDragStartIndex.value = null
     handDropTargetIndex.value = null
+    drawFaceDown.value = false
     return true
   }
 
   const resetHandDrag = () => {
+    clearLongPressTimer()
     handDragStartIndex.value = null
     handDropTargetIndex.value = null
+    drawFaceDown.value = false
   }
 
   return {
+    drawFaceDown,
     handDragStartIndex,
     handDropTargetIndex,
     handWidth,

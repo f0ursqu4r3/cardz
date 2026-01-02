@@ -34,6 +34,11 @@ const onCardPointerUp = (event: PointerEvent) => {
   emit('cardPointerUp', event)
 }
 
+// Prevent context menu on right-click drag
+const onCardContextMenu = (event: Event) => {
+  event.preventDefault()
+}
+
 // Expose hand methods for parent component
 defineExpose({
   handleHandCardDrop: hand.handleHandCardDrop,
@@ -59,10 +64,13 @@ defineExpose({
         v-for="(card, handIndex) in cardStore.handCards"
         :key="card.id"
         class="hand__card"
-        :class="{ 'hand__card--dragging': isDraggingCard(card.id) }"
+        :class="{
+          'hand__card--dragging': isDraggingCard(card.id),
+          'hand__card--face-down': isDraggingCard(card.id) && hand.drawFaceDown.value,
+        }"
         :style="{
-          '--col': card.col,
-          '--row': card.row,
+          '--col': hand.drawFaceDown.value && isDraggingCard(card.id) ? 13 : card.col,
+          '--row': hand.drawFaceDown.value && isDraggingCard(card.id) ? 1 : card.row,
           '--hand-x': `${hand.getHandCardX(handIndex) + hand.getHandCardOffset(handIndex)}px`,
           zIndex: handIndex,
         }"
@@ -70,6 +78,7 @@ defineExpose({
         @pointermove="hand.onHandCardPointerMove"
         @pointerup="onCardPointerUp"
         @pointercancel="onCardPointerUp"
+        @contextmenu="onCardContextMenu"
       />
     </div>
     <span v-if="cardStore.handCount === 0" class="hand__label">Hand</span>
