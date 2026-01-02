@@ -65,18 +65,20 @@ A designated drop target for organizing cards.
 
 ### Input Methods
 
-| Action              | Mouse                   | Touch                   | Result                       |
-| ------------------- | ----------------------- | ----------------------- | ---------------------------- |
-| **Move Card**       | Left-click + drag       | Tap + drag              | Drag single card             |
-| **Move Stack**      | Right-click + drag      | Long press + drag       | Drag entire stack            |
-| **Create Stack**    | Hover 250ms + release   | Hover 250ms + release   | Form stack at target         |
-| **Add to Stack**    | Drop on stack           | Drop on stack           | Instant add to top           |
-| **Flip Card**       | Double-click            | Double-tap              | Toggle face up/down          |
-| **Flip Stack**      | Right double-click      | —                       | Toggle all in stack          |
-| **Toggle Select**   | Ctrl+click              | Two-finger tap          | Add/remove from selection    |
-| **Move Selection**  | Drag any selected card  | Drag any selected card  | Move all selected together   |
-| **Clear Selection** | Click unselected/canvas | Tap unselected/canvas   | Deselect all                 |
-| **Shake to Stack**  | Shake selection rapidly | Shake selection rapidly | Combine selection into stack |
+| Action              | Mouse                   | Touch                   | Result                        |
+| ------------------- | ----------------------- | ----------------------- | ----------------------------- |
+| **Move Card**       | Left-click + drag       | Tap + drag              | Drag single card              |
+| **Move Stack**      | Right-click + drag      | Long press + drag       | Drag entire stack             |
+| **Create Stack**    | Hover 250ms + release   | Hover 250ms + release   | Form stack at target          |
+| **Add to Stack**    | Drop on stack           | Drop on stack           | Instant add to top            |
+| **Merge Stacks**    | Drop stack on stack     | Drop stack on stack     | Combine stacks                |
+| **Flip Card**       | Double-click            | Double-tap              | Toggle face up/down           |
+| **Flip Stack**      | Right double-click      | —                       | Toggle all in stack           |
+| **Toggle Select**   | Ctrl+click              | Two-finger tap          | Add/remove from selection     |
+| **Move Selection**  | Drag any selected card  | Drag any selected card  | Move all selected together    |
+| **Clear Selection** | Click unselected/canvas | Tap unselected/canvas   | Deselect all                  |
+| **Shake to Stack**  | Shake selection rapidly | Shake selection rapidly | Combine selection, keep held  |
+| **Shuffle Stack**   | Shake held stack        | Shake held stack        | Randomize card order in stack |
 
 > **Note:** Multi-select only works on free cards (not cards in stacks).
 
@@ -120,6 +122,13 @@ A designated drop target for organizing cards.
 | Action            | Trigger                      | Result                                |
 | ----------------- | ---------------------------- | ------------------------------------- |
 | **Merge to Deck** | Release stack over deck zone | All cards in stack move to deck stack |
+
+### Stack → Stack
+
+| Action           | Trigger                          | Result                                |
+| ---------------- | -------------------------------- | ------------------------------------- |
+| **Merge Stacks** | Drop stack on another stack/card | Source stack merges into target stack |
+| **Hover Merge**  | Hold stack over card/stack 250ms | Target shows stack indicator          |
 
 ---
 

@@ -282,6 +282,48 @@ export const useCardStore = defineStore('cards', () => {
     return stack
   }
 
+  // Merge source stack into target stack
+  const mergeStacks = (sourceStackId: number, targetStackId: number): boolean => {
+    if (sourceStackId === targetStackId) return false
+
+    const sourceStack = stacks.value.find((s) => s.id === sourceStackId)
+    const targetStack = stacks.value.find((s) => s.id === targetStackId)
+    if (!sourceStack || !targetStack) return false
+
+    // Move all cards from source to target
+    const cardIdsToMove = [...sourceStack.cardIds]
+    cardIdsToMove.forEach((id) => {
+      const card = cards.value.find((c) => c.id === id)
+      if (card) {
+        card.stackId = targetStack.id
+        targetStack.cardIds.push(id)
+      }
+    })
+
+    // Remove source stack
+    sourceStack.cardIds = []
+    stacks.value = stacks.value.filter((s) => s.id !== sourceStackId)
+
+    updateStackPositions(targetStack)
+    return true
+  }
+
+  // Shuffle cards in a stack (Fisher-Yates)
+  const shuffleStack = (stackId: number) => {
+    const stack = stacks.value.find((s) => s.id === stackId)
+    if (!stack || stack.cardIds.length < 2) return
+
+    const arr = stack.cardIds
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      const temp = arr[i]
+      arr[i] = arr[j]!
+      arr[j] = temp!
+    }
+
+    updateStackPositions(stack)
+  }
+
   return {
     cards,
     stacks,
@@ -311,5 +353,7 @@ export const useCardStore = defineStore('cards', () => {
     bumpSelectionZ,
     getSelectedIds,
     stackSelection,
+    mergeStacks,
+    shuffleStack,
   }
 })

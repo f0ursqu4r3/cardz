@@ -19,10 +19,10 @@ export function useHover() {
     x: number,
     y: number,
     cards: CardData[],
-    excludeId: number,
+    excludeIds: number | number[],
     getCardZ: (card: CardData, index: number) => number,
   ) => {
-    const hit = cardAtPoint(x, y, cards, excludeId, getCardZ)
+    const hit = cardAtPoint(x, y, cards, excludeIds, getCardZ)
 
     if (!hit) {
       reset()
@@ -54,13 +54,18 @@ export function cardAtPoint(
   x: number,
   y: number,
   cards: CardData[],
-  excludeId: number | undefined,
+  excludeIds: number | number[] | undefined,
   getCardZ: (card: CardData, index: number) => number,
 ): { card: CardData; index: number; z: number } | null {
+  const excluded = Array.isArray(excludeIds)
+    ? excludeIds
+    : excludeIds !== undefined
+      ? [excludeIds]
+      : []
   let best: { card: CardData; index: number; z: number } | null = null
 
   cards.forEach((card, index) => {
-    if (card.id === excludeId) return
+    if (excluded.includes(card.id)) return
 
     const withinX = x >= card.x && x <= card.x + CARD_W
     const withinY = y >= card.y && y <= card.y + CARD_H

@@ -292,19 +292,52 @@ const onCardPointerMove = (event: PointerEvent) => {
   if (drag.target.value?.type === 'selection') {
     const { x, y } = drag.getPending()
     if (shake.update(x, y)) {
-      // Shake detected! Stack the selection at current position
+      // Shake detected! Stack the selection and continue holding the new stack
       const anchorCard = cardStore.cards[drag.activeIndex.value!]
       if (anchorCard) {
-        cardStore.stackSelection(anchorCard.x, anchorCard.y)
-        // Clean up drag state
-        selectionStartPositions.value.clear()
-        selectionDragStart.value = null
-        drag.reset()
-        shake.reset()
-        cardStore.updateAllStacks(getDeckAnchor)
+        const newStack = cardStore.stackSelection(anchorCard.x, anchorCard.y)
+        if (newStack) {
+          // Clean up selection drag state
+          selectionStartPositions.value.clear()
+          selectionDragStart.value = null
+          shake.reset()
+
+          // Transition to stack drag (keep holding)
+          const topCardId = newStack.cardIds[newStack.cardIds.length - 1]
+          const topCardIndex = cardStore.cards.findIndex((c) => c.id === topCardId)
+          if (topCardIndex !== -1) {
+            const target: DragTarget = { type: 'stack', stackId: newStack.id, index: topCardIndex }
+            drag.target.value = target
+            drag.activeIndex.value = topCardIndex
+
+            // Update offset for stack anchor
+            const offsetX = x - newStack.anchorX
+            const offsetY = y - newStack.anchorY
+            drag.setOffset(offsetX, offsetY)
+          }
+          cardStore.updateAllStacks(getDeckAnchor)
+        }
         return
       }
     }
+  }
+
+  // Detect shake gesture during stack drag -> shuffle
+  if (drag.target.value?.type === 'stack') {
+    const { x, y } = drag.getPending()
+    if (shake.update(x, y)) {
+      cardStore.shuffleStack(drag.target.value.stackId)
+      shake.reset()
+      // Continue dragging, don't return
+    }
+
+    // Update hover target for stack-on-stack merging
+    const draggingStackId = drag.target.value.stackId
+    const stack = cardStore.stacks.find((s) => s.id === draggingStackId)
+    const excludeIds = stack ? stack.cardIds : []
+    hover.update(x, y, cardStore.cards, excludeIds, (card, idx) =>
+      cardStore.cardZ(card, idx, drag.activeIndex.value, draggingStackId),
+    )
   }
 
   // Update hover target for card drags
@@ -338,12 +371,32 @@ const onCardPointerUp = (event: PointerEvent) => {
 
   // Handle stack drop
   if (drag.target.value?.type === 'stack') {
-    if (drag.isInBounds(event, deckRef)) {
-      const stackId = drag.target.value.stackId
+    const stackId = drag.target.value.stackId
+    let handled = false
+
+    // Try to merge with another stack (hover target)
+    if (hover.state.ready && hover.state.cardId) {
+      const targetCard = cardStore.cards.find((c) => c.id === hover.state.cardId)
+      if (targetCard && targetCard.stackId !== null && targetCard.stackId !== stackId) {
+        // Merge into target stack
+        handled = cardStore.mergeStacks(stackId, targetCard.stackId)
+      } else if (targetCard && targetCard.stackId === null) {
+        // Dropping on a free card - create stack with that card, then merge
+        const targetStack = cardStore.createStackAt(targetCard.x, targetCard.y, 'free')
+        targetStack.cardIds.push(targetCard.id)
+        targetCard.stackId = targetStack.id
+        targetCard.isInDeck = true
+        handled = cardStore.mergeStacks(stackId, targetStack.id)
+      }
+    }
+
+    // Try to add to deck zone
+    if (!handled && drag.isInBounds(event, deckRef)) {
       const stack = cardStore.stacks.find((item) => item.id === stackId)
       if (stack) {
         const ids = [...stack.cardIds]
         ids.forEach((id) => cardStore.addToDeckZone(id, getDeckAnchor))
+        handled = true
       }
     }
   }
@@ -492,9 +545,10 @@ onBeforeUnmount(() => {
 }
 
 .stack-target {
-  outline: 2px solid rgba(255, 255, 0, 0.9);
-  outline-offset: 2px;
-  box-shadow: 0 0 6px rgba(255, 255, 0, 0.7);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.6),
+    0 0 8px rgba(255, 255, 255, 0.3);
+  animation: stack-glow 2s ease-in-out infinite;
 }
 
 .selected {
@@ -514,5 +568,19 @@ onBeforeUnmount(() => {
   font-size: 12px;
   font-weight: 500;
   pointer-events: none;
+}
+
+@keyframes stack-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.6),
+      0 0 8px rgba(255, 255, 255, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.8),
+      0 0 12px rgba(255, 255, 255, 0.4);
+  }
 }
 </style>

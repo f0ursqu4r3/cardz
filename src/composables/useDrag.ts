@@ -131,6 +131,11 @@ export function useDrag() {
     y: state.pendingY,
   })
 
+  const setOffset = (offsetX: number, offsetY: number) => {
+    state.offsetX = offsetX
+    state.offsetY = offsetY
+  }
+
   const isValidPointer = (pointerId: number) => pointerId === state.pointerId
 
   return {
@@ -149,6 +154,7 @@ export function useDrag() {
     reset,
     getDelta,
     getPending,
+    setOffset,
     isValidPointer,
   }
 }
