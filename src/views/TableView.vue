@@ -210,6 +210,12 @@ ws.onMessage((message: ServerMessage) => {
 
     case 'zone:updated':
       cardStore.updateZoneFromServer(message.zoneId, message.zone)
+      if (message.stackUpdate) {
+        cardStore.updateStackFromServer(message.stackUpdate.stackId, {
+          anchorX: message.stackUpdate.anchorX,
+          anchorY: message.stackUpdate.anchorY,
+        })
+      }
       if (message.cardUpdates) {
         message.cardUpdates.forEach((update) => {
           cardStore.updateCardFromServer(update.cardId, {

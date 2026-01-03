@@ -682,6 +682,21 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     targetEl?.releasePointerCapture(event.pointerId)
 
     applyPendingPosition()
+
+    // Send zone update to server
+    if (drag.target.value?.type === 'zone' || drag.target.value?.type === 'zone-resize') {
+      const zoneId =
+        drag.target.value.type === 'zone' ? drag.target.value.zoneId : drag.target.value.zoneId
+      const zone = cardStore.zones.find((z) => z.id === zoneId)
+      if (zone) {
+        send({
+          type: 'zone:update',
+          zoneId: zone.id,
+          updates: { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
+        })
+      }
+    }
+
     drag.reset()
   }
 
