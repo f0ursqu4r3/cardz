@@ -473,10 +473,13 @@ export interface SelectionStacked {
 // Cursor/Presence Messages
 // ============================================================================
 
+export type CursorState = 'default' | 'grab' | 'grabbing'
+
 export interface CursorUpdate {
   type: 'cursor:update'
   x: number
   y: number
+  state: CursorState
 }
 
 export interface CursorUpdated {
@@ -484,6 +487,7 @@ export interface CursorUpdated {
   playerId: string
   x: number
   y: number
+  state: CursorState
 }
 
 // ============================================================================

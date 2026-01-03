@@ -33,7 +33,7 @@ export interface UseWebSocketReturn {
   gameState: Ref<GameState | null>
   handCardIds: Ref<number[]>
   handCounts: Ref<Map<string, number>>
-  cursors: Ref<Map<string, { x: number; y: number }>>
+  cursors: Ref<Map<string, { x: number; y: number; state: 'default' | 'grab' | 'grabbing' }>>
 
   // Actions
   connect: () => void
@@ -87,7 +87,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
   const gameState = ref<GameState | null>(null)
   const handCardIds = ref<number[]>([])
   const handCounts = ref<Map<string, number>>(new Map())
-  const cursors = ref<Map<string, { x: number; y: number }>>(new Map())
+  const cursors = ref<Map<string, { x: number; y: number; state: 'default' | 'grab' | 'grabbing' }>>(new Map())
 
   // Message handlers
   const messageHandlers = new Set<(message: ServerMessage) => void>()
@@ -536,7 +536,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
 
       // Cursor events
       case 'cursor:updated':
-        cursors.value.set(message.playerId, { x: message.x, y: message.y })
+        cursors.value.set(message.playerId, { x: message.x, y: message.y, state: message.state })
         break
 
       // State sync

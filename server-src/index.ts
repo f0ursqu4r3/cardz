@@ -267,6 +267,7 @@ const server = Bun.serve<ClientData>({
               playerId: clientData.id,
               x: msg.x,
               y: msg.y,
+              state: msg.state,
             },
             clientData.id,
           )

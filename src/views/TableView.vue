@@ -355,12 +355,22 @@ const onCanvasPointerDown = (event: PointerEvent) => {
 
 // Throttled cursor sending
 let lastCursorSend = 0
-const sendCursorUpdate = (x: number, y: number) => {
-  const now = Date.now()
-  if (now - lastCursorSend < CURSOR_THROTTLE_MS) return
-  lastCursorSend = now
+let lastCursorState: 'default' | 'grab' | 'grabbing' = 'default'
 
-  ws.send({ type: 'cursor:update', x, y })
+const sendCursorUpdate = (x: number, y: number, state: 'default' | 'grab' | 'grabbing') => {
+  const now = Date.now()
+  // Always send if state changed, otherwise throttle
+  if (state === lastCursorState && now - lastCursorSend < CURSOR_THROTTLE_MS) return
+  lastCursorSend = now
+  lastCursorState = state
+
+  ws.send({ type: 'cursor:update', x, y, state })
+}
+
+// Get current cursor state for sending
+const getCursorState = (): 'default' | 'grab' | 'grabbing' => {
+  if (interaction.drag.isDragging.value) return 'grabbing'
+  return 'default'
 }
 
 const onCanvasPointerMove = (event: PointerEvent) => {
@@ -368,9 +378,9 @@ const onCanvasPointerMove = (event: PointerEvent) => {
     viewport.updatePan(event)
   }
 
-  // Send cursor position in world coordinates
+  // Send cursor position in world coordinates with state
   const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
-  sendCursorUpdate(worldPos.x, worldPos.y)
+  sendCursorUpdate(worldPos.x, worldPos.y, getCursorState())
 }
 
 const onCanvasPointerUp = (event: PointerEvent) => {

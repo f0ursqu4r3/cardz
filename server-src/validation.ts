@@ -251,6 +251,7 @@ export const CursorUpdateSchema = z.object({
   type: z.literal('cursor:update'),
   x: z.number(),
   y: z.number(),
+  state: z.enum(['default', 'grab', 'grabbing']),
 })
 
 // ============================================================================

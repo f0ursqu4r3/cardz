@@ -1,29 +1,37 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { MousePointer2 } from 'lucide-vue-next'
-import type { Player } from '../../shared/types'
+import { MousePointer2, Hand, Grab } from 'lucide-vue-next'
+import type { Player, CursorState } from '../../shared/types'
 
 const props = defineProps<{
-  cursors: Map<string, { x: number; y: number }>
+  cursors: Map<string, { x: number; y: number; state: CursorState }>
   players: Player[]
   currentPlayerId: string | null
 }>()
 
 // Get remote cursors with player info (excluding current player)
 const remoteCursors = computed(() => {
-  const result: { id: string; x: number; y: number; color: string; name: string }[] = []
+  const result: {
+    id: string
+    x: number
+    y: number
+    color: string
+    name: string
+    state: CursorState
+  }[] = []
 
-  props.cursors.forEach((pos, playerId) => {
+  props.cursors.forEach((cursor, playerId) => {
     if (playerId === props.currentPlayerId) return
 
     const player = props.players.find((p) => p.id === playerId)
     if (player) {
       result.push({
         id: playerId,
-        x: pos.x,
-        y: pos.y,
+        x: cursor.x,
+        y: cursor.y,
         color: player.color,
         name: player.name || 'Player',
+        state: cursor.state,
       })
     }
   })
@@ -37,13 +45,16 @@ const remoteCursors = computed(() => {
     v-for="cursor in remoteCursors"
     :key="cursor.id"
     class="remote-cursor"
+    :class="`remote-cursor--${cursor.state}`"
     :style="{
       left: `${cursor.x}px`,
       top: `${cursor.y}px`,
       '--cursor-color': cursor.color,
     }"
   >
-    <MousePointer2 class="remote-cursor__icon" :size="20" />
+    <MousePointer2 v-if="cursor.state === 'default'" class="remote-cursor__icon" :size="20" />
+    <Hand v-else-if="cursor.state === 'grab'" class="remote-cursor__icon" :size="20" />
+    <Grab v-else class="remote-cursor__icon" :size="20" />
     <span class="remote-cursor__label">{{ cursor.name }}</span>
   </div>
 </template>
