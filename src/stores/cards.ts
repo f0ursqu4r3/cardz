@@ -157,7 +157,15 @@ export const useCardStore = defineStore('cards', () => {
     kind: Stack['kind'] = 'free',
     zoneId?: number,
   ): Stack => {
-    const stack: Stack = { id: nextStackId++, anchorX, anchorY, cardIds: [], kind, zoneId }
+    const stack: Stack = {
+      id: nextStackId++,
+      anchorX,
+      anchorY,
+      cardIds: [],
+      kind,
+      zoneId,
+      lockedBy: null,
+    }
     stacks.value.push(stack)
     return stack
   }
@@ -528,6 +536,7 @@ export const useCardStore = defineStore('cards', () => {
     anchorY: state.anchorY,
     kind: state.kind,
     zoneId: state.zoneId,
+    lockedBy: state.lockedBy,
   })
 
   // Convert server ZoneState to local Zone
@@ -587,6 +596,7 @@ export const useCardStore = defineStore('cards', () => {
     if (updates.anchorY !== undefined) stack.anchorY = updates.anchorY
     if (updates.kind !== undefined) stack.kind = updates.kind
     if (updates.zoneId !== undefined) stack.zoneId = updates.zoneId
+    if (updates.lockedBy !== undefined) stack.lockedBy = updates.lockedBy
   }
 
   // Add a stack from server

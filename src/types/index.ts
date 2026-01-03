@@ -19,6 +19,7 @@ export type Stack = {
   anchorY: number
   kind: 'zone' | 'free'
   zoneId?: number // Reference to parent zone if in a zone
+  lockedBy: string | null // Player currently dragging this stack
 }
 
 export type Zone = {

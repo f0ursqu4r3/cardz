@@ -95,16 +95,8 @@ watch(
   { immediate: true },
 )
 
-// Sync game state to card store when it changes
-watch(
-  () => ws.gameState.value,
-  (state) => {
-    if (state) {
-      cardStore.syncFromServer(state, ws.handCardIds.value)
-    }
-  },
-  { immediate: true },
-)
+// Note: Full state sync is handled in the message handlers for room:created and room:joined
+// to avoid race conditions with incremental updates. The watcher below only syncs hand cards.
 
 // Sync hand cards when they change
 watch(
@@ -118,12 +110,23 @@ watch(
 ws.onMessage((message: ServerMessage) => {
   switch (message.type) {
     case 'room:created':
+      // Full state sync on room creation
+      if (ws.gameState.value) {
+        cardStore.syncFromServer(ws.gameState.value, ws.handCardIds.value)
+      }
       // Update route to include room code
       router.replace({
         name: 'table',
         params: { code: message.roomCode },
         query: { name: playerName.value },
       })
+      break
+
+    case 'room:joined':
+      // Full state sync when joining a room
+      if (ws.gameState.value) {
+        cardStore.syncFromServer(ws.gameState.value, ws.handCardIds.value)
+      }
       break
 
     case 'room:error':
@@ -178,7 +181,16 @@ ws.onMessage((message: ServerMessage) => {
       })
       break
 
-    case 'stack:card_added':
+    case 'stack:locked':
+      cardStore.updateStackFromServer(message.stackId, { lockedBy: message.playerId })
+      break
+
+    case 'stack:unlocked':
+      cardStore.updateStackFromServer(message.stackId, { lockedBy: null })
+      break
+
+    case 'stack:card_added': {
+      // Update the card state
       cardStore.updateCardFromServer(message.cardId, {
         x: message.cardState.x,
         y: message.cardState.y,
@@ -186,14 +198,27 @@ ws.onMessage((message: ServerMessage) => {
         faceUp: message.cardState.faceUp,
         stackId: message.stackId,
       })
+      // Also add to stack's cardIds if not already there
+      const stack = cardStore.stacks.find((s) => s.id === message.stackId)
+      if (stack && !stack.cardIds.includes(message.cardId)) {
+        stack.cardIds.push(message.cardId)
+      }
       break
+    }
 
-    case 'stack:card_removed':
+    case 'stack:card_removed': {
+      // Remove card from stack's cardIds
+      const stackForRemoval = cardStore.stacks.find((s) => s.id === message.stackId)
+      if (stackForRemoval) {
+        stackForRemoval.cardIds = stackForRemoval.cardIds.filter((id) => id !== message.cardId)
+      }
+      // Update the card state
       cardStore.updateCardFromServer(message.cardId, { stackId: null })
       if (message.stackDeleted) {
         cardStore.removeStack(message.stackId)
       }
       break
+    }
 
     case 'stack:merged':
       cardStore.removeStack(message.sourceStackId)
@@ -260,7 +285,32 @@ ws.onMessage((message: ServerMessage) => {
       })
       break
 
-    case 'zone:card_added':
+    case 'zone:card_added': {
+      // Handle stack creation or update
+      if (message.stackCreated) {
+        // Create a new stack for this zone
+        const zone = cardStore.zones.find((z) => z.id === message.zoneId)
+        if (zone) {
+          const newStack: import('@/types').Stack = {
+            id: message.stackId,
+            cardIds: [message.cardState.cardId],
+            anchorX: message.cardState.x,
+            anchorY: message.cardState.y,
+            kind: 'zone',
+            zoneId: message.zoneId,
+            lockedBy: null,
+          }
+          cardStore.stacks.push(newStack)
+          zone.stackId = message.stackId
+        }
+      } else {
+        // Add to existing stack
+        const existingStack = cardStore.stacks.find((s) => s.id === message.stackId)
+        if (existingStack && !existingStack.cardIds.includes(message.cardState.cardId)) {
+          existingStack.cardIds.push(message.cardState.cardId)
+        }
+      }
+      // Update the card state
       cardStore.updateCardFromServer(message.cardState.cardId, {
         x: message.cardState.x,
         y: message.cardState.y,
@@ -268,6 +318,14 @@ ws.onMessage((message: ServerMessage) => {
         faceUp: message.cardState.faceUp,
         stackId: message.stackId,
       })
+      break
+    }
+
+    case 'state:sync':
+      // Full state sync from server (e.g., after reconnection)
+      if (ws.gameState.value) {
+        cardStore.syncFromServer(ws.gameState.value, ws.handCardIds.value)
+      }
       break
   }
 })
