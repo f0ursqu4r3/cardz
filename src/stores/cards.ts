@@ -11,6 +11,7 @@ import {
   ZONE_MIN_WIDTH,
   ZONE_MIN_HEIGHT,
 } from '@/types'
+import type { GameState, CardState, StackState, ZoneState } from '../../shared/types'
 
 export const useCardStore = defineStore('cards', () => {
   const cards = ref<CardData[]>([])
@@ -499,6 +500,144 @@ export const useCardStore = defineStore('cards', () => {
     return true
   }
 
+  // ============================================================================
+  // Server State Sync
+  // ============================================================================
+
+  // Convert server CardState to local CardData
+  const cardStateToCardData = (state: CardState): CardData => ({
+    id: state.id,
+    col: state.col,
+    row: state.row,
+    x: state.x,
+    y: state.y,
+    z: state.z,
+    faceUp: state.faceUp,
+    stackId: state.stackId,
+    isInDeck: state.stackId !== null,
+    inHand: state.ownerId !== null,
+  })
+
+  // Convert server StackState to local Stack
+  const stackStateToStack = (state: StackState): Stack => ({
+    id: state.id,
+    cardIds: state.cardIds,
+    anchorX: state.anchorX,
+    anchorY: state.anchorY,
+    kind: state.kind,
+    zoneId: state.zoneId,
+  })
+
+  // Convert server ZoneState to local Zone
+  const zoneStateToZone = (state: ZoneState): Zone => ({
+    id: state.id,
+    x: state.x,
+    y: state.y,
+    width: state.width,
+    height: state.height,
+    label: state.label,
+    faceUp: state.faceUp,
+    locked: state.locked,
+    stackId: state.stackId,
+  })
+
+  // Sync entire game state from server
+  const syncFromServer = (state: GameState, myHandCardIds: number[]) => {
+    cards.value = state.cards.map(cardStateToCardData)
+    stacks.value = state.stacks.map(stackStateToStack)
+    zones.value = state.zones.map(zoneStateToZone)
+    handCardIds.value = myHandCardIds
+
+    // Update counters to prevent ID conflicts
+    nextStackId = state.nextStackId
+    nextZoneId = state.nextZoneId
+    zCounter = state.zCounter
+  }
+
+  // Update a single card from server
+  const updateCardFromServer = (cardId: number, updates: Partial<CardState>) => {
+    const card = cards.value.find((c) => c.id === cardId)
+    if (!card) return
+
+    if (updates.x !== undefined) card.x = updates.x
+    if (updates.y !== undefined) card.y = updates.y
+    if (updates.z !== undefined) card.z = updates.z
+    if (updates.faceUp !== undefined) card.faceUp = updates.faceUp
+    if (updates.stackId !== undefined) {
+      card.stackId = updates.stackId
+      card.isInDeck = updates.stackId !== null
+    }
+    if (updates.ownerId !== undefined) {
+      card.inHand = updates.ownerId !== null
+    }
+  }
+
+  // Update a single stack from server
+  const updateStackFromServer = (stackId: number, updates: Partial<StackState>) => {
+    const stack = stacks.value.find((s) => s.id === stackId)
+    if (!stack) return
+
+    if (updates.cardIds !== undefined) stack.cardIds = updates.cardIds
+    if (updates.anchorX !== undefined) stack.anchorX = updates.anchorX
+    if (updates.anchorY !== undefined) stack.anchorY = updates.anchorY
+    if (updates.kind !== undefined) stack.kind = updates.kind
+    if (updates.zoneId !== undefined) stack.zoneId = updates.zoneId
+  }
+
+  // Add a stack from server
+  const addStackFromServer = (state: StackState) => {
+    const existing = stacks.value.find((s) => s.id === state.id)
+    if (existing) {
+      Object.assign(existing, stackStateToStack(state))
+    } else {
+      stacks.value.push(stackStateToStack(state))
+    }
+  }
+
+  // Remove a stack
+  const removeStack = (stackId: number) => {
+    stacks.value = stacks.value.filter((s) => s.id !== stackId)
+  }
+
+  // Update a single zone from server
+  const updateZoneFromServer = (zoneId: number, updates: Partial<ZoneState>) => {
+    const zone = zones.value.find((z) => z.id === zoneId)
+    if (!zone) return
+
+    if (updates.x !== undefined) zone.x = updates.x
+    if (updates.y !== undefined) zone.y = updates.y
+    if (updates.width !== undefined) zone.width = updates.width
+    if (updates.height !== undefined) zone.height = updates.height
+    if (updates.label !== undefined) zone.label = updates.label
+    if (updates.faceUp !== undefined) zone.faceUp = updates.faceUp
+    if (updates.locked !== undefined) zone.locked = updates.locked
+    if (updates.stackId !== undefined) zone.stackId = updates.stackId
+  }
+
+  // Add a zone from server
+  const addZoneFromServer = (state: ZoneState) => {
+    const existing = zones.value.find((z) => z.id === state.id)
+    if (existing) {
+      Object.assign(existing, zoneStateToZone(state))
+    } else {
+      zones.value.push(zoneStateToZone(state))
+    }
+  }
+
+  // Remove a zone (without local side effects)
+  const removeZone = (zoneId: number) => {
+    zones.value = zones.value.filter((z) => z.id !== zoneId)
+  }
+
+  // Set hand card IDs from server
+  const setHandCardIds = (ids: number[]) => {
+    handCardIds.value = ids
+    // Update inHand flag on cards
+    cards.value.forEach((card) => {
+      card.inHand = ids.includes(card.id)
+    })
+  }
+
   return {
     cards,
     stacks,
@@ -543,5 +682,15 @@ export const useCardStore = defineStore('cards', () => {
     removeFromHand,
     reorderHand,
     addStackToHand,
+    // Server sync operations
+    syncFromServer,
+    updateCardFromServer,
+    updateStackFromServer,
+    addStackFromServer,
+    removeStack,
+    updateZoneFromServer,
+    addZoneFromServer,
+    removeZone,
+    setHandCardIds,
   }
 })

@@ -7,7 +7,12 @@ function getClientData(ws: GenericWebSocket): ClientData {
   return ws.data ?? ws.getUserData?.() ?? { id: '', roomCode: null, name: '' }
 }
 
-export function handleCardMove(ws: GenericWebSocket, msg: CardMoveIntent, room: Room): void {
+export function handleCardMove(
+  ws: GenericWebSocket,
+  msg: CardMoveIntent,
+  room: Room,
+  clients: Map<string, GenericWebSocket>,
+): void {
   const clientData = getClientData(ws)
   const { locks, gameState } = room
 
@@ -51,7 +56,7 @@ export function handleCardMove(ws: GenericWebSocket, msg: CardMoveIntent, room: 
   if (!result) return
 
   // Broadcast to all players in room
-  broadcastToRoom(room.players.keys() as any, room.code, {
+  broadcastToRoom(clients, room.code, {
     type: 'card:moved',
     cardId: msg.cardId,
     x: msg.x,

@@ -6,11 +6,13 @@ import { useShake } from '@/composables/useShake'
 import { useCardPhysics } from '@/composables/useCardPhysics'
 import type { DragTarget, Zone } from '@/types'
 import { CARD_BACK_COL, CARD_BACK_ROW, CARD_W, CARD_H } from '@/types'
+import type { ClientMessage } from '../../shared/types'
 
 interface CardInteractionOptions {
   onHandCardDrop?: (event: PointerEvent) => boolean
   addToHand?: (event: PointerEvent, cardId: number) => boolean
   handRef?: Ref<HTMLElement | null>
+  sendMessage?: (msg: ClientMessage) => void
 }
 
 export function useCardInteraction(options: CardInteractionOptions = {}) {
@@ -21,6 +23,11 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
   const hover = useHover()
   const shake = useShake()
   const physics = useCardPhysics()
+
+  // Helper to send WebSocket messages (optional)
+  const send = (msg: ClientMessage) => {
+    options.sendMessage?.(msg)
+  }
 
   // Track selection start positions for smooth dragging
   const selectionStartPositions = ref<Map<number, { x: number; y: number }>>(new Map())
@@ -299,9 +306,11 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     if (card.stackId !== null) {
       // Double-click on stacked card = flip entire stack
       cardStore.flipStack(card.stackId)
+      send({ type: 'stack:flip', stackId: card.stackId })
     } else {
       // Double-click on free card = flip single card
       cardStore.flipCard(card.id)
+      send({ type: 'card:flip', cardId: card.id })
     }
   }
 
@@ -393,6 +402,7 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       const { x, y } = drag.getPending()
       if (shake.update(x, y)) {
         cardStore.shuffleStack(drag.target.value.stackId)
+        send({ type: 'stack:shuffle', stackId: drag.target.value.stackId })
         shake.reset()
         // Continue dragging, don't return
       }
@@ -445,6 +455,17 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     // Handle zone drag/resize drop (just finalize position)
     if (drag.target.value?.type === 'zone' || drag.target.value?.type === 'zone-resize') {
       // Position already updated in applyPendingPosition
+      // Send zone update to server
+      const zoneId =
+        drag.target.value.type === 'zone' ? drag.target.value.zoneId : drag.target.value.zoneId
+      const zone = cardStore.zones.find((z) => z.id === zoneId)
+      if (zone) {
+        send({
+          type: 'zone:update',
+          zoneId: zone.id,
+          updates: { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
+        })
+      }
     }
     // Handle stack drop
     else if (drag.target.value?.type === 'stack') {
@@ -458,6 +479,9 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
         if (targetCard && targetCard.stackId !== null && targetCard.stackId !== stackId) {
           // Merge into target stack
           handled = cardStore.mergeStacks(stackId, targetCard.stackId)
+          if (handled) {
+            send({ type: 'stack:merge', sourceStackId: stackId, targetStackId: targetCard.stackId })
+          }
         } else if (targetCard && targetCard.stackId === null) {
           // Dropping on a free card - create stack with that card, then merge
           const targetStack = cardStore.createStackAt(targetCard.x, targetCard.y, 'free')
@@ -465,6 +489,14 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
           targetCard.stackId = targetStack.id
           targetCard.isInDeck = true
           handled = cardStore.mergeStacks(stackId, targetStack.id)
+          if (handled) {
+            send({
+              type: 'stack:create',
+              cardIds: [targetCard.id, ...stack!.cardIds],
+              anchorX: targetCard.x,
+              anchorY: targetCard.y,
+            })
+          }
         }
       }
 
@@ -473,7 +505,10 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
         const zone = findZoneAtPoint(dropX, dropY)
         if (zone) {
           const ids = [...stack.cardIds]
-          ids.forEach((id) => cardStore.addToZone(id, zone.id))
+          ids.forEach((id) => {
+            cardStore.addToZone(id, zone.id)
+            send({ type: 'zone:add_card', zoneId: zone.id, cardId: id })
+          })
           handled = true
         }
       }
@@ -482,8 +517,14 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       if (!handled && handRef && drag.isInBounds(event, handRef)) {
         if (stack) {
           cardStore.addStackToHand(stackId)
+          send({ type: 'hand:add_stack', stackId })
           handled = true
         }
+      }
+
+      // If not handled, just send stack move
+      if (!handled && stack) {
+        send({ type: 'stack:move', stackId, anchorX: stack.anchorX, anchorY: stack.anchorY })
       }
     }
     // Handle selection drop
@@ -493,11 +534,18 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       if (zone) {
         cardStore.getSelectedIds().forEach((id) => {
           cardStore.addToZone(id, zone.id)
+          send({ type: 'zone:add_card', zoneId: zone.id, cardId: id })
         })
         cardStore.clearSelection()
       } else {
-        // Bump z-index of all selected cards
+        // Bump z-index of all selected cards and send moves
         cardStore.bumpSelectionZ()
+        cardStore.getSelectedIds().forEach((id) => {
+          const card = cardStore.cards.find((c) => c.id === id)
+          if (card) {
+            send({ type: 'card:move', cardId: card.id, x: card.x, y: card.y })
+          }
+        })
       }
       selectionStartPositions.value.clear()
       selectionDragStart.value = null
@@ -516,6 +564,12 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
         // Try to stack on hover target
         if (hover.state.ready && hover.state.cardId) {
           stacked = cardStore.stackCardOnTarget(card.id, hover.state.cardId)
+          if (stacked) {
+            const targetCard = cardStore.cards.find((c) => c.id === hover.state.cardId)
+            if (targetCard && targetCard.stackId !== null) {
+              send({ type: 'stack:add_card', stackId: targetCard.stackId, cardId: card.id })
+            }
+          }
         }
 
         // Try to add to a zone
@@ -523,12 +577,18 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
           const zone = findZoneAtPoint(dropX, dropY)
           if (zone) {
             stacked = cardStore.addToZone(card.id, zone.id)
+            if (stacked) {
+              send({ type: 'zone:add_card', zoneId: zone.id, cardId: card.id })
+            }
           }
         }
 
         // Try to add to hand zone
         if (!stacked && handRef && drag.isInBounds(event, handRef)) {
           stacked = cardStore.addToHand(card.id)
+          if (stacked) {
+            send({ type: 'hand:add', cardId: card.id })
+          }
         }
 
         // If not stacked, check for throw
@@ -536,6 +596,9 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
           card.stackId = null
           card.isInDeck = false
           cardStore.bumpCardZ(card.id)
+
+          // Send card move to server
+          send({ type: 'card:move', cardId: card.id, x: card.x, y: card.y })
 
           // Get throw velocity
           const { vx, vy } = physics.endDrag()
@@ -554,7 +617,8 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
                 card.y = y
               },
               () => {
-                // Throw complete - could check for landing on zone/stack here
+                // Throw complete - send final position
+                send({ type: 'card:move', cardId: card.id, x: card.x, y: card.y })
               },
             )
           }

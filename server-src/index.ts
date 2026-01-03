@@ -163,7 +163,7 @@ const server = Bun.serve<ClientData>({
       switch (msg.type) {
         // Card actions
         case 'card:move':
-          handleCardMove(ws as any, msg, room)
+          handleCardMove(ws as any, msg, room, clients as any)
           break
         case 'card:lock':
           handleCardLock(ws as any, msg, room, clients as any)
