@@ -5,6 +5,7 @@ import Card from '@/components/CardComp.vue'
 import ZoneComp from '@/components/ZoneComp.vue'
 import HandComp from '@/components/HandComp.vue'
 import MinimapComp from '@/components/MinimapComp.vue'
+import RemoteCursors from '@/components/RemoteCursors.vue'
 import TablePanel from '@/components/ui/TablePanel.vue'
 import TableButton from '@/components/ui/TableButton.vue'
 import { useCardStore } from '@/stores/cards'
@@ -13,7 +14,13 @@ import { useViewport } from '@/composables/useViewport'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useCursor } from '@/composables/useCursor'
 import { SquarePlus, Copy, Check, LogOut, Users, Wifi, WifiOff } from 'lucide-vue-next'
-import { CARD_BACK_COL, CARD_BACK_ROW, ZONE_DEFAULT_WIDTH, ZONE_DEFAULT_HEIGHT } from '@/types'
+import {
+  CARD_BACK_COL,
+  CARD_BACK_ROW,
+  ZONE_DEFAULT_WIDTH,
+  ZONE_DEFAULT_HEIGHT,
+  CURSOR_THROTTLE_MS,
+} from '@/types'
 import type { ServerMessage, ClientMessage } from '../../shared/types'
 
 const route = useRoute()
@@ -346,10 +353,24 @@ const onCanvasPointerDown = (event: PointerEvent) => {
   }
 }
 
+// Throttled cursor sending
+let lastCursorSend = 0
+const sendCursorUpdate = (x: number, y: number) => {
+  const now = Date.now()
+  if (now - lastCursorSend < CURSOR_THROTTLE_MS) return
+  lastCursorSend = now
+
+  ws.send({ type: 'cursor:update', x, y })
+}
+
 const onCanvasPointerMove = (event: PointerEvent) => {
   if (viewport.isPanning.value) {
     viewport.updatePan(event)
   }
+
+  // Send cursor position in world coordinates
+  const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
+  sendCursorUpdate(worldPos.x, worldPos.y)
 }
 
 const onCanvasPointerUp = (event: PointerEvent) => {
@@ -521,6 +542,13 @@ onBeforeUnmount(() => {
             top: `${handDragPosition.y}px`,
             zIndex: 2000,
           }"
+        />
+
+        <!-- Remote player cursors -->
+        <RemoteCursors
+          :cursors="ws.cursors.value"
+          :players="ws.players.value"
+          :current-player-id="ws.playerId.value"
         />
       </div>
 

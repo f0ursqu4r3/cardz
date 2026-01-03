@@ -65,3 +65,6 @@ export const ZONE_MIN_WIDTH = CARD_W * 1.5
 export const ZONE_MIN_HEIGHT = CARD_H * 1.5
 export const ZONE_DEFAULT_WIDTH = CARD_H * 2.0 // Default zone width (card + padding)
 export const ZONE_DEFAULT_HEIGHT = CARD_H * 2.0 // Default zone height (card + padding)
+
+// Cursor updates
+export const CURSOR_THROTTLE_MS = 50 // Throttle cursor updates (client-side)
