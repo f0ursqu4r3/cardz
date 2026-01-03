@@ -10,6 +10,7 @@ export interface Player {
   name: string
   connected: boolean
   color: string // For cursor/highlight color
+  sessionId?: string // For reconnection after refresh
 }
 
 export interface CardState {
@@ -69,12 +70,14 @@ export interface GameState {
 export interface RoomCreate {
   type: 'room:create'
   playerName: string
+  sessionId?: string // For reconnection after refresh
 }
 
 export interface RoomJoin {
   type: 'room:join'
   roomCode: string
   playerName: string
+  sessionId?: string // For reconnection after refresh
 }
 
 export interface RoomLeave {

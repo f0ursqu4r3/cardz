@@ -49,6 +49,19 @@ export interface UseWebSocketReturn {
 }
 
 const DEFAULT_WS_URL = `ws://${window.location.hostname}:9001`
+const SESSION_ID_KEY = 'cardz_session_id'
+
+/**
+ * Get or create a persistent session ID for reconnection
+ */
+function getSessionId(): string {
+  let sessionId = localStorage.getItem(SESSION_ID_KEY)
+  if (!sessionId) {
+    sessionId = crypto.randomUUID()
+    localStorage.setItem(SESSION_ID_KEY, sessionId)
+  }
+  return sessionId
+}
 
 export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn {
   const {
@@ -161,11 +174,13 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
 
   // Room actions
   const createRoom = (playerName: string) => {
-    send({ type: 'room:create', playerName })
+    const sessionId = getSessionId()
+    send({ type: 'room:create', playerName, sessionId })
   }
 
   const joinRoom = (code: string, playerName: string) => {
-    send({ type: 'room:join', roomCode: code.toUpperCase(), playerName })
+    const sessionId = getSessionId()
+    send({ type: 'room:join', roomCode: code.toUpperCase(), playerName, sessionId })
   }
 
   const leaveRoom = () => {

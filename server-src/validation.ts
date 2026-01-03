@@ -68,6 +68,7 @@ export const GameStateSchema = z.object({
 export const RoomCreateSchema = z.object({
   type: z.literal('room:create'),
   playerName: z.string().min(1).max(32),
+  sessionId: z.string().optional(),
 })
 
 export const RoomJoinSchema = z.object({
@@ -77,6 +78,7 @@ export const RoomJoinSchema = z.object({
     .length(6)
     .regex(/^[A-Z0-9]+$/),
   playerName: z.string().min(1).max(32),
+  sessionId: z.string().optional(),
 })
 
 export const RoomLeaveSchema = z.object({

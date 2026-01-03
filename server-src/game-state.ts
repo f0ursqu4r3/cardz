@@ -541,6 +541,23 @@ export class GameStateManager {
   // Player Management
   // ============================================================================
 
+  /**
+   * Transfer hand ownership from old player ID to new player ID (for reconnection)
+   */
+  transferHandOwnership(oldPlayerId: string, newPlayerId: string): void {
+    const hand = this.getHand(oldPlayerId)
+    if (hand) {
+      hand.playerId = newPlayerId
+      // Update ownerId on all cards in hand
+      for (const cardId of hand.cardIds) {
+        const card = this.getCard(cardId)
+        if (card) {
+          card.ownerId = newPlayerId
+        }
+      }
+    }
+  }
+
   removePlayer(playerId: string): number[] {
     const hand = this.getHand(playerId)
     const cardIds = hand?.cardIds ?? []

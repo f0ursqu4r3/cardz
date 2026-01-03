@@ -25,7 +25,7 @@ export function handleRoomCreate(
     }
   }
 
-  const room = roomManager.createRoom(clientData.id, msg.playerName)
+  const room = roomManager.createRoom(clientData.id, msg.playerName, msg.sessionId)
   clientData.roomCode = room.code
   clientData.name = msg.playerName
 
@@ -55,7 +55,7 @@ export function handleRoomJoin(
     }
   }
 
-  const result = roomManager.joinRoom(msg.roomCode, clientData.id, msg.playerName)
+  const result = roomManager.joinRoom(msg.roomCode, clientData.id, msg.playerName, msg.sessionId)
 
   if ('error' in result) {
     send(ws, {
@@ -66,7 +66,7 @@ export function handleRoomJoin(
     return
   }
 
-  const { room, player } = result
+  const { room, player, isReconnect } = result
   clientData.roomCode = room.code
   clientData.name = msg.playerName
 
@@ -79,16 +79,18 @@ export function handleRoomJoin(
     state: room.gameState.getState(),
   })
 
-  // Notify others
-  broadcastToRoom(
-    roomManager.getClients(),
-    room.code,
-    {
-      type: 'room:player_joined',
-      player,
-    },
-    clientData.id,
-  )
+  // Only notify others if this is a new player, not a reconnect
+  if (!isReconnect) {
+    broadcastToRoom(
+      roomManager.getClients(),
+      room.code,
+      {
+        type: 'room:player_joined',
+        player,
+      },
+      clientData.id,
+    )
+  }
 }
 
 export function handleRoomLeave(ws: GenericWebSocket, roomManager: RoomManager): void {

@@ -30,6 +30,7 @@ export interface Room {
 export class RoomManager {
   private rooms = new Map<string, Room>()
   private clients = new Map<string, GenericWebSocket>()
+  private sessionToPlayer = new Map<string, { roomCode: string; playerId: string }>()
   private cleanupInterval: ReturnType<typeof setInterval> | null = null
 
   constructor() {
@@ -61,7 +62,7 @@ export class RoomManager {
   /**
    * Create a new room
    */
-  createRoom(playerId: string, playerName: string): Room {
+  createRoom(playerId: string, playerName: string, sessionId?: string): Room {
     // Generate unique code
     let code: string
     do {
@@ -73,6 +74,7 @@ export class RoomManager {
       name: playerName,
       connected: true,
       color: PLAYER_COLORS[0],
+      sessionId,
     }
 
     const room: Room = {
@@ -84,6 +86,12 @@ export class RoomManager {
     }
 
     this.rooms.set(code, room)
+
+    // Track session for reconnection
+    if (sessionId) {
+      this.sessionToPlayer.set(sessionId, { roomCode: code, playerId })
+    }
+
     return room
   }
 
@@ -94,10 +102,35 @@ export class RoomManager {
     roomCode: string,
     playerId: string,
     playerName: string,
-  ): { room: Room; player: Player } | { error: 'NOT_FOUND' | 'FULL' } {
+    sessionId?: string,
+  ): { room: Room; player: Player; isReconnect: boolean } | { error: 'NOT_FOUND' | 'FULL' } {
     const room = this.rooms.get(roomCode)
     if (!room) {
       return { error: 'NOT_FOUND' }
+    }
+
+    // Check if this is a reconnection via sessionId
+    if (sessionId) {
+      const existingPlayer = [...room.players.values()].find((p) => p.sessionId === sessionId)
+      if (existingPlayer) {
+        // Reconnect existing player with new socket ID
+        const oldId = existingPlayer.id
+        existingPlayer.id = playerId
+        existingPlayer.connected = true
+        existingPlayer.name = playerName
+
+        // Update the players map with new ID
+        room.players.delete(oldId)
+        room.players.set(playerId, existingPlayer)
+
+        // Update session mapping
+        this.sessionToPlayer.set(sessionId, { roomCode, playerId })
+
+        // Transfer hand ownership
+        room.gameState.transferHandOwnership(oldId, playerId)
+
+        return { room, player: existingPlayer, isReconnect: true }
+      }
     }
 
     // Check if room is full (8 players max)
@@ -114,6 +147,7 @@ export class RoomManager {
       name: playerName,
       connected: true,
       color: availableColor,
+      sessionId,
     }
 
     room.players.set(playerId, player)
@@ -121,7 +155,12 @@ export class RoomManager {
     // Create hand for new player
     room.gameState.getOrCreateHand(playerId)
 
-    return { room, player }
+    // Track session for reconnection
+    if (sessionId) {
+      this.sessionToPlayer.set(sessionId, { roomCode, playerId })
+    }
+
+    return { room, player, isReconnect: false }
   }
 
   /**
