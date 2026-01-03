@@ -14,6 +14,8 @@ const emit = defineEmits<{
   pointermove: [event: PointerEvent]
   pointerup: [event: PointerEvent]
   dblclick: [event: MouseEvent]
+  'zone:update': [zoneId: number, updates: Partial<Omit<Zone, 'id' | 'stackId'>>]
+  'zone:delete': [zoneId: number]
 }>()
 
 const cardStore = useCardStore()
@@ -45,19 +47,25 @@ const onLabelKeydown = (event: KeyboardEvent) => {
 const onLabelInput = (event: Event) => {
   const target = event.target as HTMLInputElement
   cardStore.updateZone(props.zone.id, { label: target.value })
+  emit('zone:update', props.zone.id, { label: target.value })
 }
 
 const toggleFaceUp = () => {
-  cardStore.updateZone(props.zone.id, { faceUp: !props.zone.faceUp })
+  const newFaceUp = !props.zone.faceUp
+  cardStore.updateZone(props.zone.id, { faceUp: newFaceUp })
+  emit('zone:update', props.zone.id, { faceUp: newFaceUp })
 }
 
 const toggleLocked = () => {
-  cardStore.updateZone(props.zone.id, { locked: !props.zone.locked })
+  const newLocked = !props.zone.locked
+  cardStore.updateZone(props.zone.id, { locked: newLocked })
+  emit('zone:update', props.zone.id, { locked: newLocked })
 }
 
 const deleteZone = () => {
   closeModal()
   cardStore.deleteZone(props.zone.id)
+  emit('zone:delete', props.zone.id)
 }
 
 // Close modal on outside click

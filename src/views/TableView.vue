@@ -303,6 +303,26 @@ const addZone = () => {
   })
 }
 
+// Handle zone update from ZoneComp (label, faceUp, locked)
+const onZoneUpdate = (
+  zoneId: number,
+  updates: { label?: string; faceUp?: boolean; locked?: boolean },
+) => {
+  ws.send({
+    type: 'zone:update',
+    zoneId,
+    updates,
+  })
+}
+
+// Handle zone delete from ZoneComp
+const onZoneDelete = (zoneId: number) => {
+  ws.send({
+    type: 'zone:delete',
+    zoneId,
+  })
+}
+
 // Canvas dimensions for minimap
 const canvasDimensions = computed(() => {
   const rect = canvasRef.value?.getBoundingClientRect()
@@ -510,6 +530,8 @@ onBeforeUnmount(() => {
           @pointerdown="interaction.onZonePointerDown($event, zone.id)"
           @pointermove="interaction.onZonePointerMove"
           @pointerup="interaction.onZonePointerUp"
+          @zone:update="onZoneUpdate"
+          @zone:delete="onZoneDelete"
         />
 
         <Card
