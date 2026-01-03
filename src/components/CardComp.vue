@@ -18,7 +18,8 @@
   image-rendering: -webkit-optimize-contrast; /* Safari */
   image-rendering: crisp-edges;
 
-  cursor: grab;
+  /* Cursor handled by parent .table-view with custom colored cursors */
+  cursor: inherit;
   will-change: transform;
 
   box-shadow: 0px 1px 6px rgba(0, 0, 0, 0.25);
@@ -26,7 +27,6 @@
 }
 
 .card.dragging {
-  cursor: grabbing;
   z-index: 2;
   box-shadow: 0px 12px 12px -4px rgba(0, 0, 0, 0.25);
 }

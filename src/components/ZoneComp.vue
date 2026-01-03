@@ -191,12 +191,12 @@ defineExpose({ openModal })
   color: #f0f0f0;
   background-color: rgba(0, 0, 0, 0.15);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2) inset;
-  cursor: grab;
+  /* Cursor handled by parent .table-view with custom colored cursors */
+  cursor: inherit;
   touch-action: none;
 }
 
 .zone--dragging {
-  cursor: grabbing;
   opacity: 0.8;
 }
 

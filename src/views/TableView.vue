@@ -11,6 +11,7 @@ import { useCardStore } from '@/stores/cards'
 import { useCardInteraction } from '@/composables/useCardInteraction'
 import { useViewport } from '@/composables/useViewport'
 import { useWebSocket } from '@/composables/useWebSocket'
+import { useCursor } from '@/composables/useCursor'
 import { SquarePlus, Copy, Check, LogOut, Users, Wifi, WifiOff } from 'lucide-vue-next'
 import { CARD_BACK_COL, CARD_BACK_ROW, ZONE_DEFAULT_WIDTH, ZONE_DEFAULT_HEIGHT } from '@/types'
 import type { ServerMessage, ClientMessage } from '../../shared/types'
@@ -28,6 +29,15 @@ const isNewTable = computed(() => route.name === 'table-new')
 const ws = useWebSocket()
 const codeCopied = ref(false)
 
+// Get current player's color for cursor
+const playerColor = computed(() => {
+  const player = ws.players.value.find((p) => p.id === ws.playerId.value)
+  return player?.color || '#ef4444' // Default to red
+})
+
+// Custom cursor based on player color (sets up global style via side effect)
+useCursor(playerColor)
+
 // Create refs for template binding
 const canvasRef = ref<HTMLElement | null>(null)
 const handRef = ref<HTMLElement | null>(null)
@@ -43,6 +53,20 @@ const spaceHeld = ref(false)
 const interaction = useCardInteraction({
   handRef: handRef,
   sendMessage: (msg: ClientMessage) => ws.send(msg),
+})
+
+// Compute cursor class based on interaction state
+const cursorClass = computed(() => {
+  // If dragging, show grabbing cursor
+  if (interaction.drag.isDragging.value) {
+    return 'cursor--grabbing'
+  }
+  // If panning (space held or middle mouse), show grab cursor
+  if (viewport.isPanning.value || spaceHeld.value) {
+    return 'cursor--grab'
+  }
+  // Default pointer
+  return ''
 })
 
 // Wire viewport transform to drag system
@@ -368,7 +392,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="table-view">
+  <div class="table-view" :class="cursorClass">
     <!-- Header bar -->
     <header class="table-header">
       <div class="table-header__left">
@@ -416,7 +440,6 @@ onBeforeUnmount(() => {
     <div
       ref="canvasRef"
       class="canvas"
-      :class="{ 'canvas--panning': viewport.isPanning.value || spaceHeld }"
       @wheel="viewport.onWheel"
       @pointerdown="onCanvasPointerDown"
       @pointermove="onCanvasPointerMove"
@@ -665,14 +688,6 @@ onBeforeUnmount(() => {
   overflow: hidden;
   user-select: none;
   touch-action: none;
-}
-
-.canvas--panning {
-  cursor: grab;
-}
-
-.canvas--panning:active {
-  cursor: grabbing;
 }
 
 .world {

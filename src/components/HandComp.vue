@@ -154,7 +154,8 @@ defineExpose({
 
 .hand__card {
   position: absolute;
-  cursor: grab;
+  /* Cursor handled by parent .table-view with custom colored cursors */
+  cursor: inherit;
   transition: transform 0.15s ease-out;
   pointer-events: auto;
   transform: translateX(var(--hand-x, 0));
