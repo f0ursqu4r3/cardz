@@ -9,6 +9,7 @@ export type CardData = {
   z: number
   faceUp: boolean
   inHand: boolean
+  lockedBy: string | null // Player currently grabbing this card
 }
 
 export type Stack = {

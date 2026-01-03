@@ -42,6 +42,18 @@ const playerColor = computed(() => {
   return player?.color || '#ef4444' // Default to red
 })
 
+// Get a player's color by their ID
+const getPlayerColor = (playerId: string | null): string | null => {
+  if (!playerId) return null
+  const player = ws.players.value.find((p) => p.id === playerId)
+  return player?.color || null
+}
+
+// Check if a card is locked by another player (not the current player)
+const isLockedByOther = (lockedBy: string | null): boolean => {
+  return lockedBy !== null && lockedBy !== ws.playerId.value
+}
+
 // Custom cursor based on player color (sets up global style via side effect)
 useCursor(playerColor)
 
@@ -127,6 +139,14 @@ ws.onMessage((message: ServerMessage) => {
         y: message.y,
         z: message.z,
       })
+      break
+
+    case 'card:locked':
+      cardStore.updateCardFromServer(message.cardId, { lockedBy: message.playerId })
+      break
+
+    case 'card:unlocked':
+      cardStore.updateCardFromServer(message.cardId, { lockedBy: null })
       break
 
     case 'card:flipped':
@@ -547,11 +567,13 @@ onBeforeUnmount(() => {
             selected: cardStore.isSelected(card.id),
             shuffling:
               cardStore.shufflingStackId !== null && card.stackId === cardStore.shufflingStackId,
+            'locked-by-other': isLockedByOther(card.lockedBy),
           }"
           :style="{
             '--col': interaction.getCardCol(index),
             '--row': interaction.getCardRow(index),
             '--shuffle-seed': card.id % 10,
+            '--lock-color': getPlayerColor(card.lockedBy),
             left: `${card.x}px`,
             top: `${card.y}px`,
             zIndex: interaction.getCardZ(index),
@@ -777,6 +799,24 @@ onBeforeUnmount(() => {
   outline: 2px solid rgba(0, 150, 255, 0.9);
   outline-offset: 1px;
   box-shadow: 0 0 8px rgba(0, 150, 255, 0.6);
+}
+
+/* Card being grabbed by another player */
+.locked-by-other {
+  outline: 2px solid var(--lock-color, #888);
+  outline-offset: 1px;
+  box-shadow: 0 0 12px var(--lock-color, #888);
+  animation: grabbed-pulse 1s ease-in-out infinite;
+}
+
+@keyframes grabbed-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 8px var(--lock-color, #888);
+  }
+  50% {
+    box-shadow: 0 0 16px var(--lock-color, #888);
+  }
 }
 
 .selection-indicator {

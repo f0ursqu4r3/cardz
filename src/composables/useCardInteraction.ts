@@ -198,6 +198,9 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       target,
     )
 
+    // Send lock message to server so other players see the grab
+    send({ type: 'card:lock', cardId: card.id })
+
     // Pass grab offset (where on card user clicked)
     const grabOffsetX = x - card.x
     physics.startDrag(x, y, grabOffsetX)
@@ -625,6 +628,9 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
         } else {
           physics.endDrag()
         }
+
+        // Release the lock so other players no longer see the grab
+        send({ type: 'card:unlock', cardId: card.id })
       }
     }
 

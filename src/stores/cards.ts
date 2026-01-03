@@ -62,6 +62,7 @@ export const useCardStore = defineStore('cards', () => {
       z: zCounter++,
       faceUp: true,
       inHand: false,
+      lockedBy: null,
     }))
   }
 
@@ -516,6 +517,7 @@ export const useCardStore = defineStore('cards', () => {
     stackId: state.stackId,
     isInDeck: state.stackId !== null,
     inHand: state.ownerId !== null,
+    lockedBy: state.lockedBy,
   })
 
   // Convert server StackState to local Stack
@@ -569,6 +571,9 @@ export const useCardStore = defineStore('cards', () => {
     }
     if (updates.ownerId !== undefined) {
       card.inHand = updates.ownerId !== null
+    }
+    if (updates.lockedBy !== undefined) {
+      card.lockedBy = updates.lockedBy
     }
   }
 
