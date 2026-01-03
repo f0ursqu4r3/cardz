@@ -87,7 +87,9 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
   const gameState = ref<GameState | null>(null)
   const handCardIds = ref<number[]>([])
   const handCounts = ref<Map<string, number>>(new Map())
-  const cursors = ref<Map<string, { x: number; y: number; state: 'default' | 'grab' | 'grabbing' }>>(new Map())
+  const cursors = ref<
+    Map<string, { x: number; y: number; state: 'default' | 'grab' | 'grabbing' }>
+  >(new Map())
 
   // Message handlers
   const messageHandlers = new Set<(message: ServerMessage) => void>()
