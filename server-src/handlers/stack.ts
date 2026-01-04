@@ -94,7 +94,7 @@ export function handleStackMove(
     return
   }
 
-  const result = gameState.moveStack(msg.stackId, msg.anchorX, msg.anchorY)
+  const result = gameState.moveStack(msg.stackId, msg.anchorX, msg.anchorY, msg.detachFromZone)
   if (!result) {
     send(ws, {
       type: 'error',
@@ -112,6 +112,7 @@ export function handleStackMove(
     anchorX: msg.anchorX,
     anchorY: msg.anchorY,
     cardUpdates: result.cardUpdates,
+    zoneDetached: result.zoneDetached,
     playerId: clientData.id,
   })
 }

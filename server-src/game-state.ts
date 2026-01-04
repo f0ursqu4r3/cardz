@@ -152,9 +152,27 @@ export class GameStateManager {
     stackId: number,
     anchorX: number,
     anchorY: number,
-  ): { stack: StackState; cardUpdates: { cardId: number; x: number; y: number }[] } | null {
+    detachFromZone?: boolean,
+  ): {
+    stack: StackState
+    cardUpdates: { cardId: number; x: number; y: number }[]
+    zoneDetached?: { zoneId: number }
+  } | null {
     const stack = this.getStack(stackId)
     if (!stack) return null
+
+    let zoneDetached: { zoneId: number } | undefined
+
+    // Detach from zone if requested
+    if (detachFromZone && stack.kind === 'zone' && stack.zoneId !== undefined) {
+      const zone = this.getZone(stack.zoneId)
+      if (zone && zone.stackId === stackId) {
+        zoneDetached = { zoneId: zone.id }
+        zone.stackId = null
+      }
+      stack.zoneId = undefined
+      stack.kind = 'free'
+    }
 
     stack.anchorX = anchorX
     stack.anchorY = anchorY
@@ -169,7 +187,7 @@ export class GameStateManager {
       }
     }
 
-    return { stack, cardUpdates }
+    return { stack, cardUpdates, zoneDetached }
   }
 
   setStackLock(stackId: number, playerId: string | null): boolean {
@@ -234,6 +252,13 @@ export class GameStateManager {
 
     // Delete empty stacks
     if (stack.cardIds.length === 0) {
+      // Clear zone association if stack belonged to a zone
+      if (stack.kind === 'zone' && stack.zoneId !== undefined) {
+        const zone = this.getZone(stack.zoneId)
+        if (zone && zone.stackId === stackId) {
+          zone.stackId = null
+        }
+      }
       this.state.stacks = this.state.stacks.filter((s) => s.id !== stackId)
       return { stackId, stackDeleted: true, zoneLayoutReset }
     }
@@ -264,6 +289,14 @@ export class GameStateManager {
         card.y = targetStack.anchorY + (targetStack.cardIds.length - 1) * STACK_OFFSET_Y
         card.z = ++this.state.zCounter
         cardUpdates.push({ cardId: card.id, x: card.x, y: card.y, z: card.z })
+      }
+    }
+
+    // Clear zone association if source stack belonged to a zone
+    if (sourceStack.kind === 'zone' && sourceStack.zoneId !== undefined) {
+      const zone = this.getZone(sourceStack.zoneId)
+      if (zone && zone.stackId === sourceStackId) {
+        zone.stackId = null
       }
     }
 

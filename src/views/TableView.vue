@@ -310,6 +310,18 @@ ws.onMessage((message: ServerMessage) => {
         anchorX: message.anchorX,
         anchorY: message.anchorY,
       })
+      // Handle zone detachment
+      if (message.zoneDetached) {
+        const zone = cardStore.zones.find((z) => z.id === message.zoneDetached!.zoneId)
+        if (zone) {
+          zone.stackId = null
+        }
+        const stack = cardStore.stacks.find((s) => s.id === message.stackId)
+        if (stack) {
+          stack.zoneId = undefined
+          stack.kind = 'free'
+        }
+      }
       message.cardUpdates.forEach((update) => {
         cardStore.updateCardFromServer(update.cardId, {
           x: update.x,

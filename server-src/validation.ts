@@ -135,6 +135,7 @@ export const StackMoveSchema = z.object({
   stackId: z.number().int(),
   anchorX: z.number(),
   anchorY: z.number(),
+  detachFromZone: z.boolean().optional(),
 })
 
 export const StackLockSchema = z.object({

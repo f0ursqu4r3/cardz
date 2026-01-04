@@ -36,6 +36,9 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
   // Track when dragging over hand zone
   const isOverHand = ref(false)
 
+  // Track if current stack drag detached from a zone (for sending with stack:move)
+  const stackDetachedFromZone = ref(false)
+
   // Mutable handler for hand card drop (set after hand composable is created)
   let handCardDropHandler: ((event: PointerEvent) => boolean) | undefined = options.onHandCardDrop
 
@@ -149,6 +152,8 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     send({ type: 'stack:lock', stackId: stack.id })
 
     // Detach stack from its zone so it can be moved out (e.g., right-click drag)
+    // Track this so we can tell the server when the move is complete
+    stackDetachedFromZone.value = false
     if (stack.kind === 'zone' && stack.zoneId !== undefined) {
       const zone = cardStore.zones.find((z) => z.id === stack.zoneId)
       if (zone && zone.stackId === stack.id) {
@@ -156,6 +161,7 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       }
       stack.zoneId = undefined
       stack.kind = 'free'
+      stackDetachedFromZone.value = true
     }
 
     const { x, y } = drag.getPending()
@@ -570,8 +576,17 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
 
       // If not handled, just send stack move
       if (!handled && stack) {
-        send({ type: 'stack:move', stackId, anchorX: stack.anchorX, anchorY: stack.anchorY })
+        send({
+          type: 'stack:move',
+          stackId,
+          anchorX: stack.anchorX,
+          anchorY: stack.anchorY,
+          detachFromZone: stackDetachedFromZone.value || undefined,
+        })
       }
+
+      // Reset detachment tracking
+      stackDetachedFromZone.value = false
 
       // Release the stack lock so other players no longer see the grab
       send({ type: 'stack:unlock', stackId })

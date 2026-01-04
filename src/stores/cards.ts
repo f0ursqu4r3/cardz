@@ -1,3 +1,4 @@
+import { STACK_MAX_VISUAL_DEPTH } from './../types/index'
 import { computed, ref, type Ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { CardData, Stack, Zone } from '@/types'
@@ -106,6 +107,7 @@ export const useCardStore = defineStore('cards', () => {
 
         if (layout === 'stack') {
           // Original stack behavior - center cards (no randomization for stacks)
+          const cardCount = stack.cardIds.length
           const stackWidth = CARD_W + Math.max(0, cardCount - 1) * STACK_OFFSET_X
           const stackHeight = CARD_H + Math.max(0, cardCount - 1) * Math.abs(STACK_OFFSET_Y)
           stack.anchorX = zone.x + (zone.width - stackWidth) / 2
@@ -352,7 +354,12 @@ export const useCardStore = defineStore('cards', () => {
     visibility: Zone['visibility'] = 'public',
     ownerId: string | null = null,
     layout: Zone['layout'] = 'stack',
-    cardSettings: Zone['cardSettings'] = { cardScale: 1.0, cardSpacing: 0.5 },
+    cardSettings: Zone['cardSettings'] = {
+      cardScale: 1.0,
+      cardSpacing: 0.5,
+      randomOffset: 0,
+      randomRotation: 0,
+    },
   ): Zone => {
     const zone: Zone = {
       id: nextZoneId++,

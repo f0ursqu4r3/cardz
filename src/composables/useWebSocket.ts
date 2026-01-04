@@ -371,6 +371,17 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
             stack.anchorX = message.anchorX
             stack.anchorY = message.anchorY
           }
+          // Handle zone detachment
+          if (message.zoneDetached) {
+            const zone = gameState.value.zones.find((z) => z.id === message.zoneDetached!.zoneId)
+            if (zone) {
+              zone.stackId = null
+            }
+            if (stack) {
+              stack.zoneId = undefined
+              stack.kind = 'free'
+            }
+          }
           message.cardUpdates.forEach((update) => {
             const card = gameState.value!.cards.find((c) => c.id === update.cardId)
             if (card) {

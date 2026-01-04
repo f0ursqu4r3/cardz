@@ -303,6 +303,7 @@ export interface StackMove {
   stackId: number
   anchorX: number
   anchorY: number
+  detachFromZone?: boolean // If true, detach the stack from its current zone
 }
 
 export interface StackLock {
@@ -359,6 +360,7 @@ export interface StackMoved {
   anchorX: number
   anchorY: number
   cardUpdates: { cardId: number; x: number; y: number }[]
+  zoneDetached?: { zoneId: number } // Present if stack was detached from a zone
   playerId: string
 }
 
