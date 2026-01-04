@@ -26,7 +26,17 @@
   transition: box-shadow 0.2s ease;
 }
 
-.card.dragging {
+/* Cards in a stack don't show shadow (except the bottom one) */
+.card.in-stack {
+  box-shadow: none;
+}
+
+.card.in-stack.stack-bottom {
+  box-shadow: 0px 1px 6px rgba(0, 0, 0, 0.25);
+}
+
+.card.dragging:not(.in-stack),
+.card.dragging.in-stack.stack-bottom {
   z-index: 2;
   box-shadow: 0px 12px 12px -4px rgba(0, 0, 0, 0.25);
 }

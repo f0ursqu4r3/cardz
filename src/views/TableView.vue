@@ -19,6 +19,8 @@ import {
   CARD_BACK_ROW,
   CARD_W,
   CARD_H,
+  STACK_OFFSET_X,
+  STACK_OFFSET_Y,
   ZONE_DEFAULT_WIDTH,
   ZONE_DEFAULT_HEIGHT,
   CURSOR_THROTTLE_MS,
@@ -51,14 +53,16 @@ const getPlayerColor = (playerId: string | null): string | null => {
   return player?.color || null
 }
 
-// Check if a card or its stack is locked by another player
-const isCardOrStackLockedByOther = (card: (typeof cardStore.cards)[0]): boolean => {
-  // Check card-level lock
+// Check if a card should show the lock glow (only bottom card for stack locks)
+const shouldShowLockGlow = (card: (typeof cardStore.cards)[0]): boolean => {
+  // Card-level lock always shows glow
   if (card.lockedBy && card.lockedBy !== ws.playerId.value) return true
-  // Check stack-level lock
+  // Stack-level lock only shows glow on bottom card
   if (card.stackId !== null) {
     const stack = cardStore.stacks.find((s) => s.id === card.stackId)
-    if (stack?.lockedBy && stack.lockedBy !== ws.playerId.value) return true
+    if (stack?.lockedBy && stack.lockedBy !== ws.playerId.value) {
+      return stack.cardIds[0] === card.id // Only bottom card
+    }
   }
   return false
 }
@@ -67,13 +71,16 @@ const isCardOrStackLockedByOther = (card: (typeof cardStore.cards)[0]): boolean 
 const getCardLockColor = (card: (typeof cardStore.cards)[0]): string | null => {
   // Check card-level lock first
   if (card.lockedBy && card.lockedBy !== ws.playerId.value) {
-    return getPlayerColor(card.lockedBy)
+    return getPlayerColor(card.lockedBy) || '#888' // Fallback to gray if player not found
   }
-  // Check stack-level lock
+  // Check stack-level lock (only return color for bottom card)
   if (card.stackId !== null) {
     const stack = cardStore.stacks.find((s) => s.id === card.stackId)
     if (stack?.lockedBy && stack.lockedBy !== ws.playerId.value) {
-      return getPlayerColor(stack.lockedBy)
+      // Only return color for bottom card (where the glow shows)
+      if (stack.cardIds[0] === card.id) {
+        return getPlayerColor(stack.lockedBy) || '#888' // Fallback to gray if player not found
+      }
     }
   }
   return null
@@ -93,8 +100,16 @@ const getCardLockHolder = (card: (typeof cardStore.cards)[0]): string | null => 
   return null
 }
 
+// Check if a card is the bottom card of its stack (for shadow rendering)
+const isStackBottom = (card: (typeof cardStore.cards)[0]): boolean => {
+  if (card.stackId === null) return false
+  const stack = cardStore.stacks.find((s) => s.id === card.stackId)
+  return stack ? stack.cardIds[0] === card.id : false
+}
+
 // Get the position for a card that's being held by another player
 // Card follows the holder's cursor, centered under it
+// For stack drags, maintains the card's offset within the stack
 const getLockedCardPosition = (
   card: (typeof cardStore.cards)[0],
 ): { x: number; y: number } | null => {
@@ -104,7 +119,23 @@ const getLockedCardPosition = (
   const cursor = ws.cursors.value.get(holderId)
   if (!cursor) return null
 
-  // Center the card under the cursor
+  // Check if this is a stack lock (not a card lock)
+  if (card.stackId !== null) {
+    const stack = cardStore.stacks.find((s) => s.id === card.stackId)
+    if (stack?.lockedBy && stack.lockedBy !== ws.playerId.value) {
+      // Find card's index in the stack to calculate offset
+      const cardIndex = stack.cardIds.indexOf(card.id)
+      if (cardIndex !== -1) {
+        // Position relative to cursor with stack offset
+        return {
+          x: cursor.x - CARD_W / 2 + cardIndex * STACK_OFFSET_X,
+          y: cursor.y - CARD_H / 2 + cardIndex * STACK_OFFSET_Y,
+        }
+      }
+    }
+  }
+
+  // Single card drag - center under cursor
   return {
     x: cursor.x - CARD_W / 2,
     y: cursor.y - CARD_H / 2,
@@ -673,15 +704,21 @@ onBeforeUnmount(() => {
           v-show="!card.inHand"
           :key="card.id"
           :class="{
-            dragging: interaction.drag.activeIndex.value === index,
+            dragging:
+              interaction.drag.activeIndex.value === index ||
+              (interaction.drag.target.value?.type === 'stack' &&
+                card.stackId === interaction.drag.target.value.stackId &&
+                isStackBottom(card)),
             'in-deck': card.isInDeck,
+            'in-stack': card.stackId !== null,
+            'stack-bottom': isStackBottom(card),
             'stack-target':
               interaction.hover.state.ready && interaction.hover.state.cardId === card.id,
             'face-down': !card.faceUp,
             selected: cardStore.isSelected(card.id),
             shuffling:
               cardStore.shufflingStackId !== null && card.stackId === cardStore.shufflingStackId,
-            'locked-by-other': isCardOrStackLockedByOther(card),
+            'locked-by-other': shouldShowLockGlow(card),
           }"
           :style="{
             '--col': interaction.getCardCol(index),
