@@ -17,6 +17,8 @@ import { SquarePlus, Copy, Check, LogOut, Users, Wifi, WifiOff } from 'lucide-vu
 import {
   CARD_BACK_COL,
   CARD_BACK_ROW,
+  CARD_W,
+  CARD_H,
   ZONE_DEFAULT_WIDTH,
   ZONE_DEFAULT_HEIGHT,
   CURSOR_THROTTLE_MS,
@@ -49,9 +51,64 @@ const getPlayerColor = (playerId: string | null): string | null => {
   return player?.color || null
 }
 
-// Check if a card is locked by another player (not the current player)
-const isLockedByOther = (lockedBy: string | null): boolean => {
-  return lockedBy !== null && lockedBy !== ws.playerId.value
+// Check if a card or its stack is locked by another player
+const isCardOrStackLockedByOther = (card: (typeof cardStore.cards)[0]): boolean => {
+  // Check card-level lock
+  if (card.lockedBy && card.lockedBy !== ws.playerId.value) return true
+  // Check stack-level lock
+  if (card.stackId !== null) {
+    const stack = cardStore.stacks.find((s) => s.id === card.stackId)
+    if (stack?.lockedBy && stack.lockedBy !== ws.playerId.value) return true
+  }
+  return false
+}
+
+// Get the lock color for a card (checks both card and stack locks)
+const getCardLockColor = (card: (typeof cardStore.cards)[0]): string | null => {
+  // Check card-level lock first
+  if (card.lockedBy && card.lockedBy !== ws.playerId.value) {
+    return getPlayerColor(card.lockedBy)
+  }
+  // Check stack-level lock
+  if (card.stackId !== null) {
+    const stack = cardStore.stacks.find((s) => s.id === card.stackId)
+    if (stack?.lockedBy && stack.lockedBy !== ws.playerId.value) {
+      return getPlayerColor(stack.lockedBy)
+    }
+  }
+  return null
+}
+
+// Get the lock holder's player ID for a card (checks both card and stack locks)
+const getCardLockHolder = (card: (typeof cardStore.cards)[0]): string | null => {
+  if (card.lockedBy && card.lockedBy !== ws.playerId.value) {
+    return card.lockedBy
+  }
+  if (card.stackId !== null) {
+    const stack = cardStore.stacks.find((s) => s.id === card.stackId)
+    if (stack?.lockedBy && stack.lockedBy !== ws.playerId.value) {
+      return stack.lockedBy
+    }
+  }
+  return null
+}
+
+// Get the position for a card that's being held by another player
+// Card follows the holder's cursor, centered under it
+const getLockedCardPosition = (
+  card: (typeof cardStore.cards)[0],
+): { x: number; y: number } | null => {
+  const holderId = getCardLockHolder(card)
+  if (!holderId) return null
+
+  const cursor = ws.cursors.value.get(holderId)
+  if (!cursor) return null
+
+  // Center the card under the cursor
+  return {
+    x: cursor.x - CARD_W / 2,
+    y: cursor.y - CARD_H / 2,
+  }
 }
 
 // Custom cursor based on player color (sets up global style via side effect)
@@ -110,10 +167,9 @@ watch(
 ws.onMessage((message: ServerMessage) => {
   switch (message.type) {
     case 'room:created':
-      // Full state sync on room creation
-      if (ws.gameState.value) {
-        cardStore.syncFromServer(ws.gameState.value, ws.handCardIds.value)
-      }
+      // Full state sync on room creation - use message.state directly
+      // (ws.gameState.value is not yet set when this handler runs)
+      cardStore.syncFromServer(message.state, [])
       // Update route to include room code
       router.replace({
         name: 'table',
@@ -122,12 +178,12 @@ ws.onMessage((message: ServerMessage) => {
       })
       break
 
-    case 'room:joined':
+    case 'room:joined': {
       // Full state sync when joining a room
-      if (ws.gameState.value) {
-        cardStore.syncFromServer(ws.gameState.value, ws.handCardIds.value)
-      }
+      const ourHand = message.state.hands.find((h) => h.playerId === message.playerId)
+      cardStore.syncFromServer(message.state, ourHand?.cardIds ?? [])
       break
+    }
 
     case 'room:error':
       // Room not found or other error - redirect to landing
@@ -625,15 +681,15 @@ onBeforeUnmount(() => {
             selected: cardStore.isSelected(card.id),
             shuffling:
               cardStore.shufflingStackId !== null && card.stackId === cardStore.shufflingStackId,
-            'locked-by-other': isLockedByOther(card.lockedBy),
+            'locked-by-other': isCardOrStackLockedByOther(card),
           }"
           :style="{
             '--col': interaction.getCardCol(index),
             '--row': interaction.getCardRow(index),
             '--shuffle-seed': card.id % 10,
-            '--lock-color': getPlayerColor(card.lockedBy),
-            left: `${card.x}px`,
-            top: `${card.y}px`,
+            '--lock-color': getCardLockColor(card),
+            left: `${getLockedCardPosition(card)?.x ?? card.x}px`,
+            top: `${getLockedCardPosition(card)?.y ?? card.y}px`,
             zIndex: interaction.getCardZ(index),
             transform:
               interaction.drag.activeIndex.value === index ||

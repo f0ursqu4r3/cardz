@@ -145,6 +145,9 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     const stack = cardStore.stacks.find((item) => item.id === card.stackId)
     if (!stack) return
 
+    // Send lock message to server so other players see the grab
+    send({ type: 'stack:lock', stackId: stack.id })
+
     // Detach stack from its zone so it can be moved out (e.g., right-click drag)
     if (stack.kind === 'zone' && stack.zoneId !== undefined) {
       const zone = cardStore.zones.find((z) => z.id === stack.zoneId)
@@ -183,6 +186,8 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       const topId = stack.cardIds[stack.cardIds.length - 1]
       if (topId !== card.id) return false
 
+      // Notify server that card is being removed from stack
+      send({ type: 'stack:remove_card', cardId: card.id })
       cardStore.removeFromStack(card.id)
     }
 
@@ -529,6 +534,9 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       if (!handled && stack) {
         send({ type: 'stack:move', stackId, anchorX: stack.anchorX, anchorY: stack.anchorY })
       }
+
+      // Release the stack lock so other players no longer see the grab
+      send({ type: 'stack:unlock', stackId })
     }
     // Handle selection drop
     else if (drag.target.value?.type === 'selection') {
