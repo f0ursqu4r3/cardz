@@ -52,12 +52,28 @@ const DEFAULT_WS_URL = `ws://${window.location.hostname}:9001`
 const SESSION_ID_KEY = 'cardz_session_id'
 
 /**
+ * Generate a UUID-like string (fallback for non-secure contexts)
+ */
+function generateUUID(): string {
+  // Use crypto.randomUUID if available (secure contexts)
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  // Fallback for non-secure contexts (HTTP with IP address)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
+/**
  * Get or create a persistent session ID for reconnection
  */
 function getSessionId(): string {
   let sessionId = localStorage.getItem(SESSION_ID_KEY)
   if (!sessionId) {
-    sessionId = crypto.randomUUID()
+    sessionId = generateUUID()
     localStorage.setItem(SESSION_ID_KEY, sessionId)
   }
   return sessionId
