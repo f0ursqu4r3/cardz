@@ -1,11 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'fs'
+import { Database } from 'bun:sqlite'
+import { existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import type { GameState } from '../shared/types'
-import { createInitialGameState } from './game-state'
 
-// Persistence directory
+// Database directory and file
 const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), 'data')
-const TABLES_DIR = join(DATA_DIR, 'tables')
+const DB_PATH = join(DATA_DIR, 'cardz.db')
 
 // Table metadata stored alongside game state
 export interface TableMetadata {
@@ -44,120 +44,202 @@ export interface PersistedTable {
   gameState: GameState
 }
 
+// Singleton database instance
+let db: Database | null = null
+
 /**
- * Ensure data directories exist
+ * Get or create the database instance
  */
-function ensureDirectories(): void {
+function getDb(): Database {
+  if (db) return db
+
+  // Ensure data directory exists
   if (!existsSync(DATA_DIR)) {
     mkdirSync(DATA_DIR, { recursive: true })
   }
-  if (!existsSync(TABLES_DIR)) {
-    mkdirSync(TABLES_DIR, { recursive: true })
-  }
+
+  db = new Database(DB_PATH)
+
+  // Enable WAL mode for better concurrent access
+  db.exec('PRAGMA journal_mode = WAL')
+  db.exec('PRAGMA synchronous = NORMAL')
+
+  // Create tables table if it doesn't exist
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tables (
+      code TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      is_public INTEGER NOT NULL DEFAULT 0,
+      max_players INTEGER NOT NULL DEFAULT 8,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      created_by TEXT NOT NULL,
+      settings TEXT NOT NULL,
+      game_state TEXT NOT NULL
+    )
+  `)
+
+  // Create index for public tables listing
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_tables_public ON tables (is_public, updated_at DESC)
+  `)
+
+  console.log(`[persistence] SQLite database initialized at ${DB_PATH}`)
+
+  return db
 }
 
 /**
- * Get the file path for a table
- */
-function getTablePath(code: string): string {
-  return join(TABLES_DIR, `${code}.json`)
-}
-
-/**
- * Save a table to disk
+ * Save a table to the database
  */
 export function saveTable(code: string, metadata: TableMetadata, gameState: GameState): void {
-  ensureDirectories()
+  const database = getDb()
+  const now = Date.now()
 
-  const data: PersistedTable = {
+  const stmt = database.prepare(`
+    INSERT INTO tables (code, name, is_public, max_players, created_at, updated_at, created_by, settings, game_state)
+    VALUES ($code, $name, $is_public, $max_players, $created_at, $updated_at, $created_by, $settings, $game_state)
+    ON CONFLICT(code) DO UPDATE SET
+      name = $name,
+      is_public = $is_public,
+      max_players = $max_players,
+      updated_at = $updated_at,
+      settings = $settings,
+      game_state = $game_state
+  `)
+
+  stmt.run({
+    $code: code,
+    $name: metadata.name,
+    $is_public: metadata.isPublic ? 1 : 0,
+    $max_players: metadata.maxPlayers,
+    $created_at: metadata.createdAt,
+    $updated_at: now,
+    $created_by: metadata.createdBy,
+    $settings: JSON.stringify(metadata.settings),
+    $game_state: JSON.stringify(gameState),
+  })
+
+  console.log(`[persistence] Saved table ${code}`)
+}
+
+/**
+ * Load a table from the database
+ */
+export function loadTable(code: string): PersistedTable | null {
+  const database = getDb()
+
+  const stmt = database.prepare(`
+    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, settings, game_state
+    FROM tables
+    WHERE code = ?
+  `)
+
+  const row = stmt.get(code) as {
+    code: string
+    name: string
+    is_public: number
+    max_players: number
+    created_at: number
+    updated_at: number
+    created_by: string
+    settings: string
+    game_state: string
+  } | null
+
+  if (!row) {
+    return null
+  }
+
+  let settings: TableSettings
+  try {
+    settings = JSON.parse(row.settings)
+  } catch {
+    settings = getDefaultSettings()
+  }
+
+  let gameState: GameState
+  try {
+    gameState = JSON.parse(row.game_state)
+  } catch {
+    console.error(`[persistence] Failed to parse game state for table ${code}`)
+    return null
+  }
+
+  return {
     metadata: {
-      ...metadata,
-      updatedAt: Date.now(),
+      code: row.code,
+      name: row.name,
+      isPublic: row.is_public === 1,
+      maxPlayers: row.max_players,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      createdBy: row.created_by,
+      settings,
     },
     gameState,
   }
-
-  try {
-    writeFileSync(getTablePath(code), JSON.stringify(data, null, 2), 'utf-8')
-    console.log(`[persistence] Saved table ${code}`)
-  } catch (error) {
-    console.error(`[persistence] Failed to save table ${code}:`, error)
-  }
 }
 
 /**
- * Load a table from disk
- */
-export function loadTable(code: string): PersistedTable | null {
-  const path = getTablePath(code)
-
-  if (!existsSync(path)) {
-    return null
-  }
-
-  try {
-    const data = readFileSync(path, 'utf-8')
-    const parsed = JSON.parse(data) as PersistedTable
-
-    // Migrate old data without settings
-    if (!parsed.metadata.settings) {
-      parsed.metadata.settings = getDefaultSettings()
-    }
-
-    return parsed
-  } catch (error) {
-    console.error(`[persistence] Failed to load table ${code}:`, error)
-    return null
-  }
-}
-
-/**
- * Delete a table from disk
+ * Delete a table from the database
  */
 export function deleteTable(code: string): boolean {
-  const path = getTablePath(code)
+  const database = getDb()
 
-  if (!existsSync(path)) {
-    return false
-  }
+  const stmt = database.prepare('DELETE FROM tables WHERE code = ?')
+  const result = stmt.run(code)
 
-  try {
-    unlinkSync(path)
+  if (result.changes > 0) {
     console.log(`[persistence] Deleted table ${code}`)
     return true
-  } catch (error) {
-    console.error(`[persistence] Failed to delete table ${code}:`, error)
-    return false
   }
+
+  return false
 }
 
 /**
- * List all persisted tables
+ * List all persisted tables (metadata only)
  */
 export function listTables(): TableMetadata[] {
-  ensureDirectories()
+  const database = getDb()
 
-  const tables: TableMetadata[] = []
+  const stmt = database.prepare(`
+    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, settings
+    FROM tables
+    ORDER BY updated_at DESC
+  `)
 
-  try {
-    const files = readdirSync(TABLES_DIR)
+  const rows = stmt.all() as {
+    code: string
+    name: string
+    is_public: number
+    max_players: number
+    created_at: number
+    updated_at: number
+    created_by: string
+    settings: string
+  }[]
 
-    for (const file of files) {
-      if (!file.endsWith('.json')) continue
-
-      try {
-        const data = readFileSync(join(TABLES_DIR, file), 'utf-8')
-        const parsed = JSON.parse(data) as PersistedTable
-        tables.push(parsed.metadata)
-      } catch {
-        // Skip invalid files
-      }
+  return rows.map((row) => {
+    let settings: TableSettings
+    try {
+      settings = JSON.parse(row.settings)
+    } catch {
+      settings = getDefaultSettings()
     }
-  } catch (error) {
-    console.error('[persistence] Failed to list tables:', error)
-  }
 
-  return tables
+    return {
+      code: row.code,
+      name: row.name,
+      isPublic: row.is_public === 1,
+      maxPlayers: row.max_players,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      createdBy: row.created_by,
+      settings,
+    }
+  })
 }
 
 /**
@@ -230,21 +312,72 @@ export function stopAutoSave(code: string): void {
  * Clean up old tables (older than maxAge)
  */
 export function cleanupOldTables(maxAgeMs: number = 7 * 24 * 60 * 60 * 1000): number {
-  const now = Date.now()
-  let deleted = 0
+  const database = getDb()
+  const cutoff = Date.now() - maxAgeMs
 
-  const tables = listTables()
-  for (const table of tables) {
-    if (now - table.updatedAt > maxAgeMs) {
-      if (deleteTable(table.code)) {
-        deleted++
-      }
+  const stmt = database.prepare('DELETE FROM tables WHERE updated_at < ?')
+  const result = stmt.run(cutoff)
+
+  if (result.changes > 0) {
+    console.log(`[persistence] Cleaned up ${result.changes} old tables`)
+  }
+
+  return result.changes
+}
+
+/**
+ * Close the database connection (call on server shutdown)
+ */
+export function closeDatabase(): void {
+  if (db) {
+    db.close()
+    db = null
+    console.log('[persistence] Database connection closed')
+  }
+}
+
+/**
+ * Search tables by name (case-insensitive)
+ */
+export function searchTables(query: string, publicOnly: boolean = true): TableMetadata[] {
+  const database = getDb()
+
+  const stmt = database.prepare(`
+    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, settings
+    FROM tables
+    WHERE name LIKE $query ${publicOnly ? 'AND is_public = 1' : ''}
+    ORDER BY updated_at DESC
+    LIMIT 50
+  `)
+
+  const rows = stmt.all({ $query: `%${query}%` }) as {
+    code: string
+    name: string
+    is_public: number
+    max_players: number
+    created_at: number
+    updated_at: number
+    created_by: string
+    settings: string
+  }[]
+
+  return rows.map((row) => {
+    let settings: TableSettings
+    try {
+      settings = JSON.parse(row.settings)
+    } catch {
+      settings = getDefaultSettings()
     }
-  }
 
-  if (deleted > 0) {
-    console.log(`[persistence] Cleaned up ${deleted} old tables`)
-  }
-
-  return deleted
+    return {
+      code: row.code,
+      name: row.name,
+      isPublic: row.is_public === 1,
+      maxPlayers: row.max_players,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      createdBy: row.created_by,
+      settings,
+    }
+  })
 }

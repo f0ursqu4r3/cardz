@@ -57,6 +57,10 @@ export class RoomManager {
   private sessionToPlayer = new Map<string, { roomCode: string; playerId: string }>()
   private cleanupInterval: ReturnType<typeof setInterval> | null = null
   private persistenceCleanupInterval: ReturnType<typeof setInterval> | null = null
+  private emptyRoomCleanups = new Map<string, ReturnType<typeof setTimeout>>()
+
+  // How long to wait before cleaning up an empty room (1 minute)
+  private static readonly EMPTY_ROOM_CLEANUP_DELAY = 60_000
 
   constructor() {
     // Clean up empty rooms every minute
@@ -251,6 +255,9 @@ export class RoomManager {
       return { error: 'NOT_FOUND' }
     }
 
+    // Cancel any pending cleanup since someone is joining
+    this.cancelEmptyRoomCleanup(roomCode)
+
     // Check if this is a reconnection via sessionId
     if (sessionId) {
       const existingPlayer = [...room.players.values()].find((p) => p.sessionId === sessionId)
@@ -325,14 +332,65 @@ export class RoomManager {
     room.players.delete(playerId)
     room.cursors.delete(playerId)
 
-    // Delete room if empty
+    // Schedule cleanup if room is now empty
     if (room.players.size === 0) {
-      room.locks.dispose()
-      this.rooms.delete(roomCode)
+      this.scheduleEmptyRoomCleanup(roomCode)
       return null
     }
 
     return room
+  }
+
+  /**
+   * Schedule cleanup of an empty room after a delay
+   */
+  private scheduleEmptyRoomCleanup(roomCode: string): void {
+    // Clear any existing cleanup timer
+    this.cancelEmptyRoomCleanup(roomCode)
+
+    console.log(`[room] Scheduling cleanup for empty room ${roomCode} in 1 minute`)
+
+    const timeout = setTimeout(() => {
+      this.emptyRoomCleanups.delete(roomCode)
+      const room = this.rooms.get(roomCode)
+
+      // Only cleanup if room still exists and is still empty
+      if (room && room.players.size === 0) {
+        console.log(`[room] Cleaning up empty room ${roomCode}`)
+        // Save final state before deletion
+        saveTable(
+          roomCode,
+          {
+            code: room.code,
+            name: room.name,
+            isPublic: room.isPublic,
+            maxPlayers: room.maxPlayers,
+            createdAt: room.createdAt,
+            updatedAt: Date.now(),
+            createdBy: room.createdBy,
+            settings: room.settings,
+          },
+          room.gameState.getState(),
+        )
+        stopAutoSave(roomCode)
+        room.locks.dispose()
+        this.rooms.delete(roomCode)
+      }
+    }, RoomManager.EMPTY_ROOM_CLEANUP_DELAY)
+
+    this.emptyRoomCleanups.set(roomCode, timeout)
+  }
+
+  /**
+   * Cancel scheduled cleanup for a room (called when player joins)
+   */
+  private cancelEmptyRoomCleanup(roomCode: string): void {
+    const timeout = this.emptyRoomCleanups.get(roomCode)
+    if (timeout) {
+      clearTimeout(timeout)
+      this.emptyRoomCleanups.delete(roomCode)
+      console.log(`[room] Cancelled cleanup for room ${roomCode} - player joined`)
+    }
   }
 
   /**
@@ -531,6 +589,11 @@ export class RoomManager {
       clearInterval(this.persistenceCleanupInterval)
       this.persistenceCleanupInterval = null
     }
+    // Clear all pending empty room cleanup timers
+    for (const timeout of this.emptyRoomCleanups.values()) {
+      clearTimeout(timeout)
+    }
+    this.emptyRoomCleanups.clear()
     // Save all rooms before disposing
     for (const [code, room] of this.rooms) {
       saveTable(

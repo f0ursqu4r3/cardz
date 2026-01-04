@@ -463,6 +463,11 @@ ws.onMessage((message: ServerMessage) => {
         cardStore.updateCardFromServer(cardId, { ownerId: message.playerId, stackId: null })
       }
       break
+
+    case 'table:reset':
+      // Table was reset - sync the new state (hands are cleared)
+      cardStore.syncFromServer(message.state, [])
+      break
   }
 })
 

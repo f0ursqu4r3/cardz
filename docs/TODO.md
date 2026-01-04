@@ -2,14 +2,16 @@
 
 ## Table Management
 
-[ ] server-side persistence of tables and game state
-[ ] button to reset table to initial state
-[ ] table visibility (public/private)
-[ ] table settings (background, music, etc)
-[ ] improved table browser (search, filters, etc)
+[x] server-side persistence of tables and game state (SQLite)
+[x] button to reset table to initial state
+[x] table visibility (public/private)
+[x] table settings (background)
+[x] improved table browser (search, filters, sorting)
+[ ] table settings (music)
 
 ## Cards & Zones
 
+[ ] cards in-hand order is reset when the server "syncs" the table
 [ ] zone visibility settings (player specific zones, hidden zones, etc)
 [ ] multi-select from hand
 [ ] zone card layouts (row, column, grid, fan, etc)

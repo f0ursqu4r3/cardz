@@ -5,6 +5,7 @@ import { ClientMessageSchema } from './validation'
 import type { ClientData } from './utils/broadcast'
 import { send, broadcastToRoom } from './utils/broadcast'
 import { CURSOR_THROTTLE_MS } from '../shared/types'
+import { closeDatabase } from './persistence'
 
 // Handlers
 import {
@@ -349,6 +350,7 @@ console.log(
 process.on('SIGINT', () => {
   console.log('\nShutting down...')
   roomManager.dispose()
+  closeDatabase()
   server.stop()
   process.exit(0)
 })
@@ -356,6 +358,7 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
   console.log('\nShutting down...')
   roomManager.dispose()
+  closeDatabase()
   server.stop()
   process.exit(0)
 })
