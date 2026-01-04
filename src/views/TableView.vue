@@ -204,6 +204,12 @@ ws.onMessage((message: ServerMessage) => {
     case 'room:created':
       // Full state sync on room creation - use message.state directly
       // (ws.gameState.value is not yet set when this handler runs)
+      console.log(
+        '[room:created] cards:',
+        message.state.cards.length,
+        'stacks:',
+        message.state.stacks.length,
+      )
       cardStore.syncFromServer(message.state, [])
       // Update route to include room code
       router.replace({

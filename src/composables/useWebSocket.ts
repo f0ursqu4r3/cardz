@@ -177,11 +177,13 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
   // Room actions
   const createRoom = (playerName: string) => {
     const sessionId = getSessionId()
+    console.log('[ws] creating room for:', playerName)
     send({ type: 'room:create', playerName, sessionId })
   }
 
   const joinRoom = (code: string, playerName: string) => {
     const sessionId = getSessionId()
+    console.log('[ws] joining room:', code)
     send({ type: 'room:join', roomCode: code.toUpperCase(), playerName, sessionId })
   }
 

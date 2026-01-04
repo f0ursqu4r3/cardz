@@ -29,11 +29,16 @@ export function handleRoomCreate(
   clientData.roomCode = room.code
   clientData.name = msg.playerName
 
+  const state = room.gameState.getState()
+  console.log(
+    `[room:create] ${room.code} - cards: ${state.cards.length}, stacks: ${state.stacks.length}`,
+  )
+
   send(ws, {
     type: 'room:created',
     roomCode: room.code,
     playerId: clientData.id,
-    state: room.gameState.getState(),
+    state,
   })
 }
 
