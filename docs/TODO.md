@@ -14,13 +14,13 @@
 
 ## Cards & Zones
 
-[ ] cards in-hand order is reset when the server "syncs" the table
-[ ] zone visibility settings (player specific zones, hidden zones, etc)
-[ ] multi-select from hand
-[ ] zone card layouts (row, column, grid, fan, etc)
-[ ] zone card settings (size, spacing, etc)
-[ ] should not be able to select cards in the middle of a stack
-[ ] stack height should be based on number of cards, not pixel height
+[x] cards in-hand order is reset when the server "syncs" the table
+[x] zone visibility settings (player specific zones, hidden zones, etc)
+[x] multi-select from hand
+[x] zone card layouts (row, column, grid, fan, etc)
+[x] zone card settings (size, spacing, etc)
+[x] should not be able to select cards in the middle of a stack
+[x] stack height should be based on number of cards, not pixel height
 
 ## Social Features
 
