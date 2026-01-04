@@ -221,10 +221,10 @@ ws.onMessage((message: ServerMessage) => {
     }
 
     case 'room:error':
-      // Room not found or other error - redirect to landing
-      if (message.code === 'NOT_FOUND' || message.code === 'INVALID_CODE') {
-        router.replace({ name: 'landing' })
-      }
+      // Room error - redirect to landing
+      // Codes: NOT_FOUND, FULL, INVALID_CODE
+      console.error('[room] error:', message.code, message.message)
+      router.replace({ name: 'landing' })
       break
 
     case 'card:moved':

@@ -541,6 +541,7 @@ export type ErrorCode =
   | 'NOT_YOUR_CARD'
   | 'ZONE_LOCKED'
   | 'RATE_LIMITED'
+  | 'INTERNAL_ERROR'
 
 // ============================================================================
 // Union Types for Message Handling

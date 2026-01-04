@@ -78,7 +78,7 @@ const server = Bun.serve<ClientData>({
 
   websocket: {
     idleTimeout: 120,
-    maxPayloadLength: 16 * 1024,
+    maxPayloadLength: 64 * 1024, // 64KB max message size
 
     open(ws) {
       const clientData = ws.data
@@ -118,161 +118,171 @@ const server = Bun.serve<ClientData>({
 
       const msg = result.data
 
-      // Handle room messages (don't require being in a room)
-      if (msg.type === 'room:create') {
-        handleRoomCreate(ws as any, msg, roomManager)
-        return
-      }
+      try {
+        // Handle room messages (don't require being in a room)
+        if (msg.type === 'room:create') {
+          handleRoomCreate(ws as any, msg, roomManager)
+          return
+        }
 
-      if (msg.type === 'room:join') {
-        handleRoomJoin(ws as any, msg, roomManager)
-        return
-      }
+        if (msg.type === 'room:join') {
+          handleRoomJoin(ws as any, msg, roomManager)
+          return
+        }
 
-      if (msg.type === 'room:leave') {
-        handleRoomLeave(ws as any, roomManager)
-        return
-      }
+        if (msg.type === 'room:leave') {
+          handleRoomLeave(ws as any, roomManager)
+          return
+        }
 
-      // All other messages require being in a room
-      if (!clientData.roomCode) {
-        send(ws as any, {
-          type: 'error',
-          originalAction: msg.type,
-          code: 'INVALID_ACTION',
-          message: 'Not in a room',
-        })
-        return
-      }
+        // All other messages require being in a room
+        if (!clientData.roomCode) {
+          send(ws as any, {
+            type: 'error',
+            originalAction: msg.type,
+            code: 'INVALID_ACTION',
+            message: 'Not in a room',
+          })
+          return
+        }
 
-      const room = roomManager.getRoom(clientData.roomCode)
-      if (!room) {
-        clientData.roomCode = null
-        send(ws as any, {
-          type: 'error',
-          originalAction: msg.type,
-          code: 'NOT_FOUND',
-          message: 'Room no longer exists',
-        })
-        return
-      }
+        const room = roomManager.getRoom(clientData.roomCode)
+        if (!room) {
+          clientData.roomCode = null
+          send(ws as any, {
+            type: 'error',
+            originalAction: msg.type,
+            code: 'NOT_FOUND',
+            message: 'Room no longer exists',
+          })
+          return
+        }
 
-      const clients = roomManager.getClients()
+        const clients = roomManager.getClients()
 
-      // Route to appropriate handler
-      switch (msg.type) {
-        // Card actions
-        case 'card:move':
-          handleCardMove(ws as any, msg, room, clients as any)
-          break
-        case 'card:lock':
-          handleCardLock(ws as any, msg, room, clients as any)
-          break
-        case 'card:unlock':
-          handleCardUnlock(ws as any, msg, room, clients as any)
-          break
-        case 'card:flip':
-          handleCardFlip(ws as any, msg, room, clients as any)
-          break
+        // Route to appropriate handler
+        switch (msg.type) {
+          // Card actions
+          case 'card:move':
+            handleCardMove(ws as any, msg, room, clients as any)
+            break
+          case 'card:lock':
+            handleCardLock(ws as any, msg, room, clients as any)
+            break
+          case 'card:unlock':
+            handleCardUnlock(ws as any, msg, room, clients as any)
+            break
+          case 'card:flip':
+            handleCardFlip(ws as any, msg, room, clients as any)
+            break
 
-        // Stack actions
-        case 'stack:create':
-          handleStackCreate(ws as any, msg, room, clients as any)
-          break
-        case 'stack:move':
-          handleStackMove(ws as any, msg, room, clients as any)
-          break
-        case 'stack:lock':
-          handleStackLock(ws as any, msg, room, clients as any)
-          break
-        case 'stack:unlock':
-          handleStackUnlock(ws as any, msg, room, clients as any)
-          break
-        case 'stack:add_card':
-          handleStackAddCard(ws as any, msg, room, clients as any)
-          break
-        case 'stack:remove_card':
-          handleStackRemoveCard(ws as any, msg, room, clients as any)
-          break
-        case 'stack:merge':
-          handleStackMerge(ws as any, msg, room, clients as any)
-          break
-        case 'stack:shuffle':
-          handleStackShuffle(ws as any, msg, room, clients as any)
-          break
-        case 'stack:flip':
-          handleStackFlip(ws as any, msg, room, clients as any)
-          break
+          // Stack actions
+          case 'stack:create':
+            handleStackCreate(ws as any, msg, room, clients as any)
+            break
+          case 'stack:move':
+            handleStackMove(ws as any, msg, room, clients as any)
+            break
+          case 'stack:lock':
+            handleStackLock(ws as any, msg, room, clients as any)
+            break
+          case 'stack:unlock':
+            handleStackUnlock(ws as any, msg, room, clients as any)
+            break
+          case 'stack:add_card':
+            handleStackAddCard(ws as any, msg, room, clients as any)
+            break
+          case 'stack:remove_card':
+            handleStackRemoveCard(ws as any, msg, room, clients as any)
+            break
+          case 'stack:merge':
+            handleStackMerge(ws as any, msg, room, clients as any)
+            break
+          case 'stack:shuffle':
+            handleStackShuffle(ws as any, msg, room, clients as any)
+            break
+          case 'stack:flip':
+            handleStackFlip(ws as any, msg, room, clients as any)
+            break
 
-        // Zone actions
-        case 'zone:create':
-          handleZoneCreate(ws as any, msg, room, clients as any)
-          break
-        case 'zone:update':
-          handleZoneUpdate(ws as any, msg, room, clients as any)
-          break
-        case 'zone:delete':
-          handleZoneDelete(ws as any, msg, room, clients as any)
-          break
-        case 'zone:add_card':
-          handleZoneAddCard(ws as any, msg, room, clients as any)
-          break
+          // Zone actions
+          case 'zone:create':
+            handleZoneCreate(ws as any, msg, room, clients as any)
+            break
+          case 'zone:update':
+            handleZoneUpdate(ws as any, msg, room, clients as any)
+            break
+          case 'zone:delete':
+            handleZoneDelete(ws as any, msg, room, clients as any)
+            break
+          case 'zone:add_card':
+            handleZoneAddCard(ws as any, msg, room, clients as any)
+            break
 
-        // Hand actions
-        case 'hand:add':
-          handleHandAdd(ws as any, msg, room, clients as any)
-          break
-        case 'hand:remove':
-          handleHandRemove(ws as any, msg, room, clients as any)
-          break
-        case 'hand:reorder':
-          handleHandReorder(ws as any, msg, room)
-          break
-        case 'hand:add_stack':
-          handleHandAddStack(ws as any, msg, room, clients as any)
-          break
+          // Hand actions
+          case 'hand:add':
+            handleHandAdd(ws as any, msg, room, clients as any)
+            break
+          case 'hand:remove':
+            handleHandRemove(ws as any, msg, room, clients as any)
+            break
+          case 'hand:reorder':
+            handleHandReorder(ws as any, msg, room)
+            break
+          case 'hand:add_stack':
+            handleHandAddStack(ws as any, msg, room, clients as any)
+            break
 
-        // Selection actions
-        case 'selection:stack':
-          handleStackCreate(
-            ws as any,
-            {
-              type: 'stack:create',
-              cardIds: msg.cardIds,
-              anchorX: msg.anchorX,
-              anchorY: msg.anchorY,
-            },
-            room,
-            clients as any,
-          )
-          break
+          // Selection actions
+          case 'selection:stack':
+            handleStackCreate(
+              ws as any,
+              {
+                type: 'stack:create',
+                cardIds: msg.cardIds,
+                anchorX: msg.anchorX,
+                anchorY: msg.anchorY,
+              },
+              room,
+              clients as any,
+            )
+            break
 
-        // Cursor updates (throttled)
-        case 'cursor:update': {
-          const now = Date.now()
-          const lastUpdate = lastCursorUpdate.get(clientData.id) ?? 0
+          // Cursor updates (throttled)
+          case 'cursor:update': {
+            const now = Date.now()
+            const lastUpdate = lastCursorUpdate.get(clientData.id) ?? 0
 
-          if (now - lastUpdate < CURSOR_THROTTLE_MS) {
-            // Throttled, skip
+            if (now - lastUpdate < CURSOR_THROTTLE_MS) {
+              // Throttled, skip
+              break
+            }
+
+            lastCursorUpdate.set(clientData.id, now)
+
+            broadcastToRoom(
+              clients as any,
+              room.code,
+              {
+                type: 'cursor:updated',
+                playerId: clientData.id,
+                x: msg.x,
+                y: msg.y,
+                state: msg.state,
+              },
+              clientData.id,
+            )
             break
           }
-
-          lastCursorUpdate.set(clientData.id, now)
-
-          broadcastToRoom(
-            clients as any,
-            room.code,
-            {
-              type: 'cursor:updated',
-              playerId: clientData.id,
-              x: msg.x,
-              y: msg.y,
-              state: msg.state,
-            },
-            clientData.id,
-          )
-          break
         }
+      } catch (err) {
+        console.error(`[error] Handler error for ${msg.type}:`, err)
+        send(ws as any, {
+          type: 'error',
+          originalAction: msg.type,
+          code: 'INTERNAL_ERROR',
+          message: 'Internal server error',
+        })
       }
     },
 
