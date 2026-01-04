@@ -31,6 +31,7 @@ export function useCardPhysics() {
 
   let rafId: number | null = null
   let throwRafId: number | null = null
+  let throwOnComplete: (() => void) | null = null
 
   const startSettleLoop = () => {
     if (rafId) return
@@ -83,12 +84,18 @@ export function useCardPhysics() {
   }
 
   const startDrag = (x: number, y: number, offsetX: number) => {
-    // Cancel any ongoing throw
+    // Cancel any ongoing throw and notify completion
     if (throwRafId) {
       cancelAnimationFrame(throwRafId)
       throwRafId = null
+      // Call onComplete so final position is sent to server
+      if (throwOnComplete) {
+        throwOnComplete()
+        throwOnComplete = null
+      }
     }
     isThrowing.value = false
+    throwingCardId.value = null
 
     isDragging.value = true
     lastX.value = x
@@ -121,14 +128,19 @@ export function useCardPhysics() {
     onUpdate: (x: number, y: number) => void,
     onComplete: () => void,
   ) => {
+    // Cancel any existing throw and notify completion
     if (throwRafId) {
       cancelAnimationFrame(throwRafId)
+      if (throwOnComplete) {
+        throwOnComplete()
+      }
     }
 
     isThrowing.value = true
     throwingCardId.value = cardId
     throwX.value = startX
     throwY.value = startY
+    throwOnComplete = onComplete
     let throwVelX = vx
     let throwVelY = vy
 
@@ -153,6 +165,7 @@ export function useCardPhysics() {
         isThrowing.value = false
         throwingCardId.value = null
         throwRafId = null
+        throwOnComplete = null
         tilt.value = 0
         onComplete()
         return
@@ -172,6 +185,11 @@ export function useCardPhysics() {
     if (throwRafId) {
       cancelAnimationFrame(throwRafId)
       throwRafId = null
+      // Call onComplete so final position is sent to server
+      if (throwOnComplete) {
+        throwOnComplete()
+        throwOnComplete = null
+      }
     }
     velocityX.value = 0
     velocityY.value = 0

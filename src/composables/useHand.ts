@@ -150,13 +150,18 @@ export function useHand(
     }
   }
 
-  const handleHandCardDrop = (event: PointerEvent) => {
+  const handleHandCardDrop = (
+    event: PointerEvent,
+  ): {
+    handled: boolean
+    removedCard?: { cardId: number; x: number; y: number; faceUp: boolean }
+  } => {
     clearLongPressTimer()
 
-    if (drag.target.value?.type !== 'hand-card') return false
+    if (drag.target.value?.type !== 'hand-card') return { handled: false }
 
     const card = cardStore.cards[drag.target.value.index]
-    if (!card) return false
+    if (!card) return { handled: false }
 
     // If dropped back on hand zone, possibly reorder
     if (drag.isInBounds(event, handRef)) {
@@ -164,20 +169,27 @@ export function useHand(
       if (handDragStartIndex.value !== null && targetIndex !== handDragStartIndex.value) {
         cardStore.reorderHand(handDragStartIndex.value, targetIndex)
       }
+      handDragStartIndex.value = null
+      handDropTargetIndex.value = null
+      drawFaceDown.value = false
+      return { handled: true }
     } else {
       // Remove from hand and place on canvas
       cardStore.removeFromHand(card.id)
-      card.x = drag.getDelta().x
-      card.y = drag.getDelta().y
+      const { x, y } = drag.getDelta()
+      card.x = x
+      card.y = y
       // Set face-down if right-click drag or long-press
       card.faceUp = !drawFaceDown.value
       cardStore.bumpCardZ(card.id)
-    }
 
-    handDragStartIndex.value = null
-    handDropTargetIndex.value = null
-    drawFaceDown.value = false
-    return true
+      const removedCard = { cardId: card.id, x, y, faceUp: card.faceUp }
+
+      handDragStartIndex.value = null
+      handDropTargetIndex.value = null
+      drawFaceDown.value = false
+      return { handled: true, removedCard }
+    }
   }
 
   const resetHandDrag = () => {

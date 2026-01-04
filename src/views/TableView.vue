@@ -461,7 +461,22 @@ const isHandReordering = computed(() => {
 const handDragPosition = computed(() => interaction.drag.position.value)
 
 // Wire up hand card drop handler
-interaction.setHandCardDropHandler((event) => handCompRef.value?.handleHandCardDrop(event) ?? false)
+interaction.setHandCardDropHandler((event) => {
+  const result = handCompRef.value?.handleHandCardDrop(event)
+  if (!result) return false
+
+  // If card was removed from hand (dropped on table), notify server
+  if (result.removedCard) {
+    ws.send({
+      type: 'hand:remove',
+      cardId: result.removedCard.cardId,
+      x: result.removedCard.x,
+      y: result.removedCard.y,
+    })
+  }
+
+  return result.handled
+})
 
 // Wrap pointer up to pass handRef
 const onPointerUp = (event: PointerEvent) => {
