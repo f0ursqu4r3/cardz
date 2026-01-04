@@ -424,6 +424,7 @@ export interface HandCardAdded {
 export interface HandCardAddedOther {
   type: 'hand:card_added_other'
   playerId: string
+  cardId: number
   handCount: number
 }
 
@@ -447,6 +448,7 @@ export interface HandStackAdded {
 export interface HandStackAddedOther {
   type: 'hand:stack_added_other'
   playerId: string
+  cardIds: number[]
   stackDeleted: number
   handCount: number
 }

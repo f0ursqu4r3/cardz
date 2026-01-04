@@ -507,6 +507,13 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
 
       case 'hand:card_added_other':
         handCounts.value.set(message.playerId, message.handCount)
+        // Update card state so it's hidden from view (owned by another player)
+        if (gameState.value) {
+          const card = gameState.value.cards.find((c) => c.id === message.cardId)
+          if (card) {
+            card.ownerId = message.playerId
+          }
+        }
         break
 
       case 'hand:card_removed':
@@ -536,6 +543,14 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
           gameState.value.stacks = gameState.value.stacks.filter(
             (s) => s.id !== message.stackDeleted,
           )
+          // Mark cards as owned so they're hidden from view
+          for (const cardId of message.cardIds) {
+            const card = gameState.value.cards.find((c) => c.id === cardId)
+            if (card) {
+              card.ownerId = message.playerId
+              card.stackId = null
+            }
+          }
         }
         break
 

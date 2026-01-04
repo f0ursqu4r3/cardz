@@ -414,6 +414,32 @@ ws.onMessage((message: ServerMessage) => {
         cardStore.syncFromServer(ws.gameState.value, ws.handCardIds.value)
       }
       break
+
+    case 'hand:card_added_other':
+      // Another player added a card to their hand - hide it from view
+      // Using ownerId triggers the inHand update in updateCardFromServer
+      cardStore.updateCardFromServer(message.cardId, { ownerId: message.playerId })
+      break
+
+    case 'hand:card_removed':
+      // A card was removed from a hand - update the card to be visible again
+      cardStore.updateCardFromServer(message.cardState.id, {
+        x: message.cardState.x,
+        y: message.cardState.y,
+        z: message.cardState.z,
+        faceUp: message.cardState.faceUp,
+        ownerId: message.cardState.ownerId,
+        stackId: message.cardState.stackId,
+      })
+      break
+
+    case 'hand:stack_added_other':
+      // Another player added a stack to their hand - hide cards and remove stack
+      cardStore.removeStack(message.stackDeleted)
+      for (const cardId of message.cardIds) {
+        cardStore.updateCardFromServer(cardId, { ownerId: message.playerId, stackId: null })
+      }
+      break
   }
 })
 

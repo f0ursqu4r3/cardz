@@ -71,6 +71,7 @@ export function handleHandAdd(
     {
       type: 'hand:card_added_other',
       playerId: clientData.id,
+      cardId: msg.cardId,
       handCount,
     },
   )
@@ -182,6 +183,7 @@ export function handleHandAddStack(
     {
       type: 'hand:stack_added_other',
       playerId: clientData.id,
+      cardIds: result.cardIds,
       stackDeleted: msg.stackId,
       handCount,
     },
