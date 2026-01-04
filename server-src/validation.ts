@@ -272,6 +272,39 @@ export const StateRequestSchema = z.object({
 })
 
 // ============================================================================
+// Table Management Message Schemas (Client → Server)
+// ============================================================================
+
+export const TableBackgroundSchema = z.enum([
+  'green-felt',
+  'blue-felt',
+  'red-felt',
+  'wood-oak',
+  'wood-dark',
+  'slate',
+])
+
+export const TableSettingsSchema = z.object({
+  background: TableBackgroundSchema,
+})
+
+export const TableResetSchema = z.object({
+  type: z.literal('table:reset'),
+})
+
+export const TableUpdateSettingsSchema = z.object({
+  type: z.literal('table:update_settings'),
+  settings: z.object({
+    background: TableBackgroundSchema.optional(),
+  }),
+})
+
+export const TableUpdateVisibilitySchema = z.object({
+  type: z.literal('table:update_visibility'),
+  isPublic: z.boolean(),
+})
+
+// ============================================================================
 // Combined Client Message Schema
 // ============================================================================
 
@@ -304,6 +337,9 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   SelectionStackSchema,
   CursorUpdateSchema,
   StateRequestSchema,
+  TableResetSchema,
+  TableUpdateSettingsSchema,
+  TableUpdateVisibilitySchema,
 ])
 
 // ============================================================================

@@ -38,6 +38,11 @@ import {
   handleHandReorder,
   handleHandAddStack,
 } from './handlers/hand'
+import {
+  handleTableReset,
+  handleTableUpdateSettings,
+  handleTableUpdateVisibility,
+} from './handlers/table'
 
 const PORT = parseInt(process.env.PORT ?? '9001', 10)
 const roomManager = new RoomManager()
@@ -301,6 +306,17 @@ const server = Bun.serve<ClientData>({
             })
             break
           }
+
+          // Table management
+          case 'table:reset':
+            handleTableReset(ws as any, msg, roomManager)
+            break
+          case 'table:update_settings':
+            handleTableUpdateSettings(ws as any, msg, roomManager)
+            break
+          case 'table:update_visibility':
+            handleTableUpdateVisibility(ws as any, msg, roomManager)
+            break
         }
       } catch (err) {
         console.error(`[error] Handler error for ${msg.type}:`, err)

@@ -8,13 +8,14 @@ import MinimapComp from '@/components/MinimapComp.vue'
 import RemoteCursors from '@/components/RemoteCursors.vue'
 import TablePanel from '@/components/ui/TablePanel.vue'
 import TableButton from '@/components/ui/TableButton.vue'
+import TableSettingsPanel from '@/components/ui/TableSettingsPanel.vue'
 import { useCardStore } from '@/stores/cards'
 import { useCardInteraction } from '@/composables/useCardInteraction'
 import { useViewport } from '@/composables/useViewport'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useCursor } from '@/composables/useCursor'
 import { useRemoteThrow } from '@/composables/useRemoteThrow'
-import { SquarePlus, Copy, Check, LogOut, Users, Wifi, WifiOff } from 'lucide-vue-next'
+import { SquarePlus, Copy, Check, LogOut, Users, Wifi, WifiOff, Settings } from 'lucide-vue-next'
 import {
   CARD_BACK_COL,
   CARD_BACK_ROW,
@@ -26,7 +27,7 @@ import {
   ZONE_DEFAULT_HEIGHT,
   CURSOR_THROTTLE_MS,
 } from '@/types'
-import type { ServerMessage, ClientMessage } from '../../shared/types'
+import type { ServerMessage, ClientMessage, TableSettings } from '../../shared/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -42,6 +43,7 @@ const isNewTable = computed(() => route.name === 'table-new')
 // WebSocket connection
 const ws = useWebSocket()
 const codeCopied = ref(false)
+const showSettings = ref(false)
 
 // Get current player's color for cursor
 const playerColor = computed(() => {
@@ -557,6 +559,62 @@ const canvasDimensions = computed(() => {
   return { width: rect?.width ?? 800, height: rect?.height ?? 600 }
 })
 
+// Background style based on table settings
+const canvasBackgroundStyle = computed(() => {
+  const backgrounds: Record<string, string> = {
+    'green-felt': `
+      radial-gradient(1200px 800px at 30% 25%, rgba(255, 255, 255, 0.08), transparent 55%),
+      radial-gradient(900px 700px at 70% 75%, rgba(0, 0, 0, 0.25), transparent 60%),
+      repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.02) 0 2px, rgba(0, 0, 0, 0.02) 2px 4px),
+      linear-gradient(180deg, #1f7a3a 0%, #0f4f27 100%)
+    `,
+    'blue-felt': `
+      radial-gradient(1200px 800px at 30% 25%, rgba(255, 255, 255, 0.08), transparent 55%),
+      radial-gradient(900px 700px at 70% 75%, rgba(0, 0, 0, 0.25), transparent 60%),
+      repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.02) 0 2px, rgba(0, 0, 0, 0.02) 2px 4px),
+      linear-gradient(180deg, #1a5a8a 0%, #0f3a5a 100%)
+    `,
+    'red-felt': `
+      radial-gradient(1200px 800px at 30% 25%, rgba(255, 255, 255, 0.08), transparent 55%),
+      radial-gradient(900px 700px at 70% 75%, rgba(0, 0, 0, 0.25), transparent 60%),
+      repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.02) 0 2px, rgba(0, 0, 0, 0.02) 2px 4px),
+      linear-gradient(180deg, #8a1a1a 0%, #5a0f0f 100%)
+    `,
+    'wood-oak': `
+      radial-gradient(1200px 800px at 30% 25%, rgba(255, 255, 255, 0.06), transparent 55%),
+      radial-gradient(900px 700px at 70% 75%, rgba(0, 0, 0, 0.3), transparent 60%),
+      repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.03) 0 1px, transparent 1px 8px),
+      linear-gradient(180deg, #8b6b4e 0%, #5c4033 100%)
+    `,
+    'wood-dark': `
+      radial-gradient(1200px 800px at 30% 25%, rgba(255, 255, 255, 0.04), transparent 55%),
+      radial-gradient(900px 700px at 70% 75%, rgba(0, 0, 0, 0.4), transparent 60%),
+      repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.05) 0 1px, transparent 1px 8px),
+      linear-gradient(180deg, #3d2817 0%, #1a0f0a 100%)
+    `,
+    slate: `
+      radial-gradient(1200px 800px at 30% 25%, rgba(255, 255, 255, 0.06), transparent 55%),
+      radial-gradient(900px 700px at 70% 75%, rgba(0, 0, 0, 0.3), transparent 60%),
+      linear-gradient(180deg, #4a5568 0%, #2d3748 100%)
+    `,
+  }
+  return { background: backgrounds[ws.tableSettings.value.background] || backgrounds['green-felt'] }
+})
+
+// Table settings handlers
+const handleSettingsUpdate = (settings: Partial<TableSettings>) => {
+  ws.updateTableSettings(settings)
+}
+
+const handleVisibilityUpdate = (isPublic: boolean) => {
+  ws.updateTableVisibility(isPublic)
+}
+
+const handleTableReset = () => {
+  ws.resetTable()
+  showSettings.value = false
+}
+
 // Copy room code to clipboard
 const copyRoomCode = async () => {
   if (!ws.roomCode.value) return
@@ -728,6 +786,14 @@ onBeforeUnmount(() => {
           <Users :size="16" />
           <span>{{ ws.players.value.length }}</span>
         </div>
+        <button
+          class="table-header__settings"
+          :class="{ 'table-header__settings--active': showSettings }"
+          @click="showSettings = !showSettings"
+          title="Table Settings"
+        >
+          <Settings :size="16" />
+        </button>
         <div
           class="table-header__status"
           :class="{ 'table-header__status--connected': ws.isConnected.value }"
@@ -736,6 +802,18 @@ onBeforeUnmount(() => {
           <Wifi v-if="ws.isConnected.value" :size="16" />
           <WifiOff v-else :size="16" />
         </div>
+
+        <!-- Settings Panel -->
+        <TableSettingsPanel
+          v-if="showSettings"
+          :settings="ws.tableSettings.value"
+          :is-public="ws.tableIsPublic.value"
+          :table-name="ws.tableName.value || tableName"
+          @update:settings="handleSettingsUpdate"
+          @update:visibility="handleVisibilityUpdate"
+          @reset="handleTableReset"
+          @close="showSettings = false"
+        />
       </div>
     </header>
 
@@ -743,6 +821,7 @@ onBeforeUnmount(() => {
     <div
       ref="canvasRef"
       class="canvas"
+      :style="canvasBackgroundStyle"
       @wheel="viewport.onWheel"
       @pointerdown="onCanvasPointerDown"
       @pointermove="onCanvasPointerMove"
@@ -994,13 +1073,32 @@ onBeforeUnmount(() => {
   color: #4ade80;
 }
 
+.table-header__settings {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 6px;
+  color: #a0a0b0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.table-header__settings:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.table-header__settings--active {
+  background: rgba(233, 69, 96, 0.2);
+  color: #e94560;
+}
+
 .canvas {
   flex: 1;
-  background:
-    radial-gradient(1200px 800px at 30% 25%, rgba(255, 255, 255, 0.08), transparent 55%),
-    radial-gradient(900px 700px at 70% 75%, rgba(0, 0, 0, 0.25), transparent 60%),
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.02) 0 2px, rgba(0, 0, 0, 0.02) 2px 4px),
-    linear-gradient(180deg, #1f7a3a 0%, #0f4f27 100%);
   box-shadow:
     inset 0 0 0 2px rgba(255, 255, 255, 0.06),
     inset 0 0 80px rgba(0, 0, 0, 0.35);
@@ -1008,6 +1106,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   user-select: none;
   touch-action: none;
+  transition: background 0.5s ease;
 }
 
 .world {

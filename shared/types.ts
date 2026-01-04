@@ -132,11 +132,76 @@ export interface PublicRoomInfo {
   playerCount: number
   maxPlayers: number
   createdAt: number
+  background?: TableBackground
 }
 
 export interface RoomListResponse {
   type: 'room:list'
   rooms: PublicRoomInfo[]
+}
+
+// ============================================================================
+// Table Settings Types
+// ============================================================================
+
+export type TableBackground =
+  | 'green-felt'
+  | 'blue-felt'
+  | 'red-felt'
+  | 'wood-oak'
+  | 'wood-dark'
+  | 'slate'
+
+export interface TableSettings {
+  background: TableBackground
+}
+
+// ============================================================================
+// Table Management Messages (Client → Server)
+// ============================================================================
+
+export interface TableReset {
+  type: 'table:reset'
+}
+
+export interface TableUpdateSettings {
+  type: 'table:update_settings'
+  settings: Partial<TableSettings>
+}
+
+export interface TableUpdateVisibility {
+  type: 'table:update_visibility'
+  isPublic: boolean
+}
+
+// ============================================================================
+// Table Management Messages (Server → Client)
+// ============================================================================
+
+export interface TableResetComplete {
+  type: 'table:reset'
+  state: GameState
+}
+
+export interface TableSettingsUpdated {
+  type: 'table:settings_updated'
+  settings: TableSettings
+  playerId: string
+}
+
+export interface TableVisibilityUpdated {
+  type: 'table:visibility_updated'
+  isPublic: boolean
+  playerId: string
+}
+
+export interface TableInfo {
+  type: 'table:info'
+  name: string
+  isPublic: boolean
+  settings: TableSettings
+  createdAt: number
+  createdBy: string
 }
 
 // ============================================================================
@@ -600,6 +665,9 @@ export type ClientMessage =
   | SelectionStack
   | CursorUpdate
   | StateRequest
+  | TableReset
+  | TableUpdateSettings
+  | TableUpdateVisibility
 
 export type ServerMessage =
   | RoomCreated
@@ -637,6 +705,10 @@ export type ServerMessage =
   | StateSync
   | StateDelta
   | ActionError
+  | TableResetComplete
+  | TableSettingsUpdated
+  | TableVisibilityUpdated
+  | TableInfo
 
 // ============================================================================
 // Constants

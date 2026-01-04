@@ -1,8 +1,18 @@
-import type { Player } from '../shared/types'
+import type { Player, TableSettings, TableBackground } from '../shared/types'
 import { PLAYER_COLORS } from '../shared/types'
-import { GameStateManager } from './game-state'
+import { GameStateManager, createInitialGameState } from './game-state'
 import { LockManager } from './utils/locks'
 import type { ClientData, GenericWebSocket } from './utils/broadcast'
+import {
+  saveTable,
+  loadTable,
+  deleteTable,
+  startAutoSave,
+  stopAutoSave,
+  cleanupOldTables,
+  getDefaultSettings,
+  type TableMetadata,
+} from './persistence'
 
 /**
  * Generate a random 6-character room code
@@ -34,6 +44,8 @@ export interface Room {
   locks: LockManager
   cursors: Map<string, CursorPosition>
   createdAt: number
+  createdBy: string
+  settings: TableSettings
 }
 
 /**
@@ -44,10 +56,13 @@ export class RoomManager {
   private clients = new Map<string, GenericWebSocket>()
   private sessionToPlayer = new Map<string, { roomCode: string; playerId: string }>()
   private cleanupInterval: ReturnType<typeof setInterval> | null = null
+  private persistenceCleanupInterval: ReturnType<typeof setInterval> | null = null
 
   constructor() {
     // Clean up empty rooms every minute
     this.cleanupInterval = setInterval(() => this.cleanupEmptyRooms(), 60_000)
+    // Clean up old persisted tables every hour
+    this.persistenceCleanupInterval = setInterval(() => cleanupOldTables(), 60 * 60 * 1000)
   }
 
   /**
@@ -95,6 +110,8 @@ export class RoomManager {
       sessionId,
     }
 
+    const settings: TableSettings = { background: 'green-felt' }
+
     const room: Room = {
       code,
       name: tableName || `${playerName}'s Table`,
@@ -105,6 +122,8 @@ export class RoomManager {
       locks: new LockManager(),
       cursors: new Map(),
       createdAt: Date.now(),
+      createdBy: playerName,
+      settings,
     }
 
     this.rooms.set(code, room)
@@ -114,7 +133,108 @@ export class RoomManager {
       this.sessionToPlayer.set(sessionId, { roomCode: code, playerId })
     }
 
+    // Start auto-saving this room
+    startAutoSave(code, () => {
+      const r = this.rooms.get(code)
+      if (!r) return null
+      return {
+        metadata: {
+          code: r.code,
+          name: r.name,
+          isPublic: r.isPublic,
+          maxPlayers: r.maxPlayers,
+          createdAt: r.createdAt,
+          updatedAt: Date.now(),
+          createdBy: r.createdBy,
+          settings: r.settings,
+        },
+        gameState: r.gameState.getState(),
+      }
+    })
+
     return room
+  }
+
+  /**
+   * Load a persisted room or create a new one if not found
+   */
+  loadOrCreateRoom(
+    roomCode: string,
+    playerId: string,
+    playerName: string,
+    sessionId?: string,
+  ):
+    | { room: Room; player: Player; isReconnect: boolean; loaded: boolean }
+    | { error: 'NOT_FOUND' | 'FULL' } {
+    // Check if room is already in memory
+    const existingRoom = this.rooms.get(roomCode)
+    if (existingRoom) {
+      // Use normal join flow
+      const result = this.joinRoom(roomCode, playerId, playerName, sessionId)
+      if ('error' in result) return result
+      return { ...result, loaded: false }
+    }
+
+    // Try to load from persistence
+    const persisted = loadTable(roomCode)
+    if (!persisted) {
+      return { error: 'NOT_FOUND' }
+    }
+
+    // Recreate the room from persisted data
+    const player: Player = {
+      id: playerId,
+      name: playerName,
+      connected: true,
+      color: PLAYER_COLORS[0],
+      sessionId,
+    }
+
+    const room: Room = {
+      code: persisted.metadata.code,
+      name: persisted.metadata.name,
+      isPublic: persisted.metadata.isPublic,
+      maxPlayers: persisted.metadata.maxPlayers,
+      players: new Map([[playerId, player]]),
+      gameState: new GameStateManager(persisted.gameState),
+      locks: new LockManager(),
+      cursors: new Map(),
+      createdAt: persisted.metadata.createdAt,
+      createdBy: persisted.metadata.createdBy,
+      settings: persisted.metadata.settings || { background: 'green-felt' },
+    }
+
+    this.rooms.set(roomCode, room)
+
+    // Create hand for the player
+    room.gameState.getOrCreateHand(playerId)
+
+    // Track session for reconnection
+    if (sessionId) {
+      this.sessionToPlayer.set(sessionId, { roomCode, playerId })
+    }
+
+    // Start auto-saving
+    startAutoSave(roomCode, () => {
+      const r = this.rooms.get(roomCode)
+      if (!r) return null
+      return {
+        metadata: {
+          code: r.code,
+          name: r.name,
+          isPublic: r.isPublic,
+          maxPlayers: r.maxPlayers,
+          createdAt: r.createdAt,
+          updatedAt: Date.now(),
+          createdBy: r.createdBy,
+          settings: r.settings,
+        },
+        gameState: r.gameState.getState(),
+      }
+    })
+
+    console.log(`[room:load] Loaded persisted table ${roomCode}`)
+    return { room, player, isReconnect: false, loaded: true }
   }
 
   /**
@@ -276,6 +396,7 @@ export class RoomManager {
     playerCount: number
     maxPlayers: number
     createdAt: number
+    background?: TableBackground
   }[] {
     const publicRooms: {
       code: string
@@ -283,6 +404,7 @@ export class RoomManager {
       playerCount: number
       maxPlayers: number
       createdAt: number
+      background?: TableBackground
     }[] = []
 
     for (const room of this.rooms.values()) {
@@ -296,6 +418,7 @@ export class RoomManager {
             playerCount: connectedCount,
             maxPlayers: room.maxPlayers,
             createdAt: room.createdAt,
+            background: room.settings.background,
           })
         }
       }
@@ -311,6 +434,51 @@ export class RoomManager {
   }
 
   /**
+   * Reset a room's game state to initial state
+   */
+  resetRoom(roomCode: string): GameState | null {
+    const room = this.rooms.get(roomCode)
+    if (!room) return null
+
+    // Create fresh game state
+    const newState = createInitialGameState()
+    room.gameState = new GameStateManager(newState)
+
+    // Clear all hands (players will need to draw cards again)
+    for (const playerId of room.players.keys()) {
+      room.gameState.getOrCreateHand(playerId)
+    }
+
+    // Release all locks
+    room.locks.releaseAll()
+
+    console.log(`[room:reset] Reset table ${roomCode}`)
+    return room.gameState.getState()
+  }
+
+  /**
+   * Update room settings
+   */
+  updateSettings(roomCode: string, settings: Partial<TableSettings>): TableSettings | null {
+    const room = this.rooms.get(roomCode)
+    if (!room) return null
+
+    room.settings = { ...room.settings, ...settings }
+    return room.settings
+  }
+
+  /**
+   * Update room visibility
+   */
+  updateVisibility(roomCode: string, isPublic: boolean): boolean {
+    const room = this.rooms.get(roomCode)
+    if (!room) return false
+
+    room.isPublic = isPublic
+    return true
+  }
+
+  /**
    * Clean up empty or old rooms
    */
   private cleanupEmptyRooms(): void {
@@ -318,8 +486,24 @@ export class RoomManager {
     const maxAge = 24 * 60 * 60 * 1000 // 24 hours
 
     for (const [code, room] of this.rooms) {
-      // Remove empty rooms
+      // Remove empty rooms - but save them first!
       if (room.players.size === 0) {
+        // Save before cleanup so tables can be restored
+        saveTable(
+          code,
+          {
+            code: room.code,
+            name: room.name,
+            isPublic: room.isPublic,
+            maxPlayers: room.maxPlayers,
+            createdAt: room.createdAt,
+            updatedAt: Date.now(),
+            createdBy: room.createdBy,
+            settings: room.settings,
+          },
+          room.gameState.getState(),
+        )
+        stopAutoSave(code)
         room.locks.dispose()
         this.rooms.delete(code)
         continue
@@ -328,6 +512,7 @@ export class RoomManager {
       // Remove old rooms with no connected players
       const hasConnected = [...room.players.values()].some((p) => p.connected)
       if (!hasConnected && now - room.createdAt > maxAge) {
+        stopAutoSave(code)
         room.locks.dispose()
         this.rooms.delete(code)
       }
@@ -342,7 +527,27 @@ export class RoomManager {
       clearInterval(this.cleanupInterval)
       this.cleanupInterval = null
     }
-    for (const room of this.rooms.values()) {
+    if (this.persistenceCleanupInterval) {
+      clearInterval(this.persistenceCleanupInterval)
+      this.persistenceCleanupInterval = null
+    }
+    // Save all rooms before disposing
+    for (const [code, room] of this.rooms) {
+      saveTable(
+        code,
+        {
+          code: room.code,
+          name: room.name,
+          isPublic: room.isPublic,
+          maxPlayers: room.maxPlayers,
+          createdAt: room.createdAt,
+          updatedAt: Date.now(),
+          createdBy: room.createdBy,
+          settings: room.settings,
+        },
+        room.gameState.getState(),
+      )
+      stopAutoSave(code)
       room.locks.dispose()
     }
     this.rooms.clear()

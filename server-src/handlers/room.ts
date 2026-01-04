@@ -46,6 +46,14 @@ export function handleRoomCreate(
     playerId: clientData.id,
     state,
   })
+
+  // Send table info (name, visibility, settings)
+  send(ws, {
+    type: 'table:info',
+    name: room.name,
+    isPublic: room.isPublic,
+    settings: room.settings,
+  })
 }
 
 export function handleRoomJoin(
@@ -102,6 +110,14 @@ export function handleRoomJoin(
     players: [...room.players.values()],
     state: room.gameState.getState(),
     cursors,
+  })
+
+  // Send table info (name, visibility, settings)
+  send(ws, {
+    type: 'table:info',
+    name: room.name,
+    isPublic: room.isPublic,
+    settings: room.settings,
   })
 
   // Only notify others if this is a new player, not a reconnect

@@ -1,7 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Users, RefreshCw, Globe, Lock } from 'lucide-vue-next'
+import {
+  ArrowLeft,
+  Users,
+  RefreshCw,
+  Globe,
+  Search,
+  SortAsc,
+  SortDesc,
+  Clock,
+  Filter,
+} from 'lucide-vue-next'
 import type { ServerMessage, PublicRoomInfo } from '../../shared/types'
 
 const router = useRouter()
@@ -9,10 +19,42 @@ const tables = ref<PublicRoomInfo[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 const playerName = ref('')
+const searchQuery = ref('')
+const sortBy = ref<'players' | 'newest' | 'oldest'>('players')
+const showFilters = ref(false)
 
 // WebSocket connection for fetching public rooms
 let ws: WebSocket | null = null
 const wsUrl = `ws://${window.location.hostname}:9001`
+
+// Filtered and sorted tables
+const filteredTables = computed(() => {
+  let result = [...tables.value]
+
+  // Apply search filter
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase().trim()
+    result = result.filter(
+      (table) =>
+        table.name.toLowerCase().includes(query) || table.code.toLowerCase().includes(query),
+    )
+  }
+
+  // Apply sorting
+  switch (sortBy.value) {
+    case 'players':
+      result.sort((a, b) => b.playerCount - a.playerCount)
+      break
+    case 'newest':
+      result.sort((a, b) => b.createdAt - a.createdAt)
+      break
+    case 'oldest':
+      result.sort((a, b) => a.createdAt - b.createdAt)
+      break
+  }
+
+  return result
+})
 
 const connectWebSocket = () => {
   if (ws?.readyState === WebSocket.OPEN) {
@@ -94,6 +136,19 @@ const formatTimeAgo = (timestamp: number): string => {
   return `${days}d ago`
 }
 
+// Background colors for table cards based on table background setting
+const getTableCardBackground = (bg?: string): string => {
+  const backgrounds: Record<string, string> = {
+    'green-felt': 'linear-gradient(135deg, #1f7a3a 0%, #0f4f27 100%)',
+    'blue-felt': 'linear-gradient(135deg, #1a5a8a 0%, #0f3a5a 100%)',
+    'red-felt': 'linear-gradient(135deg, #8a1a1a 0%, #5a0f0f 100%)',
+    'wood-oak': 'linear-gradient(135deg, #8b6b4e 0%, #5c4033 100%)',
+    'wood-dark': 'linear-gradient(135deg, #3d2817 0%, #1a0f0a 100%)',
+    slate: 'linear-gradient(135deg, #4a5568 0%, #2d3748 100%)',
+  }
+  return backgrounds[bg ?? 'green-felt'] ?? backgrounds['green-felt']!
+}
+
 onMounted(() => {
   connectWebSocket()
 })
@@ -127,15 +182,66 @@ onUnmounted(() => {
     </header>
 
     <div class="browser__content">
-      <div class="browser__name-field">
-        <label for="browserPlayerName">Your Name</label>
-        <input
-          id="browserPlayerName"
-          v-model="playerName"
-          type="text"
-          placeholder="Enter your name to join"
-          maxlength="20"
-        />
+      <!-- Search and Filters -->
+      <div class="browser__controls">
+        <div class="browser__search">
+          <Search :size="18" class="browser__search-icon" />
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search tables by name or code..."
+            class="browser__search-input"
+          />
+        </div>
+
+        <div class="browser__filter-row">
+          <div class="browser__name-field">
+            <label for="browserPlayerName">Your Name</label>
+            <input
+              id="browserPlayerName"
+              v-model="playerName"
+              type="text"
+              placeholder="Enter your name"
+              maxlength="20"
+            />
+          </div>
+
+          <div class="browser__sort">
+            <label>Sort by</label>
+            <div class="browser__sort-buttons">
+              <button
+                :class="{ active: sortBy === 'players' }"
+                @click="sortBy = 'players'"
+                title="Sort by player count"
+              >
+                <Users :size="14" />
+                Popular
+              </button>
+              <button
+                :class="{ active: sortBy === 'newest' }"
+                @click="sortBy = 'newest'"
+                title="Sort by newest"
+              >
+                <Clock :size="14" />
+                Newest
+              </button>
+              <button
+                :class="{ active: sortBy === 'oldest' }"
+                @click="sortBy = 'oldest'"
+                title="Sort by oldest"
+              >
+                <Clock :size="14" />
+                Oldest
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results count -->
+      <div v-if="!loading && !error && tables.length > 0" class="browser__results-info">
+        <span v-if="searchQuery"> {{ filteredTables.length }} of {{ tables.length }} tables </span>
+        <span v-else> {{ tables.length }} public table{{ tables.length === 1 ? '' : 's' }} </span>
       </div>
 
       <div v-if="loading" class="browser__loading">
@@ -155,13 +261,26 @@ onUnmounted(() => {
         <button class="browser__btn browser__btn--primary" @click="goBack">Create Your Own</button>
       </div>
 
+      <div v-else-if="filteredTables.length === 0" class="browser__empty">
+        <Search :size="48" />
+        <h3>No Results</h3>
+        <p>No tables match your search "{{ searchQuery }}"</p>
+        <button class="browser__btn" @click="searchQuery = ''">Clear Search</button>
+      </div>
+
       <div v-else class="browser__list">
         <div
-          v-for="table in tables"
+          v-for="table in filteredTables"
           :key="table.code"
           class="browser__table"
           @click="joinTable(table.code)"
         >
+          <div
+            class="browser__table-preview"
+            :style="{ background: getTableCardBackground(table.background) }"
+          >
+            <div class="browser__table-cards">🃏</div>
+          </div>
           <div class="browser__table-info">
             <h3 class="browser__table-name">
               {{ table.name }}
@@ -264,16 +383,63 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   padding: 2rem;
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
   width: 100%;
+  gap: 1.5rem;
+}
+
+.browser__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.browser__search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.browser__search-icon {
+  position: absolute;
+  left: 1rem;
+  color: #666;
+  pointer-events: none;
+}
+
+.browser__search-input {
+  width: 100%;
+  padding: 0.875rem 1rem 0.875rem 2.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.browser__search-input:focus {
+  outline: none;
+  border-color: #e94560;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.browser__search-input::placeholder {
+  color: #666;
+}
+
+.browser__filter-row {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-end;
 }
 
 .browser__name-field {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  margin-bottom: 1.5rem;
+  flex: 1;
 }
 
 .browser__name-field label {
@@ -282,12 +448,12 @@ onUnmounted(() => {
 }
 
 .browser__name-field input {
-  padding: 0.75rem 1rem;
+  padding: 0.625rem 1rem;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
-  font-size: 1rem;
+  font-size: 0.9rem;
   transition: all 0.2s;
 }
 
@@ -301,6 +467,55 @@ onUnmounted(() => {
   color: #666;
 }
 
+.browser__sort {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.browser__sort label {
+  font-size: 0.875rem;
+  color: #a0a0b0;
+}
+
+.browser__sort-buttons {
+  display: flex;
+  gap: 0.25rem;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.browser__sort-buttons button {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #888;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.browser__sort-buttons button:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.browser__sort-buttons button.active {
+  color: #fff;
+  background: rgba(233, 69, 96, 0.3);
+}
+
+.browser__results-info {
+  font-size: 0.875rem;
+  color: #888;
+}
+
 .browser__loading,
 .browser__error,
 .browser__empty {
@@ -312,6 +527,7 @@ onUnmounted(() => {
   text-align: center;
   gap: 1rem;
   color: #a0a0b0;
+  padding: 3rem 0;
 }
 
 .browser__spinner {
@@ -365,7 +581,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 1rem 1.25rem;
+  padding: 0.75rem 1rem;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
@@ -376,19 +592,40 @@ onUnmounted(() => {
 .browser__table:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.browser__table-preview {
+  width: 64px;
+  height: 48px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.browser__table-cards {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
 .browser__table-info {
   flex: 1;
+  min-width: 0;
 }
 
 .browser__table-name {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
   margin: 0 0 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .browser__table-meta {
@@ -398,23 +635,25 @@ onUnmounted(() => {
 }
 
 .browser__table-code {
-  font-size: 0.8rem;
-  color: #666;
+  font-size: 0.75rem;
+  color: #e94560;
   font-family: monospace;
   letter-spacing: 0.05em;
+  font-weight: 600;
 }
 
 .browser__table-time {
   font-size: 0.75rem;
-  color: #555;
+  color: #666;
 }
 
 .browser__table-players {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.375rem;
   color: #a0a0b0;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
 }
 
 .browser__join-btn {
@@ -423,7 +662,7 @@ onUnmounted(() => {
   border: none;
   border-radius: 6px;
   color: #fff;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
@@ -431,5 +670,26 @@ onUnmounted(() => {
 
 .browser__join-btn:hover {
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(233, 69, 96, 0.4);
+}
+
+@media (max-width: 640px) {
+  .browser__filter-row {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .browser__sort {
+    width: 100%;
+  }
+
+  .browser__sort-buttons {
+    width: 100%;
+  }
+
+  .browser__sort-buttons button {
+    flex: 1;
+    justify-content: center;
+  }
 }
 </style>

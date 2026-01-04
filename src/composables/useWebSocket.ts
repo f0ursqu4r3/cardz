@@ -7,6 +7,8 @@ import type {
   CardState,
   StackState,
   ZoneState,
+  TableSettings,
+  TableBackground,
 } from '../../shared/types'
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
@@ -35,6 +37,11 @@ export interface UseWebSocketReturn {
   handCounts: Ref<Map<string, number>>
   cursors: Ref<Map<string, { x: number; y: number; state: 'default' | 'grab' | 'grabbing' }>>
 
+  // Table settings
+  tableSettings: Ref<TableSettings>
+  tableName: Ref<string>
+  tableIsPublic: Ref<boolean>
+
   // Actions
   connect: () => void
   disconnect: () => void
@@ -42,6 +49,11 @@ export interface UseWebSocketReturn {
   joinRoom: (roomCode: string, playerName: string) => void
   leaveRoom: () => void
   send: (message: ClientMessage) => void
+
+  // Table management
+  resetTable: () => void
+  updateTableSettings: (settings: Partial<TableSettings>) => void
+  updateTableVisibility: (isPublic: boolean) => void
 
   // Event handlers
   onMessage: (handler: (message: ServerMessage) => void) => void
@@ -106,6 +118,11 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
   const cursors = ref<
     Map<string, { x: number; y: number; state: 'default' | 'grab' | 'grabbing' }>
   >(new Map())
+
+  // Table settings
+  const tableSettings = ref<TableSettings>({ background: 'green-felt' })
+  const tableName = ref<string>('')
+  const tableIsPublic = ref<boolean>(false)
 
   // Message handlers
   const messageHandlers = new Set<(message: ServerMessage) => void>()
@@ -180,6 +197,9 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     handCardIds.value = []
     handCounts.value.clear()
     cursors.value.clear()
+    tableSettings.value = { background: 'green-felt' }
+    tableName.value = ''
+    tableIsPublic.value = false
   }
 
   const send = (message: ClientMessage) => {
@@ -218,6 +238,22 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     handCardIds.value = []
     handCounts.value.clear()
     cursors.value.clear()
+    tableSettings.value = { background: 'green-felt' }
+    tableName.value = ''
+    tableIsPublic.value = false
+  }
+
+  // Table management actions
+  const resetTable = () => {
+    send({ type: 'table:reset' })
+  }
+
+  const updateTableSettings = (settings: Partial<TableSettings>) => {
+    send({ type: 'table:update_settings', settings })
+  }
+
+  const updateTableVisibility = (isPublic: boolean) => {
+    send({ type: 'table:update_visibility', isPublic })
   }
 
   // Message handling
@@ -607,6 +643,29 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
         })
         break
 
+      // Table management
+      case 'table:reset':
+        gameState.value = message.state
+        handCardIds.value = []
+        console.log('[ws] table reset')
+        break
+
+      case 'table:settings_updated':
+        tableSettings.value = message.settings
+        console.log('[ws] table settings updated')
+        break
+
+      case 'table:visibility_updated':
+        tableIsPublic.value = message.isPublic
+        console.log('[ws] table visibility updated:', message.isPublic ? 'public' : 'private')
+        break
+
+      case 'table:info':
+        tableName.value = message.name
+        tableIsPublic.value = message.isPublic
+        tableSettings.value = message.settings
+        break
+
       // Errors
       case 'error':
         console.error('[ws] error:', message.code, message.message)
@@ -639,12 +698,18 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     handCardIds,
     handCounts,
     cursors,
+    tableSettings,
+    tableName,
+    tableIsPublic,
     connect,
     disconnect,
     createRoom,
     joinRoom,
     leaveRoom,
     send,
+    resetTable,
+    updateTableSettings,
+    updateTableVisibility,
     onMessage,
     offMessage,
   }
