@@ -76,7 +76,6 @@ export const useCardStore = defineStore('cards', () => {
         const cardCount = stack.cardIds.length
         const settings = zone.cardSettings || { cardScale: 1.0, cardSpacing: 0.5 }
         const spacing = settings.cardSpacing // 0 to 1 range
-        const baseRotation = settings.cardRotation ?? 0
         const randomOffset = settings.randomOffset ?? 0
         const randomRotation = settings.randomRotation ?? 0
 
@@ -102,11 +101,11 @@ export const useCardStore = defineStore('cards', () => {
 
           card.x = baseX + offsetX
           card.y = baseY + offsetY
-          card.rotation = baseRot + baseRotation + rotOffset
+          card.rotation = baseRot + rotOffset
         }
 
         if (layout === 'stack') {
-          // Original stack behavior - center cards
+          // Original stack behavior - center cards (no randomization for stacks)
           const stackWidth = CARD_W + Math.max(0, cardCount - 1) * STACK_OFFSET_X
           const stackHeight = CARD_H + Math.max(0, cardCount - 1) * Math.abs(STACK_OFFSET_Y)
           stack.anchorX = zone.x + (zone.width - stackWidth) / 2
@@ -117,9 +116,9 @@ export const useCardStore = defineStore('cards', () => {
             if (!card) return
             card.stackId = stack.id
             card.isInDeck = true
-            const baseX = stack.anchorX + idx * STACK_OFFSET_X
-            const baseY = stack.anchorY + idx * STACK_OFFSET_Y
-            applyRandomization(card, baseX, baseY, 0)
+            card.x = stack.anchorX + idx * STACK_OFFSET_X
+            card.y = stack.anchorY + idx * STACK_OFFSET_Y
+            card.rotation = 0
           })
         } else if (layout === 'row') {
           // Arrange cards horizontally with overlap (spacing controls overlap)
@@ -257,15 +256,29 @@ export const useCardStore = defineStore('cards', () => {
   }
 
   // Stack operations
-  const removeFromStack = (cardId: number) => {
+  const removeFromStack = (
+    cardId: number,
+    resetZoneLayout = true,
+  ): { zoneId?: number; layoutReset?: boolean } | undefined => {
     const card = cards.value.find((item) => item.id === cardId)
     if (!card || card.stackId === null) return
 
     const stack = stacks.value.find((item) => item.id === card.stackId)
     card.stackId = null
     card.isInDeck = false
+    card.rotation = 0 // Clear any layout rotation
 
     if (!stack) return
+
+    // Check if we need to reset zone layout to stack
+    let result: { zoneId?: number; layoutReset?: boolean } | undefined
+    if (resetZoneLayout && stack.kind === 'zone' && stack.zoneId !== undefined) {
+      const zone = zones.value.find((z) => z.id === stack.zoneId)
+      if (zone && zone.layout !== 'stack') {
+        zone.layout = 'stack'
+        result = { zoneId: zone.id, layoutReset: true }
+      }
+    }
 
     stack.cardIds = stack.cardIds.filter((value) => value !== cardId)
     if (stack.cardIds.length === 0) {
@@ -275,7 +288,12 @@ export const useCardStore = defineStore('cards', () => {
         if (zone) zone.stackId = null
       }
       stacks.value = stacks.value.filter((item) => item.id !== stack.id)
+    } else {
+      // Update remaining cards positions after layout reset
+      updateStackPositions(stack)
     }
+
+    return result
   }
 
   const addCardToStack = (cardId: number, stack: Stack) => {

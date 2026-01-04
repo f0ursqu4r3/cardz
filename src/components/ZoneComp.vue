@@ -109,19 +109,6 @@ const onSpacingChange = (event: Event) => {
   emit('zone:update', props.zone.id, { cardSettings })
 }
 
-const onRotationChange = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  const rotation = parseFloat(target.value)
-  const cardSettings = {
-    ...props.zone.cardSettings,
-    cardScale: props.zone.cardSettings?.cardScale ?? 1.0,
-    cardSpacing: props.zone.cardSettings?.cardSpacing ?? 0.5,
-    cardRotation: rotation,
-  }
-  cardStore.updateZone(props.zone.id, { cardSettings })
-  emit('zone:update', props.zone.id, { cardSettings })
-}
-
 const onRandomOffsetChange = (event: Event) => {
   const target = event.target as HTMLInputElement
   const randomOffset = parseFloat(target.value)
@@ -368,24 +355,7 @@ defineExpose({ openModal })
               <span class="zone-modal__slider-label">Spread</span>
             </div>
           </div>
-          <div class="zone-modal__field">
-            <span class="zone-modal__label">Card Rotation</span>
-            <div class="zone-modal__slider-row">
-              <span class="zone-modal__slider-label">-180°</span>
-              <input
-                type="range"
-                class="zone-modal__slider"
-                min="-180"
-                max="180"
-                step="15"
-                :value="zone.cardSettings?.cardRotation ?? 0"
-                @input="onRotationChange"
-              />
-              <span class="zone-modal__slider-label">180°</span>
-            </div>
-            <span class="zone-modal__value">{{ zone.cardSettings?.cardRotation ?? 0 }}°</span>
-          </div>
-          <div class="zone-modal__field">
+          <div v-if="zone.layout !== 'stack'" class="zone-modal__field">
             <span class="zone-modal__label">Random Offset</span>
             <div class="zone-modal__slider-row">
               <span class="zone-modal__slider-label">None</span>
@@ -402,7 +372,7 @@ defineExpose({ openModal })
             </div>
             <span class="zone-modal__value">{{ zone.cardSettings?.randomOffset ?? 0 }}px</span>
           </div>
-          <div class="zone-modal__field">
+          <div v-if="zone.layout !== 'stack'" class="zone-modal__field">
             <span class="zone-modal__label">Random Rotation</span>
             <div class="zone-modal__slider-row">
               <span class="zone-modal__slider-label">None</span>

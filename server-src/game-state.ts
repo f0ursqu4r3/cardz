@@ -329,7 +329,6 @@ export class GameStateManager {
     cardSettings: {
       cardScale: number
       cardSpacing: number
-      cardRotation?: number
       randomOffset?: number
       randomRotation?: number
     } = { cardScale: 1.0, cardSpacing: 0.5 },

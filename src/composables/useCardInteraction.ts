@@ -185,11 +185,13 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
 
       // Check if this stack belongs to a zone with a non-stack layout
       let canPickAnyCard = false
+      let zoneId: number | undefined
       if (stack.kind === 'zone' && stack.zoneId !== undefined) {
         const zone = cardStore.zones.find((z) => z.id === stack.zoneId)
         if (zone && zone.layout !== 'stack') {
           // Non-stack layouts allow picking any visible card
           canPickAnyCard = true
+          zoneId = zone.id
         }
       }
 
@@ -201,7 +203,12 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
 
       // Notify server that card is being removed from stack
       send({ type: 'stack:remove_card', cardId: card.id })
-      cardStore.removeFromStack(card.id)
+      const result = cardStore.removeFromStack(card.id)
+
+      // If zone layout was reset to stack, notify server
+      if (result?.layoutReset && result?.zoneId !== undefined) {
+        send({ type: 'zone:update', zoneId: result.zoneId, updates: { layout: 'stack' } })
+      }
     }
 
     const { x, y } = drag.getPending()

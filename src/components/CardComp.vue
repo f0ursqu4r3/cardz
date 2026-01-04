@@ -33,16 +33,7 @@
 
 /* Stack depth visual - creates edge effect based on card count */
 .card.in-stack.stack-bottom {
-  /* Calculate visual depth: min(stack-size, 10) cards shown, 1px per card edge */
-  --depth: min(var(--stack-size, 1), 10);
-  /* Shadow shows stack depth - darker and larger for bigger stacks */
-  box-shadow:
-    /* Card edges effect - shows deck thickness */
-    calc(var(--depth) * 0.3px) calc(var(--depth) * 0.5px) 0 rgba(50, 50, 50, 0.9),
-    calc(var(--depth) * 0.2px) calc(var(--depth) * 0.4px) 0 rgba(80, 80, 80, 0.8),
-    calc(var(--depth) * 0.1px) calc(var(--depth) * 0.2px) 0 rgba(120, 120, 120, 0.7),
-    /* Drop shadow scaled to stack size */ 0px calc(2px + var(--depth) * 0.5px)
-      calc(6px + var(--depth) * 1px) rgba(0, 0, 0, 0.3);
+  box-shadow: 0px 1px 6px rgba(0, 0, 0, 0.25);
 }
 
 .card.dragging:not(.in-stack),
