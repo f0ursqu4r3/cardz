@@ -634,14 +634,27 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
       }
 
       // State sync
-      case 'state:sync':
+      case 'state:sync': {
         gameState.value = message.state
-        handCardIds.value = message.yourHand
+        // Preserve local hand order if the same cards exist (just reordered)
+        // Only update if cards have actually been added/removed
+        const currentSet = new Set(handCardIds.value)
+        const serverSet = new Set(message.yourHand)
+        const sameCards =
+          currentSet.size === serverSet.size && [...currentSet].every((id) => serverSet.has(id))
+
+        if (!sameCards) {
+          // Cards changed - use server's order
+          handCardIds.value = message.yourHand
+        }
+        // If same cards, keep local order to preserve recent reordering
+
         handCounts.value.clear()
         message.handCounts.forEach(({ playerId: pid, count }) => {
           handCounts.value.set(pid, count)
         })
         break
+      }
 
       // Table management
       case 'table:reset':

@@ -36,6 +36,15 @@ export interface StackState {
   lockedBy: string | null // Player currently dragging this stack
 }
 
+export type ZoneVisibility = 'public' | 'owner' | 'hidden'
+
+export type ZoneLayout = 'stack' | 'row' | 'column' | 'grid' | 'fan'
+
+export interface ZoneCardSettings {
+  cardScale: number // 0.5 to 1.5 (default 1.0)
+  cardSpacing: number // 0 to 1.0 (default 0.5, percentage of card dimension)
+}
+
 export interface ZoneState {
   id: number
   x: number
@@ -46,6 +55,10 @@ export interface ZoneState {
   faceUp: boolean
   locked: boolean
   stackId: number | null
+  visibility: ZoneVisibility // Who can see cards in this zone
+  ownerId: string | null // Player who owns this zone (for 'owner' visibility)
+  layout: ZoneLayout // How cards are arranged in the zone
+  cardSettings: ZoneCardSettings // Card size and spacing settings
 }
 
 export interface HandState {
@@ -410,6 +423,10 @@ export interface ZoneCreate {
   height: number
   label: string
   faceUp: boolean
+  visibility?: ZoneVisibility
+  ownerId?: string | null
+  layout?: ZoneLayout
+  cardSettings?: ZoneCardSettings
 }
 
 export interface ZoneUpdate {
@@ -423,6 +440,10 @@ export interface ZoneUpdate {
     label?: string
     faceUp?: boolean
     locked?: boolean
+    visibility?: ZoneVisibility
+    ownerId?: string | null
+    layout?: ZoneLayout
+    cardSettings?: ZoneCardSettings
   }
 }
 

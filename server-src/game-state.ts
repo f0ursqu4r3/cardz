@@ -323,6 +323,10 @@ export class GameStateManager {
     height: number,
     label: string,
     faceUp: boolean,
+    visibility: 'public' | 'owner' | 'hidden' = 'public',
+    ownerId: string | null = null,
+    layout: 'stack' | 'row' | 'column' | 'grid' | 'fan' = 'stack',
+    cardSettings: { cardScale: number; cardSpacing: number } = { cardScale: 1.0, cardSpacing: 0.5 },
   ): ZoneState {
     const zone: ZoneState = {
       id: this.state.nextZoneId++,
@@ -334,6 +338,10 @@ export class GameStateManager {
       faceUp,
       locked: false,
       stackId: null,
+      visibility,
+      ownerId,
+      layout,
+      cardSettings,
     }
 
     this.state.zones.push(zone)
@@ -343,7 +351,20 @@ export class GameStateManager {
   updateZone(
     zoneId: number,
     updates: Partial<
-      Pick<ZoneState, 'x' | 'y' | 'width' | 'height' | 'label' | 'faceUp' | 'locked'>
+      Pick<
+        ZoneState,
+        | 'x'
+        | 'y'
+        | 'width'
+        | 'height'
+        | 'label'
+        | 'faceUp'
+        | 'locked'
+        | 'visibility'
+        | 'ownerId'
+        | 'layout'
+        | 'cardSettings'
+      >
     >,
   ): {
     zone: ZoneState

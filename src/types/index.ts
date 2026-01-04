@@ -22,6 +22,13 @@ export type Stack = {
   lockedBy: string | null // Player currently dragging this stack
 }
 
+export type ZoneLayout = 'stack' | 'row' | 'column' | 'grid' | 'fan'
+
+export type ZoneCardSettings = {
+  cardScale: number // 0.5 to 1.5 (default 1.0)
+  cardSpacing: number // 0 to 1.0 (default 0.5, percentage of card dimension)
+}
+
 export type Zone = {
   id: number
   x: number
@@ -32,6 +39,10 @@ export type Zone = {
   faceUp: boolean // Cards dropped here default to this orientation
   locked: boolean // Prevent moving/resizing when locked
   stackId: number | null // Associated stack
+  visibility: 'public' | 'owner' | 'hidden' // Who can see cards in this zone
+  ownerId: string | null // Player who owns this zone (for 'owner' visibility)
+  layout: ZoneLayout // How cards are arranged in the zone
+  cardSettings: ZoneCardSettings // Card size and spacing settings
 }
 
 export type DragTarget =
@@ -47,7 +58,10 @@ export const CARD_H = 60
 export const STACK_HOVER_MS = 250
 export const LONG_PRESS_MS = 500
 export const STACK_OFFSET_X = 0
-export const STACK_OFFSET_Y = -1
+export const STACK_OFFSET_Y = -1 // Visual offset per card in stack
+
+// Maximum visual offset for stack depth (prevents stack from getting too tall visually)
+export const STACK_MAX_VISUAL_DEPTH = 10 // Only show edges for first 10 cards
 
 // Card back sprite position in tilemap
 export const CARD_BACK_COL = 13

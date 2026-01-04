@@ -58,6 +58,11 @@ defineExpose({
   handDropTargetIndex: hand.handDropTargetIndex,
   handDragStartIndex: hand.handDragStartIndex,
   getHandCardX: hand.getHandCardX,
+  // Multi-select
+  selectedHandCardIds: hand.selectedHandCardIds,
+  isHandCardSelected: hand.isHandCardSelected,
+  clearHandSelection: hand.clearHandSelection,
+  handSelectionCount: hand.handSelectionCount,
 })
 </script>
 
@@ -85,6 +90,7 @@ defineExpose({
         :class="{
           'hand__card--hidden': isDraggingCard(card.id),
           'hand__card--face-down': isDraggingCard(card.id) && hand.drawFaceDown.value,
+          'hand__card--selected': hand.isHandCardSelected(card.id),
         }"
         :style="{
           '--col': hand.drawFaceDown.value && isDraggingCard(card.id) ? 13 : card.col,
@@ -172,6 +178,17 @@ defineExpose({
 .hand__card--hidden {
   opacity: 0;
   pointer-events: none;
+}
+
+.hand__card--selected {
+  box-shadow:
+    0 0 0 3px rgba(100, 200, 255, 0.8),
+    0 0 15px rgba(100, 200, 255, 0.5);
+  transform: translateX(var(--hand-x, 0)) translateY(-12px);
+}
+
+.hand__card--selected:hover {
+  transform: translateX(var(--hand-x, 0)) translateY(-14px);
 }
 
 .hand__placeholder {

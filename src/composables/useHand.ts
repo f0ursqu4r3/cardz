@@ -20,6 +20,31 @@ export function useHand(
   // Long-press timer for touch face-down draw
   let longPressTimer: number | null = null
 
+  // Multi-select support for hand cards
+  const selectedHandCardIds = ref<Set<number>>(new Set())
+
+  // Check if a hand card is selected
+  const isHandCardSelected = (cardId: number) => selectedHandCardIds.value.has(cardId)
+
+  // Toggle hand card selection
+  const toggleHandCardSelection = (cardId: number) => {
+    if (selectedHandCardIds.value.has(cardId)) {
+      selectedHandCardIds.value.delete(cardId)
+    } else {
+      selectedHandCardIds.value.add(cardId)
+    }
+    // Force reactivity update
+    selectedHandCardIds.value = new Set(selectedHandCardIds.value)
+  }
+
+  // Clear hand selection
+  const clearHandSelection = () => {
+    selectedHandCardIds.value = new Set()
+  }
+
+  // Get count of selected hand cards
+  const handSelectionCount = computed(() => selectedHandCardIds.value.size)
+
   // Hand card position calculation
   const getHandCardX = (index: number): number => {
     const totalCards = cardStore.handCount
@@ -109,10 +134,31 @@ export function useHand(
     const targetEl = event.currentTarget as HTMLElement | null
     targetEl?.setPointerCapture(event.pointerId)
 
+    // Ctrl+click or Cmd+click for multi-select
+    const isCtrlClick = event.ctrlKey || event.metaKey
+
+    if (isCtrlClick && event.button === 0) {
+      toggleHandCardSelection(cardId)
+      return
+    }
+
     // Right-click: immediately start face-down drag
     if (event.button === 2) {
+      // If card is selected, drag all selected cards face-down
+      if (isHandCardSelected(cardId)) {
+        // Add the card to selection if not already
+        if (!selectedHandCardIds.value.has(cardId)) {
+          selectedHandCardIds.value.add(cardId)
+        }
+      }
       startHandCardDrag(event, cardId, true)
       return
+    }
+
+    // If clicking on a selected card without Ctrl, drag all selected
+    // Otherwise, clear selection and start fresh drag
+    if (!isHandCardSelected(cardId) && selectedHandCardIds.value.size > 0) {
+      clearHandSelection()
     }
 
     // Left-click: start normal drag, but set up long-press for face-down (touch support)
@@ -155,6 +201,7 @@ export function useHand(
   ): {
     handled: boolean
     removedCard?: { cardId: number; x: number; y: number; faceUp: boolean }
+    removedCards?: { cardId: number; x: number; y: number; faceUp: boolean }[]
   } => {
     clearLongPressTimer()
 
@@ -163,7 +210,7 @@ export function useHand(
     const card = cardStore.cards[drag.target.value.index]
     if (!card) return { handled: false }
 
-    // If dropped back on hand zone, possibly reorder
+    // If dropped back on hand zone, possibly reorder (single card only)
     if (drag.isInBounds(event, handRef)) {
       const targetIndex = getHandIndexFromX(event.clientX)
       if (handDragStartIndex.value !== null && targetIndex !== handDragStartIndex.value) {
@@ -172,23 +219,63 @@ export function useHand(
       handDragStartIndex.value = null
       handDropTargetIndex.value = null
       drawFaceDown.value = false
+      clearHandSelection()
       return { handled: true }
     } else {
-      // Remove from hand and place on canvas
-      cardStore.removeFromHand(card.id)
       const { x, y } = drag.getDelta()
-      card.x = x
-      card.y = y
-      // Set face-down if right-click drag or long-press
-      card.faceUp = !drawFaceDown.value
-      cardStore.bumpCardZ(card.id)
+      const faceUp = !drawFaceDown.value
 
-      const removedCard = { cardId: card.id, x, y, faceUp: card.faceUp }
+      // Check if we have multiple selected cards to drop
+      const hasMultipleSelected =
+        selectedHandCardIds.value.size > 1 ||
+        (selectedHandCardIds.value.size === 1 && selectedHandCardIds.value.has(card.id))
 
-      handDragStartIndex.value = null
-      handDropTargetIndex.value = null
-      drawFaceDown.value = false
-      return { handled: true, removedCard }
+      if (hasMultipleSelected && selectedHandCardIds.value.size > 1) {
+        // Multi-card drop - create a stack or spread them
+        const selectedIds = Array.from(selectedHandCardIds.value)
+        // Sort by hand order
+        selectedIds.sort((a, b) => {
+          const aIdx = cardStore.handCardIds.indexOf(a)
+          const bIdx = cardStore.handCardIds.indexOf(b)
+          return aIdx - bIdx
+        })
+
+        const removedCards: { cardId: number; x: number; y: number; faceUp: boolean }[] = []
+
+        // Remove all selected cards and position them as a stack
+        selectedIds.forEach((cardId, idx) => {
+          const c = cardStore.cards.find((card) => card.id === cardId)
+          if (c) {
+            cardStore.removeFromHand(cardId)
+            c.x = x
+            c.y = y + idx * -1 // Stack offset
+            c.faceUp = faceUp
+            cardStore.bumpCardZ(cardId)
+            removedCards.push({ cardId, x: c.x, y: c.y, faceUp: c.faceUp })
+          }
+        })
+
+        handDragStartIndex.value = null
+        handDropTargetIndex.value = null
+        drawFaceDown.value = false
+        clearHandSelection()
+        return { handled: true, removedCards }
+      } else {
+        // Single card drop
+        cardStore.removeFromHand(card.id)
+        card.x = x
+        card.y = y
+        card.faceUp = faceUp
+        cardStore.bumpCardZ(card.id)
+
+        const removedCard = { cardId: card.id, x, y, faceUp: card.faceUp }
+
+        handDragStartIndex.value = null
+        handDropTargetIndex.value = null
+        drawFaceDown.value = false
+        clearHandSelection()
+        return { handled: true, removedCard }
+      }
     }
   }
 
@@ -204,6 +291,11 @@ export function useHand(
     handDragStartIndex,
     handDropTargetIndex,
     handWidth,
+    selectedHandCardIds,
+    isHandCardSelected,
+    toggleHandCardSelection,
+    clearHandSelection,
+    handSelectionCount,
     getHandCardX,
     getHandIndexFromX,
     getHandCardOffset,

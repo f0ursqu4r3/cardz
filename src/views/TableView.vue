@@ -112,6 +112,13 @@ const isStackBottom = (card: (typeof cardStore.cards)[0]): boolean => {
   return stack ? stack.cardIds[0] === card.id : false
 }
 
+// Get the number of cards in a stack (for visual depth effect on bottom card)
+const getStackSize = (card: (typeof cardStore.cards)[0]): number => {
+  if (card.stackId === null) return 1
+  const stack = cardStore.stacks.find((s) => s.id === card.stackId)
+  return stack ? stack.cardIds.length : 1
+}
+
 // Get the position for a card that's being held by another player
 // Card follows the holder's cursor, centered under it
 // For stack drags, maintains the card's offset within the stack
@@ -493,15 +500,29 @@ interaction.setHandCardDropHandler((event) => {
   const result = handCompRef.value?.handleHandCardDrop(event)
   if (!result) return false
 
-  // If card was removed from hand (dropped on table), notify server
-  if (result.removedCard) {
-    ws.send({
-      type: 'hand:remove',
-      cardId: result.removedCard.cardId,
-      x: result.removedCard.x,
-      y: result.removedCard.y,
-      faceUp: result.removedCard.faceUp,
-    })
+  // If cards were removed from hand (dropped on table), notify server
+  if (result.removedCards && result.removedCards.length > 0) {
+    for (const removed of result.removedCards) {
+      ws.send({
+        type: 'hand:remove',
+        cardId: removed.cardId,
+        x: removed.x,
+        y: removed.y,
+        faceUp: removed.faceUp,
+      })
+    }
+
+    // If multiple cards were dropped, create a stack from them
+    if (result.removedCards.length > 1) {
+      const cardIds = result.removedCards.map((r) => r.cardId)
+      ws.send({
+        type: 'stack:create',
+        cardIds,
+      })
+    }
+
+    // Clear selection after drop
+    handCompRef.value?.clearHandSelection()
   }
 
   return result.handled
@@ -857,6 +878,7 @@ onBeforeUnmount(() => {
           :key="zone.id"
           :zone="zone"
           :is-dragging="isZoneDragging(zone.id)"
+          :current-player-id="ws.playerId.value"
           @pointerdown="interaction.onZonePointerDown($event, zone.id)"
           @pointermove="interaction.onZonePointerMove"
           @pointerup="interaction.onZonePointerUp"
@@ -890,6 +912,7 @@ onBeforeUnmount(() => {
             '--row': interaction.getCardRow(index),
             '--shuffle-seed': card.id % 10,
             '--lock-color': getCardLockColor(card),
+            '--stack-size': isStackBottom(card) ? getStackSize(card) : 1,
             left: `${getLockedCardPosition(card)?.x ?? card.x}px`,
             top: `${getLockedCardPosition(card)?.y ?? card.y}px`,
             zIndex: interaction.getCardZ(index),

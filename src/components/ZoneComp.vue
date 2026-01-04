@@ -1,12 +1,29 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
-import { Lock, LockOpen, Settings, Eye, EyeOff, Trash2, X } from 'lucide-vue-next'
+import {
+  Lock,
+  LockOpen,
+  Settings,
+  Eye,
+  EyeOff,
+  Trash2,
+  X,
+  Users,
+  User,
+  EyeClosed,
+  Layers,
+  AlignHorizontalJustifyStart,
+  AlignVerticalJustifyStart,
+  Grid3X3,
+  Circle,
+} from 'lucide-vue-next'
 import { useCardStore } from '@/stores/cards'
-import type { Zone } from '@/types'
+import type { Zone, ZoneLayout } from '@/types'
 
 const props = defineProps<{
   zone: Zone
   isDragging: boolean
+  currentPlayerId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -62,6 +79,34 @@ const toggleLocked = () => {
   emit('zone:update', props.zone.id, { locked: newLocked })
 }
 
+const setVisibility = (visibility: Zone['visibility']) => {
+  // If setting to 'owner', also set the current player as owner
+  const updates: Partial<Zone> = { visibility }
+  if (visibility === 'owner' && props.currentPlayerId) {
+    updates.ownerId = props.currentPlayerId
+  } else if (visibility !== 'owner') {
+    updates.ownerId = null
+  }
+  cardStore.updateZone(props.zone.id, updates)
+  emit('zone:update', props.zone.id, updates)
+}
+
+const setLayout = (layout: ZoneLayout) => {
+  cardStore.updateZone(props.zone.id, { layout })
+  emit('zone:update', props.zone.id, { layout })
+}
+
+const onSpacingChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const spacing = parseFloat(target.value)
+  const cardSettings = {
+    cardScale: props.zone.cardSettings?.cardScale ?? 1.0,
+    cardSpacing: spacing,
+  }
+  cardStore.updateZone(props.zone.id, { cardSettings })
+  emit('zone:update', props.zone.id, { cardSettings })
+}
+
 const deleteZone = () => {
   closeModal()
   cardStore.deleteZone(props.zone.id)
@@ -93,6 +138,8 @@ defineExpose({ openModal })
       'zone--dragging': isDragging,
       'zone--face-down': !zone.faceUp,
       'zone--locked': zone.locked,
+      'zone--private': zone.visibility === 'owner',
+      'zone--hidden': zone.visibility === 'hidden',
     }"
     :style="{
       transform: `translate3d(${zone.x}px, ${zone.y}px, 0)`,
@@ -129,6 +176,12 @@ defineExpose({ openModal })
       >
         <Settings :size="12" />
       </button>
+    </div>
+    <!-- Visibility indicator -->
+    <div class="zone__visibility-indicator" :title="`Visibility: ${zone.visibility}`">
+      <Users v-if="zone.visibility === 'public'" :size="10" />
+      <User v-else-if="zone.visibility === 'owner'" :size="10" />
+      <EyeClosed v-else :size="10" />
     </div>
     <div v-if="!zone.locked" class="zone__resize-handle" />
   </div>
@@ -167,6 +220,104 @@ defineExpose({ openModal })
               {{ zone.faceUp ? 'Yes' : 'No' }}
             </button>
           </label>
+          <div class="zone-modal__field">
+            <span class="zone-modal__label">Visibility</span>
+            <div class="zone-modal__visibility-options">
+              <button
+                class="zone-modal__visibility-btn"
+                :class="{ 'zone-modal__visibility-btn--active': zone.visibility === 'public' }"
+                @click="setVisibility('public')"
+                title="Everyone can see cards"
+              >
+                <Users :size="14" />
+                Public
+              </button>
+              <button
+                class="zone-modal__visibility-btn"
+                :class="{ 'zone-modal__visibility-btn--active': zone.visibility === 'owner' }"
+                @click="setVisibility('owner')"
+                title="Only you can see cards"
+              >
+                <User :size="14" />
+                Private
+              </button>
+              <button
+                class="zone-modal__visibility-btn"
+                :class="{ 'zone-modal__visibility-btn--active': zone.visibility === 'hidden' }"
+                @click="setVisibility('hidden')"
+                title="No one can see cards"
+              >
+                <EyeClosed :size="14" />
+                Hidden
+              </button>
+            </div>
+          </div>
+          <div class="zone-modal__field">
+            <span class="zone-modal__label">Card Layout</span>
+            <div class="zone-modal__layout-options">
+              <button
+                class="zone-modal__layout-btn"
+                :class="{ 'zone-modal__layout-btn--active': zone.layout === 'stack' }"
+                @click="setLayout('stack')"
+                title="Stack cards on top of each other"
+              >
+                <Layers :size="14" />
+                Stack
+              </button>
+              <button
+                class="zone-modal__layout-btn"
+                :class="{ 'zone-modal__layout-btn--active': zone.layout === 'row' }"
+                @click="setLayout('row')"
+                title="Arrange cards in a row"
+              >
+                <AlignHorizontalJustifyStart :size="14" />
+                Row
+              </button>
+              <button
+                class="zone-modal__layout-btn"
+                :class="{ 'zone-modal__layout-btn--active': zone.layout === 'column' }"
+                @click="setLayout('column')"
+                title="Arrange cards in a column"
+              >
+                <AlignVerticalJustifyStart :size="14" />
+                Column
+              </button>
+              <button
+                class="zone-modal__layout-btn"
+                :class="{ 'zone-modal__layout-btn--active': zone.layout === 'grid' }"
+                @click="setLayout('grid')"
+                title="Arrange cards in a grid"
+              >
+                <Grid3X3 :size="14" />
+                Grid
+              </button>
+              <button
+                class="zone-modal__layout-btn"
+                :class="{ 'zone-modal__layout-btn--active': zone.layout === 'fan' }"
+                @click="setLayout('fan')"
+                title="Fan cards in an arc"
+              >
+                <Circle :size="14" />
+                Fan
+              </button>
+            </div>
+          </div>
+          <div v-if="zone.layout !== 'stack'" class="zone-modal__field">
+            <span class="zone-modal__label">Card Spacing</span>
+            <div class="zone-modal__slider-row">
+              <span class="zone-modal__slider-label">Tight</span>
+              <input
+                type="range"
+                class="zone-modal__slider"
+                min="0"
+                max="1"
+                step="0.1"
+                :value="zone.cardSettings?.cardSpacing ?? 0.5"
+                @input="onSpacingChange"
+              />
+              <span class="zone-modal__slider-label">Spread</span>
+            </div>
+          </div>
           <label class="zone-modal__field zone-modal__field--row">
             <span class="zone-modal__label">Locked</span>
             <button
@@ -214,6 +365,16 @@ defineExpose({ openModal })
 
 .zone--locked {
   cursor: default;
+}
+
+.zone--private {
+  border-color: rgba(100, 180, 255, 0.7);
+  background-color: rgba(50, 100, 150, 0.15);
+}
+
+.zone--hidden {
+  border-color: rgba(180, 100, 180, 0.7);
+  background-color: rgba(100, 50, 100, 0.15);
 }
 
 .zone__header {
@@ -281,6 +442,29 @@ defineExpose({ openModal })
 .zone__lock-toggle:hover,
 .zone__settings:hover {
   background: rgba(0, 0, 0, 0.5);
+}
+
+.zone__visibility-indicator {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+}
+
+.zone--private .zone__visibility-indicator {
+  color: rgba(100, 180, 255, 0.8);
+}
+
+.zone--hidden .zone__visibility-indicator {
+  color: rgba(180, 100, 180, 0.8);
 }
 
 .zone__resize-handle {
@@ -407,6 +591,39 @@ defineExpose({ openModal })
   color: #a0e0a0;
 }
 
+.zone-modal__visibility-options {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.zone-modal__visibility-btn {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 8px 10px;
+  color: #888;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.zone-modal__visibility-btn:hover {
+  background: rgba(0, 0, 0, 0.4);
+  color: #bbb;
+}
+
+.zone-modal__visibility-btn--active {
+  background: rgba(100, 180, 255, 0.2);
+  border-color: rgba(100, 180, 255, 0.5);
+  color: #a0d0ff;
+}
+
 .zone-modal__footer {
   padding: 12px 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -429,5 +646,83 @@ defineExpose({ openModal })
 
 .zone-modal__delete:hover {
   background: rgba(180, 60, 60, 0.5);
+}
+
+.zone-modal__layout-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.zone-modal__layout-btn {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 6px 10px;
+  color: #888;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.15s ease;
+  min-width: 50px;
+}
+
+.zone-modal__layout-btn:hover {
+  background: rgba(0, 0, 0, 0.4);
+  color: #bbb;
+}
+
+.zone-modal__layout-btn--active {
+  background: rgba(100, 180, 255, 0.2);
+  border-color: rgba(100, 180, 255, 0.5);
+  color: #a0d0ff;
+}
+
+.zone-modal__slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.zone-modal__slider-label {
+  font-size: 10px;
+  color: #666;
+  min-width: 36px;
+}
+
+.zone-modal__slider-label:last-child {
+  text-align: right;
+}
+
+.zone-modal__slider {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  appearance: none;
+  cursor: pointer;
+}
+
+.zone-modal__slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #a0d0ff;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.zone-modal__slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: #a0d0ff;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
 }
 </style>

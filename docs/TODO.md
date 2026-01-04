@@ -7,6 +7,9 @@
 [x] table visibility (public/private)
 [x] table settings (background)
 [x] improved table browser (search, filters, sorting)
+[ ] player cursors still do not show if the player refreshes the page
+[ ] minimap "current view" rectangle should be contained within the minimap view bounds
+[ ] table name should be editable from the table view
 [ ] table settings (music) _FUTURE_
 
 ## Cards & Zones

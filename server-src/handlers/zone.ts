@@ -16,7 +16,18 @@ export function handleZoneCreate(
   const clientData = getClientData(ws)
   const { gameState } = room
 
-  const zone = gameState.createZone(msg.x, msg.y, msg.width, msg.height, msg.label, msg.faceUp)
+  const zone = gameState.createZone(
+    msg.x,
+    msg.y,
+    msg.width,
+    msg.height,
+    msg.label,
+    msg.faceUp,
+    msg.visibility ?? 'public',
+    msg.ownerId ?? null,
+    msg.layout ?? 'stack',
+    msg.cardSettings ?? { cardScale: 1.0, cardSpacing: 0.5 },
+  )
 
   broadcastToRoom(clients, room.code, {
     type: 'zone:created',

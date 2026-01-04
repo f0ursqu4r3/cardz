@@ -262,6 +262,14 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     const card = cardStore.cards[index]
     const isInStack = card && card.stackId !== null
 
+    // Check if this card is the top of its stack
+    const isTopOfStack = () => {
+      if (!card || card.stackId === null) return true
+      const stack = cardStore.stacks.find((s) => s.id === card.stackId)
+      if (!stack) return true
+      return stack.cardIds[stack.cardIds.length - 1] === card.id
+    }
+
     // Ctrl+click (mouse) or two-finger tap detection for selection toggle
     // For touch: we detect multi-touch via event.isPrimary being false or checking touches
     const isMultiTouch = !event.isPrimary
@@ -292,8 +300,14 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       return
     }
 
-    // Left-click on stacked card = long-press for stack, move for card
+    // Left-click on stacked card = only allow on top card
+    // Long-press for stack drag, short click/drag for card drag
     if (isInStack) {
+      if (!isTopOfStack()) {
+        // Not top card - only allow stack drag via long-press
+        drag.setLongPressTimer(() => startStackDrag(index))
+        return
+      }
       drag.setLongPressTimer(() => startStackDrag(index))
     } else {
       startCardDrag(index)

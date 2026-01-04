@@ -68,20 +68,117 @@ export const useCardStore = defineStore('cards', () => {
 
   // Stack position management
   const updateStackPositions = (stack: Stack) => {
-    // If stack belongs to a zone, center cards within zone
+    // If stack belongs to a zone, position cards based on zone layout
     if (stack.kind === 'zone' && stack.zoneId !== undefined) {
       const zone = zones.value.find((z) => z.id === stack.zoneId)
       if (zone) {
-        // Calculate stack dimensions
+        const layout = zone.layout || 'stack'
         const cardCount = stack.cardIds.length
-        const stackWidth = CARD_W + Math.max(0, cardCount - 1) * STACK_OFFSET_X
-        const stackHeight = CARD_H + Math.max(0, cardCount - 1) * Math.abs(STACK_OFFSET_Y)
-        // Center the stack within the zone
-        stack.anchorX = zone.x + (zone.width - stackWidth) / 2
-        stack.anchorY = zone.y + (zone.height - stackHeight) / 2
+        const settings = zone.cardSettings || { cardScale: 1.0, cardSpacing: 0.5 }
+        const spacing = settings.cardSpacing // 0 to 1 range
+
+        if (layout === 'stack') {
+          // Original stack behavior - center cards
+          const stackWidth = CARD_W + Math.max(0, cardCount - 1) * STACK_OFFSET_X
+          const stackHeight = CARD_H + Math.max(0, cardCount - 1) * Math.abs(STACK_OFFSET_Y)
+          stack.anchorX = zone.x + (zone.width - stackWidth) / 2
+          stack.anchorY = zone.y + (zone.height - stackHeight) / 2
+
+          stack.cardIds.forEach((id, idx) => {
+            const card = cards.value.find((item) => item.id === id)
+            if (!card) return
+            card.stackId = stack.id
+            card.isInDeck = true
+            card.x = stack.anchorX + idx * STACK_OFFSET_X
+            card.y = stack.anchorY + idx * STACK_OFFSET_Y
+          })
+        } else if (layout === 'row') {
+          // Arrange cards horizontally with overlap (spacing controls overlap)
+          const overlap = CARD_W * (1 - spacing) // Higher spacing = less overlap
+          const totalWidth = CARD_W + Math.max(0, cardCount - 1) * overlap
+          const startX = zone.x + (zone.width - totalWidth) / 2
+          const startY = zone.y + (zone.height - CARD_H) / 2
+
+          stack.anchorX = startX
+          stack.anchorY = startY
+
+          stack.cardIds.forEach((id, idx) => {
+            const card = cards.value.find((item) => item.id === id)
+            if (!card) return
+            card.stackId = stack.id
+            card.isInDeck = true
+            card.x = startX + idx * overlap
+            card.y = startY
+          })
+        } else if (layout === 'column') {
+          // Arrange cards vertically with overlap (spacing controls overlap)
+          const overlap = CARD_H * (0.15 + spacing * 0.5) // Range from 15% to 65%
+          const totalHeight = CARD_H + Math.max(0, cardCount - 1) * overlap
+          const startX = zone.x + (zone.width - CARD_W) / 2
+          const startY = zone.y + (zone.height - totalHeight) / 2
+
+          stack.anchorX = startX
+          stack.anchorY = startY
+
+          stack.cardIds.forEach((id, idx) => {
+            const card = cards.value.find((item) => item.id === id)
+            if (!card) return
+            card.stackId = stack.id
+            card.isInDeck = true
+            card.x = startX
+            card.y = startY + idx * overlap
+          })
+        } else if (layout === 'grid') {
+          // Arrange cards in a grid (spacing controls gap)
+          const gapX = CARD_W * (0.3 + spacing * 0.7) // Range from 30% to 100%
+          const gapY = CARD_H * (0.2 + spacing * 0.6) // Range from 20% to 80%
+          const cols = Math.max(1, Math.floor(zone.width / (CARD_W * 0.5 + gapX * 0.5)))
+          const rows = Math.ceil(cardCount / cols)
+          const totalWidth = CARD_W + Math.max(0, cols - 1) * gapX
+          const totalHeight = CARD_H + Math.max(0, rows - 1) * gapY
+          const startX = zone.x + (zone.width - totalWidth) / 2
+          const startY = zone.y + (zone.height - totalHeight) / 2
+
+          stack.anchorX = startX
+          stack.anchorY = startY
+
+          stack.cardIds.forEach((id, idx) => {
+            const card = cards.value.find((item) => item.id === id)
+            if (!card) return
+            card.stackId = stack.id
+            card.isInDeck = true
+            const col = idx % cols
+            const row = Math.floor(idx / cols)
+            card.x = startX + col * gapX
+            card.y = startY + row * gapY
+          })
+        } else if (layout === 'fan') {
+          // Arrange cards in a fan/arc pattern (spacing controls arc width)
+          const centerX = zone.x + zone.width / 2
+          const centerY = zone.y + zone.height + 50 // Center below the zone
+          const radius = Math.max(80, zone.height * 0.8)
+          const arcSpan = Math.min(Math.PI * (0.3 + spacing * 0.5), cardCount * 0.15) // Spacing affects arc width
+          const startAngle = Math.PI / 2 + arcSpan / 2 // Start from left side
+          const angleStep = cardCount > 1 ? arcSpan / (cardCount - 1) : 0
+
+          stack.anchorX = centerX
+          stack.anchorY = zone.y + zone.height / 2
+
+          stack.cardIds.forEach((id, idx) => {
+            const card = cards.value.find((item) => item.id === id)
+            if (!card) return
+            card.stackId = stack.id
+            card.isInDeck = true
+            const angle = startAngle - idx * angleStep
+            card.x = centerX + Math.cos(angle) * radius - CARD_W / 2
+            card.y = centerY - Math.sin(angle) * radius - CARD_H / 2
+          })
+        }
+        return
       }
     }
 
+    // Default free stack behavior
     stack.cardIds.forEach((id, idx) => {
       const card = cards.value.find((item) => item.id === id)
       if (!card) return
@@ -178,6 +275,10 @@ export const useCardStore = defineStore('cards', () => {
     faceUp = false,
     width = ZONE_DEFAULT_WIDTH,
     height = ZONE_DEFAULT_HEIGHT,
+    visibility: Zone['visibility'] = 'public',
+    ownerId: string | null = null,
+    layout: Zone['layout'] = 'stack',
+    cardSettings: Zone['cardSettings'] = { cardScale: 1.0, cardSpacing: 0.5 },
   ): Zone => {
     const zone: Zone = {
       id: nextZoneId++,
@@ -189,6 +290,10 @@ export const useCardStore = defineStore('cards', () => {
       faceUp,
       locked: false,
       stackId: null,
+      visibility,
+      ownerId,
+      layout,
+      cardSettings,
     }
     zones.value.push(zone)
     return zone
@@ -227,8 +332,12 @@ export const useCardStore = defineStore('cards', () => {
     if (updates.label !== undefined) zone.label = updates.label
     if (updates.faceUp !== undefined) zone.faceUp = updates.faceUp
     if (updates.locked !== undefined) zone.locked = updates.locked
+    if (updates.visibility !== undefined) zone.visibility = updates.visibility
+    if (updates.ownerId !== undefined) zone.ownerId = updates.ownerId
+    if (updates.layout !== undefined) zone.layout = updates.layout
+    if (updates.cardSettings !== undefined) zone.cardSettings = updates.cardSettings
 
-    // Update stack positions if zone moved
+    // Update stack positions if zone moved or layout/settings changed
     if (zone.stackId !== null) {
       const stack = stacks.value.find((s) => s.id === zone.stackId)
       if (stack) {
@@ -550,6 +659,10 @@ export const useCardStore = defineStore('cards', () => {
     faceUp: state.faceUp,
     locked: state.locked,
     stackId: state.stackId,
+    visibility: state.visibility ?? 'public',
+    ownerId: state.ownerId ?? null,
+    layout: state.layout ?? 'stack',
+    cardSettings: state.cardSettings ?? { cardScale: 1.0, cardSpacing: 0.5 },
   })
 
   // Sync entire game state from server
@@ -557,7 +670,19 @@ export const useCardStore = defineStore('cards', () => {
     cards.value = state.cards.map(cardStateToCardData)
     stacks.value = state.stacks.map(stackStateToStack)
     zones.value = state.zones.map(zoneStateToZone)
-    handCardIds.value = myHandCardIds
+
+    // Preserve local hand order if the same cards exist (just reordered)
+    // Only update if cards have actually been added/removed
+    const currentSet = new Set(handCardIds.value)
+    const serverSet = new Set(myHandCardIds)
+    const sameCards =
+      currentSet.size === serverSet.size && [...currentSet].every((id) => serverSet.has(id))
+
+    if (!sameCards) {
+      // Cards changed - use server's order
+      handCardIds.value = myHandCardIds
+    }
+    // If same cards, keep local order to preserve recent reordering
 
     // Update counters to prevent ID conflicts
     nextStackId = state.nextStackId
@@ -627,6 +752,10 @@ export const useCardStore = defineStore('cards', () => {
     if (updates.faceUp !== undefined) zone.faceUp = updates.faceUp
     if (updates.locked !== undefined) zone.locked = updates.locked
     if (updates.stackId !== undefined) zone.stackId = updates.stackId
+    if (updates.visibility !== undefined) zone.visibility = updates.visibility
+    if (updates.ownerId !== undefined) zone.ownerId = updates.ownerId
+    if (updates.layout !== undefined) zone.layout = updates.layout
+    if (updates.cardSettings !== undefined) zone.cardSettings = updates.cardSettings
   }
 
   // Add a zone from server
