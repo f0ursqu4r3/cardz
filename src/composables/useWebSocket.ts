@@ -229,12 +229,15 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
         console.log('[ws] player joined:', message.player.name)
         break
 
-      case 'room:player_left':
+      case 'room:player_left': {
         players.value = players.value.filter((p) => p.id !== message.playerId)
-        cursors.value.delete(message.playerId)
+        const newCursors = new Map(cursors.value)
+        newCursors.delete(message.playerId)
+        cursors.value = newCursors
         handCounts.value.delete(message.playerId)
         console.log('[ws] player left:', message.playerId)
         break
+      }
 
       case 'room:error':
         error.value = message.message
@@ -537,9 +540,12 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
         break
 
       // Cursor events
-      case 'cursor:updated':
-        cursors.value.set(message.playerId, { x: message.x, y: message.y, state: message.state })
+      case 'cursor:updated': {
+        const newCursors = new Map(cursors.value)
+        newCursors.set(message.playerId, { x: message.x, y: message.y, state: message.state })
+        cursors.value = newCursors
         break
+      }
 
       // State sync
       case 'state:sync':
