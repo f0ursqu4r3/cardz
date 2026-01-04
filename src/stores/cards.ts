@@ -644,12 +644,21 @@ export const useCardStore = defineStore('cards', () => {
     zones.value = zones.value.filter((z) => z.id !== zoneId)
   }
 
-  // Set hand card IDs from server
+  // Set hand card IDs from server (only updates OUR hand, doesn't touch other players' cards)
   const setHandCardIds = (ids: number[]) => {
+    const prevIds = new Set(handCardIds.value)
+    const newIds = new Set(ids)
+
     handCardIds.value = ids
-    // Update inHand flag on cards
+
+    // Only update inHand for cards that moved in/out of OUR hand
+    // Cards that were in our hand but aren't anymore -> inHand = false
     cards.value.forEach((card) => {
-      card.inHand = ids.includes(card.id)
+      if (prevIds.has(card.id) && !newIds.has(card.id)) {
+        card.inHand = false
+      } else if (!prevIds.has(card.id) && newIds.has(card.id)) {
+        card.inHand = true
+      }
     })
   }
 
