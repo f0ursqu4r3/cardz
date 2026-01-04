@@ -27,6 +27,7 @@ import {
   ZONE_DEFAULT_HEIGHT,
   CURSOR_THROTTLE_MS,
 } from '@/types'
+import type { Zone } from '@/types'
 import type { ServerMessage, ClientMessage, TableSettings } from '../../shared/types'
 
 const route = useRoute()
@@ -597,11 +598,8 @@ const addZone = () => {
   })
 }
 
-// Handle zone update from ZoneComp (label, faceUp, locked)
-const onZoneUpdate = (
-  zoneId: number,
-  updates: { label?: string; faceUp?: boolean; locked?: boolean },
-) => {
+// Handle zone update from ZoneComp (label, faceUp, locked, layout, cardSettings, etc.)
+const onZoneUpdate = (zoneId: number, updates: Partial<Zone>) => {
   ws.send({
     type: 'zone:update',
     zoneId,

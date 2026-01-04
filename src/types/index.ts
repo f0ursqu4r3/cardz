@@ -28,8 +28,8 @@ export type ZoneLayout = 'stack' | 'row' | 'column' | 'grid' | 'fan' | 'circle'
 export type ZoneCardSettings = {
   cardScale: number // 0.5 to 1.5 (default 1.0)
   cardSpacing: number // 0 to 1.0 (default 0.5, percentage of card dimension)
-  randomOffset: number // 0 to 50 pixels of random position jitter (default 0)
-  randomRotation: number // 0 to 45 degrees of random rotation (default 0)
+  randomOffset?: number // 0 to 50 pixels of random position jitter (default 0)
+  randomRotation?: number // 0 to 45 degrees of random rotation (default 0)
 }
 
 export type Zone = {

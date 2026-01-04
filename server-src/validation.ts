@@ -200,6 +200,17 @@ export const ZoneUpdateSchema = z.object({
     label: z.string().max(32).optional(),
     faceUp: z.boolean().optional(),
     locked: z.boolean().optional(),
+    visibility: z.enum(['public', 'owner', 'hidden']).optional(),
+    ownerId: z.string().nullable().optional(),
+    layout: z.enum(['stack', 'row', 'column', 'grid', 'fan', 'circle']).optional(),
+    cardSettings: z
+      .object({
+        cardScale: z.number().min(0.5).max(1.5),
+        cardSpacing: z.number().min(0).max(1),
+        randomOffset: z.number().min(0).max(50).optional(),
+        randomRotation: z.number().min(0).max(45).optional(),
+      })
+      .optional(),
   }),
 })
 

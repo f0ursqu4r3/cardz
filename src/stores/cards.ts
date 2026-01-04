@@ -80,6 +80,13 @@ export const useCardStore = defineStore('cards', () => {
         const randomOffset = settings.randomOffset ?? 0
         const randomRotation = settings.randomRotation ?? 0
 
+        // Spacing interpretation:
+        // 0.0 = maximum overlap (cards stacked tightly, ~30% visible)
+        // 0.5 = edge-to-edge (no gap, no overlap)
+        // 1.0 = maximum spread (gaps between cards)
+        // This maps spacing to a multiplier: 0->0.3, 0.5->1.0, 1.0->1.7
+        const spacingMultiplier = spacing < 0.5 ? 0.3 + spacing * 1.4 : 1.0 + (spacing - 0.5) * 1.4
+
         // Helper to apply random offset and rotation to a card
         const applyRandomization = (
           card: CardData,
@@ -123,9 +130,10 @@ export const useCardStore = defineStore('cards', () => {
             card.rotation = 0
           })
         } else if (layout === 'row') {
-          // Arrange cards horizontally with overlap (spacing controls overlap)
-          const overlap = CARD_W * (1 - spacing) // Higher spacing = less overlap
-          const totalWidth = CARD_W + Math.max(0, cardCount - 1) * overlap
+          // Arrange cards horizontally
+          // At spacingMultiplier=1.0, step=CARD_W (edge-to-edge)
+          const step = CARD_W * spacingMultiplier
+          const totalWidth = CARD_W + Math.max(0, cardCount - 1) * step
           const startX = zone.x + (zone.width - totalWidth) / 2
           const startY = zone.y + (zone.height - CARD_H) / 2
 
@@ -137,13 +145,14 @@ export const useCardStore = defineStore('cards', () => {
             if (!card) return
             card.stackId = stack.id
             card.isInDeck = true
-            const baseX = startX + idx * overlap
+            const baseX = startX + idx * step
             applyRandomization(card, baseX, startY, 0)
           })
         } else if (layout === 'column') {
-          // Arrange cards vertically with overlap (spacing controls overlap)
-          const overlap = CARD_H * (0.15 + spacing * 0.5) // Range from 15% to 65%
-          const totalHeight = CARD_H + Math.max(0, cardCount - 1) * overlap
+          // Arrange cards vertically
+          // At spacingMultiplier=1.0, step=CARD_H (edge-to-edge)
+          const step = CARD_H * spacingMultiplier
+          const totalHeight = CARD_H + Math.max(0, cardCount - 1) * step
           const startX = zone.x + (zone.width - CARD_W) / 2
           const startY = zone.y + (zone.height - totalHeight) / 2
 
@@ -155,14 +164,15 @@ export const useCardStore = defineStore('cards', () => {
             if (!card) return
             card.stackId = stack.id
             card.isInDeck = true
-            const baseY = startY + idx * overlap
+            const baseY = startY + idx * step
             applyRandomization(card, startX, baseY, 0)
           })
         } else if (layout === 'grid') {
-          // Arrange cards in a grid (spacing controls gap)
-          const gapX = CARD_W * (0.3 + spacing * 0.7) // Range from 30% to 100%
-          const gapY = CARD_H * (0.2 + spacing * 0.6) // Range from 20% to 80%
-          const cols = Math.max(1, Math.floor(zone.width / (CARD_W * 0.5 + gapX * 0.5)))
+          // Arrange cards in a grid
+          // At spacingMultiplier=1.0, gaps equal card dimensions (edge-to-edge)
+          const gapX = CARD_W * spacingMultiplier
+          const gapY = CARD_H * spacingMultiplier
+          const cols = Math.max(1, Math.floor((zone.width + gapX - CARD_W) / gapX))
           const rows = Math.ceil(cardCount / cols)
           const totalWidth = CARD_W + Math.max(0, cols - 1) * gapX
           const totalHeight = CARD_H + Math.max(0, rows - 1) * gapY
@@ -184,11 +194,14 @@ export const useCardStore = defineStore('cards', () => {
             applyRandomization(card, baseX, baseY, 0)
           })
         } else if (layout === 'fan') {
-          // Arrange cards in a fan/arc pattern (spacing controls arc width)
+          // Arrange cards in a fan/arc pattern
+          // Spacing affects arc width - tighter = smaller arc, spread = wider arc
           const centerX = zone.x + zone.width / 2
           const centerY = zone.y + zone.height + 50 // Center below the zone
           const radius = Math.max(80, zone.height * 0.8)
-          const arcSpan = Math.min(Math.PI * (0.3 + spacing * 0.5), cardCount * 0.15) // Spacing affects arc width
+          // Arc span scales with spacing: tight=narrow fan, spread=wide fan
+          const baseArcSpan = Math.PI * 0.4 * spacingMultiplier
+          const arcSpan = Math.min(baseArcSpan, cardCount * 0.2) // Cap based on card count
           const startAngle = Math.PI / 2 + arcSpan / 2 // Start from left side
           const angleStep = cardCount > 1 ? arcSpan / (cardCount - 1) : 0
 
@@ -211,7 +224,9 @@ export const useCardStore = defineStore('cards', () => {
           // Arrange cards in a circle pattern
           const centerX = zone.x + zone.width / 2
           const centerY = zone.y + zone.height / 2
-          const radius = Math.min(zone.width, zone.height) / 2 - CARD_W / 2 - 10
+          // Spacing affects radius - tighter = smaller circle, spread = larger circle
+          const baseRadius = Math.min(zone.width, zone.height) / 2 - CARD_W / 2 - 10
+          const radius = baseRadius * spacingMultiplier
           const angleStep = cardCount > 0 ? (Math.PI * 2) / cardCount : 0
           const startAngle = -Math.PI / 2 // Start from top
 

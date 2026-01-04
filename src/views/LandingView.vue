@@ -132,6 +132,10 @@ const browseTables = () => {
 
     <footer class="landing__footer">
       <p>Drag cards, create stacks, and play with friends in real-time</p>
+      <a href="https://www.buymeacoffee.com/kdougan6"
+        ><img
+          src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=kdougan6&button_colour=FFDD00&font_colour=000000&font_family=Inter&outline_colour=000000&coffee_colour=ffffff"
+      /></a>
     </footer>
   </div>
 </template>
@@ -393,6 +397,11 @@ const browseTables = () => {
 .landing__footer {
   margin-top: 3rem;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
 }
 
 .landing__footer p {
