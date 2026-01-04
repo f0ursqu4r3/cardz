@@ -17,6 +17,7 @@
 [ ] zone card layouts (row, column, grid, fan, etc)
 [ ] zone card settings (size, spacing, etc)
 [ ] should not be able to select cards in the middle of a stack
+[ ] stack height should be based on number of cards, not pixel height
 
 ## Social Features
 
