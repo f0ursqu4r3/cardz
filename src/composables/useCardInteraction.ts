@@ -574,11 +574,22 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
 
         // Try to stack on hover target
         if (hover.state.ready && hover.state.cardId) {
+          const targetCard = cardStore.cards.find((c) => c.id === hover.state.cardId)
+          const targetHadStack = targetCard?.stackId !== null
+
           stacked = cardStore.stackCardOnTarget(card.id, hover.state.cardId)
-          if (stacked) {
-            const targetCard = cardStore.cards.find((c) => c.id === hover.state.cardId)
-            if (targetCard && targetCard.stackId !== null) {
+          if (stacked && targetCard) {
+            if (targetHadStack && targetCard.stackId !== null) {
+              // Target already had a stack - just add our card to it
               send({ type: 'stack:add_card', stackId: targetCard.stackId, cardId: card.id })
+            } else if (targetCard.stackId !== null) {
+              // Target didn't have a stack - create a new stack with both cards
+              send({
+                type: 'stack:create',
+                cardIds: [targetCard.id, card.id],
+                anchorX: targetCard.x,
+                anchorY: targetCard.y,
+              })
             }
           }
         }
