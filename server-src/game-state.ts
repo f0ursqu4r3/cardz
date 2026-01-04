@@ -480,7 +480,13 @@ export class GameStateManager {
     return card
   }
 
-  removeCardFromHand(playerId: string, cardId: number, x: number, y: number): CardState | null {
+  removeCardFromHand(
+    playerId: string,
+    cardId: number,
+    x: number,
+    y: number,
+    faceUp: boolean,
+  ): CardState | null {
     const hand = this.getHand(playerId)
     const card = this.getCard(cardId)
     if (!hand || !card || card.ownerId !== playerId) return null
@@ -490,6 +496,7 @@ export class GameStateManager {
     card.x = x
     card.y = y
     card.z = ++this.state.zCounter
+    card.faceUp = faceUp
 
     return card
   }

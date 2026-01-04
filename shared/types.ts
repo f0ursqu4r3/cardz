@@ -128,6 +128,8 @@ export interface CardMoveIntent {
   cardId: number
   x: number
   y: number
+  vx?: number
+  vy?: number
 }
 
 export interface CardLock {
@@ -156,6 +158,8 @@ export interface CardMoved {
   y: number
   z: number
   playerId: string
+  vx?: number
+  vy?: number
 }
 
 export interface CardMoveRejected {
@@ -398,6 +402,7 @@ export interface HandRemove {
   cardId: number
   x: number
   y: number
+  faceUp: boolean
 }
 
 export interface HandReorder {

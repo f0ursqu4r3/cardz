@@ -94,6 +94,8 @@ export const CardMoveIntentSchema = z.object({
   cardId: z.number().int().min(0).max(51),
   x: z.number(),
   y: z.number(),
+  vx: z.number().optional(),
+  vy: z.number().optional(),
 })
 
 export const CardLockSchema = z.object({
@@ -219,6 +221,7 @@ export const HandRemoveSchema = z.object({
   cardId: z.number().int().min(0).max(51),
   x: z.number(),
   y: z.number(),
+  faceUp: z.boolean(),
 })
 
 export const HandReorderSchema = z.object({

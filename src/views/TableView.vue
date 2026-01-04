@@ -13,6 +13,7 @@ import { useCardInteraction } from '@/composables/useCardInteraction'
 import { useViewport } from '@/composables/useViewport'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useCursor } from '@/composables/useCursor'
+import { useRemoteThrow } from '@/composables/useRemoteThrow'
 import { SquarePlus, Copy, Check, LogOut, Users, Wifi, WifiOff } from 'lucide-vue-next'
 import {
   CARD_BACK_COL,
@@ -162,6 +163,9 @@ const interaction = useCardInteraction({
   sendMessage: (msg: ClientMessage) => ws.send(msg),
 })
 
+// Remote throw physics for other players' card throws
+const remoteThrow = useRemoteThrow((id) => cardStore.cards.find((c) => c.id === id))
+
 // Compute cursor class based on interaction state
 const cursorClass = computed(() => {
   // If dragging, show grabbing cursor
@@ -224,14 +228,31 @@ ws.onMessage((message: ServerMessage) => {
       break
 
     case 'card:moved':
-      cardStore.updateCardFromServer(message.cardId, {
-        x: message.x,
-        y: message.y,
-        z: message.z,
-      })
+      // Skip if this is our own card move
+      if (message.playerId === ws.playerId.value) {
+        cardStore.updateCardFromServer(message.cardId, {
+          x: message.x,
+          y: message.y,
+          z: message.z,
+        })
+      } else if (message.vx !== undefined && message.vy !== undefined) {
+        // Remote player threw the card - animate with physics prediction
+        cardStore.updateCardFromServer(message.cardId, { z: message.z })
+        remoteThrow.startThrow(message.cardId, message.x, message.y, message.vx, message.vy)
+      } else {
+        // Remote player moved card without throw (or final position after throw)
+        remoteThrow.cancelThrow(message.cardId)
+        cardStore.updateCardFromServer(message.cardId, {
+          x: message.x,
+          y: message.y,
+          z: message.z,
+        })
+      }
       break
 
     case 'card:locked':
+      // Cancel any remote throw animation when card is grabbed
+      remoteThrow.cancelThrow(message.cardId)
       cardStore.updateCardFromServer(message.cardId, { lockedBy: message.playerId })
       break
 
@@ -472,6 +493,7 @@ interaction.setHandCardDropHandler((event) => {
       cardId: result.removedCard.cardId,
       x: result.removedCard.x,
       y: result.removedCard.y,
+      faceUp: result.removedCard.faceUp,
     })
   }
 

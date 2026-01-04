@@ -63,6 +63,8 @@ export function handleCardMove(
     y: msg.y,
     z: result.z,
     playerId: clientData.id,
+    vx: msg.vx,
+    vy: msg.vy,
   })
 }
 

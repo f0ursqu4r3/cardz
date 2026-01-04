@@ -619,15 +619,15 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
           card.isInDeck = false
           cardStore.bumpCardZ(card.id)
 
-          // Send card move to server
-          send({ type: 'card:move', cardId: card.id, x: card.x, y: card.y })
-
           // Get throw velocity
           const { vx, vy } = physics.endDrag()
           const speed = Math.sqrt(vx * vx + vy * vy)
 
           // Only throw if moving fast enough
           if (speed > 3) {
+            // Send card move with velocity so other clients can predict
+            send({ type: 'card:move', cardId: card.id, x: card.x, y: card.y, vx, vy })
+
             physics.startThrow(
               card.id,
               card.x,
@@ -639,10 +639,13 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
                 card.y = y
               },
               () => {
-                // Throw complete - send final position
+                // Throw complete - send final position (no velocity)
                 send({ type: 'card:move', cardId: card.id, x: card.x, y: card.y })
               },
             )
+          } else {
+            // No throw - just send position
+            send({ type: 'card:move', cardId: card.id, x: card.x, y: card.y })
           }
         } else {
           physics.endDrag()

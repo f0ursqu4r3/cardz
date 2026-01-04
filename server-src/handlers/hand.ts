@@ -97,7 +97,7 @@ export function handleHandRemove(
     return
   }
 
-  const result = gameState.removeCardFromHand(clientData.id, msg.cardId, msg.x, msg.y)
+  const result = gameState.removeCardFromHand(clientData.id, msg.cardId, msg.x, msg.y, msg.faceUp)
   if (!result) return
 
   // Card is now visible to everyone
