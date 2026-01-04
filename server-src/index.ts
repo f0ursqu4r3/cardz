@@ -261,6 +261,9 @@ const server = Bun.serve<ClientData>({
 
             lastCursorUpdate.set(clientData.id, now)
 
+            // Store cursor position in room for new players joining
+            room.cursors.set(clientData.id, { x: msg.x, y: msg.y, state: msg.state })
+
             broadcastToRoom(
               clients as any,
               room.code,

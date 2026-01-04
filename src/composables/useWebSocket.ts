@@ -239,6 +239,17 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
         if (ourHand) {
           handCardIds.value = ourHand.cardIds
         }
+        // Restore cursor positions from other players
+        if (message.cursors) {
+          const newCursors = new Map<
+            string,
+            { x: number; y: number; state: 'default' | 'grab' | 'grabbing' }
+          >()
+          for (const cursor of message.cursors) {
+            newCursors.set(cursor.playerId, { x: cursor.x, y: cursor.y, state: cursor.state })
+          }
+          cursors.value = newCursors
+        }
         console.log('[ws] joined room:', message.roomCode)
         break
 

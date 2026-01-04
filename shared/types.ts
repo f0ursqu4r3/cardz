@@ -101,6 +101,7 @@ export interface RoomJoined {
   playerId: string
   players: Player[]
   state: GameState
+  cursors: { playerId: string; x: number; y: number; state: 'default' | 'grab' | 'grabbing' }[]
 }
 
 export interface PlayerJoined {

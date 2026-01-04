@@ -75,6 +75,19 @@ export function handleRoomJoin(
   clientData.roomCode = room.code
   clientData.name = msg.playerName
 
+  // Build cursors array for joining player (exclude their own cursor)
+  const cursors: {
+    playerId: string
+    x: number
+    y: number
+    state: 'default' | 'grab' | 'grabbing'
+  }[] = []
+  for (const [pid, cursor] of room.cursors) {
+    if (pid !== clientData.id) {
+      cursors.push({ playerId: pid, x: cursor.x, y: cursor.y, state: cursor.state })
+    }
+  }
+
   // Send full state to joining player
   send(ws, {
     type: 'room:joined',
@@ -82,6 +95,7 @@ export function handleRoomJoin(
     playerId: clientData.id,
     players: [...room.players.values()],
     state: room.gameState.getState(),
+    cursors,
   })
 
   // Only notify others if this is a new player, not a reconnect

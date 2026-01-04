@@ -16,11 +16,20 @@ function generateRoomCode(): string {
   return code
 }
 
+export type CursorState = 'default' | 'grab' | 'grabbing'
+
+export interface CursorPosition {
+  x: number
+  y: number
+  state: CursorState
+}
+
 export interface Room {
   code: string
   players: Map<string, Player>
   gameState: GameStateManager
   locks: LockManager
+  cursors: Map<string, CursorPosition>
   createdAt: number
 }
 
@@ -82,6 +91,7 @@ export class RoomManager {
       players: new Map([[playerId, player]]),
       gameState: new GameStateManager(),
       locks: new LockManager(),
+      cursors: new Map(),
       createdAt: Date.now(),
     }
 
@@ -179,8 +189,9 @@ export class RoomManager {
     // Return cards from hand to table
     room.gameState.removePlayer(playerId)
 
-    // Remove player
+    // Remove player and their cursor
     room.players.delete(playerId)
+    room.cursors.delete(playerId)
 
     // Delete room if empty
     if (room.players.size === 0) {
@@ -204,6 +215,8 @@ export class RoomManager {
       player.connected = false
       // Release locks but keep hand
       room.locks.releaseAllForPlayer(playerId)
+      // Remove cursor position
+      room.cursors.delete(playerId)
     }
 
     return room
