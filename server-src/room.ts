@@ -26,6 +26,9 @@ export interface CursorPosition {
 
 export interface Room {
   code: string
+  name: string
+  isPublic: boolean
+  maxPlayers: number
   players: Map<string, Player>
   gameState: GameStateManager
   locks: LockManager
@@ -71,7 +74,13 @@ export class RoomManager {
   /**
    * Create a new room
    */
-  createRoom(playerId: string, playerName: string, sessionId?: string): Room {
+  createRoom(
+    playerId: string,
+    playerName: string,
+    sessionId?: string,
+    tableName?: string,
+    isPublic?: boolean,
+  ): Room {
     // Generate unique code
     let code: string
     do {
@@ -88,6 +97,9 @@ export class RoomManager {
 
     const room: Room = {
       code,
+      name: tableName || `${playerName}'s Table`,
+      isPublic: isPublic ?? false,
+      maxPlayers: 8,
       players: new Map([[playerId, player]]),
       gameState: new GameStateManager(),
       locks: new LockManager(),
@@ -253,6 +265,49 @@ export class RoomManager {
       }
     }
     return undefined
+  }
+
+  /**
+   * Get all public rooms for the browser
+   */
+  getPublicRooms(): {
+    code: string
+    name: string
+    playerCount: number
+    maxPlayers: number
+    createdAt: number
+  }[] {
+    const publicRooms: {
+      code: string
+      name: string
+      playerCount: number
+      maxPlayers: number
+      createdAt: number
+    }[] = []
+
+    for (const room of this.rooms.values()) {
+      if (room.isPublic) {
+        // Only include rooms with at least one connected player
+        const connectedCount = [...room.players.values()].filter((p) => p.connected).length
+        if (connectedCount > 0) {
+          publicRooms.push({
+            code: room.code,
+            name: room.name,
+            playerCount: connectedCount,
+            maxPlayers: room.maxPlayers,
+            createdAt: room.createdAt,
+          })
+        }
+      }
+    }
+
+    // Sort by player count descending, then by creation time
+    return publicRooms.sort((a, b) => {
+      if (b.playerCount !== a.playerCount) {
+        return b.playerCount - a.playerCount
+      }
+      return b.createdAt - a.createdAt
+    })
   }
 
   /**

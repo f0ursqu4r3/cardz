@@ -11,6 +11,7 @@ import {
   handleRoomCreate,
   handleRoomJoin,
   handleRoomLeave,
+  handleRoomList,
   handleDisconnect,
 } from './handlers/room'
 import { handleCardMove, handleCardLock, handleCardUnlock, handleCardFlip } from './handlers/card'
@@ -133,6 +134,11 @@ const server = Bun.serve<ClientData>({
 
         if (msg.type === 'room:leave') {
           handleRoomLeave(ws as any, roomManager)
+          return
+        }
+
+        if (msg.type === 'room:list') {
+          handleRoomList(ws as any, msg, roomManager)
           return
         }
 

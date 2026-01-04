@@ -68,6 +68,8 @@ export const GameStateSchema = z.object({
 export const RoomCreateSchema = z.object({
   type: z.literal('room:create'),
   playerName: z.string().min(1).max(32),
+  tableName: z.string().min(1).max(50).optional(),
+  isPublic: z.boolean().optional(),
   sessionId: z.string().optional(),
 })
 
@@ -83,6 +85,10 @@ export const RoomJoinSchema = z.object({
 
 export const RoomLeaveSchema = z.object({
   type: z.literal('room:leave'),
+})
+
+export const RoomListSchema = z.object({
+  type: z.literal('room:list'),
 })
 
 // ============================================================================
@@ -273,6 +279,7 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   RoomCreateSchema,
   RoomJoinSchema,
   RoomLeaveSchema,
+  RoomListSchema,
   CardMoveIntentSchema,
   CardLockSchema,
   CardUnlockSchema,

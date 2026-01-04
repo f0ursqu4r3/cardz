@@ -1,19 +1,28 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { PlayCircle, Users, Sparkles } from 'lucide-vue-next'
+import { PlayCircle, Users, Sparkles, Globe } from 'lucide-vue-next'
 
 const router = useRouter()
 const joinCode = ref('')
 const playerName = ref('')
+const tableName = ref('')
+const isPublic = ref(false)
 
 const createTable = () => {
   if (!playerName.value.trim()) {
     playerName.value = 'Player'
   }
+  const query: Record<string, string> = { name: playerName.value }
+  if (isPublic.value) {
+    query.public = 'true'
+  }
+  if (tableName.value.trim()) {
+    query.tableName = tableName.value.trim()
+  }
   router.push({
     name: 'table-new',
-    query: { name: playerName.value },
+    query,
   })
 }
 
@@ -61,6 +70,27 @@ const browseTables = () => {
               placeholder="Enter your name"
               maxlength="20"
             />
+          </div>
+
+          <div class="landing__field">
+            <label for="tableName"
+              >Table Name <span class="landing__optional">(optional)</span></label
+            >
+            <input
+              id="tableName"
+              v-model="tableName"
+              type="text"
+              placeholder="My Card Table"
+              maxlength="50"
+            />
+          </div>
+
+          <div class="landing__checkbox">
+            <input id="isPublic" v-model="isPublic" type="checkbox" />
+            <label for="isPublic">
+              <Globe :size="16" />
+              Make table public
+            </label>
           </div>
 
           <div class="landing__actions">
@@ -216,6 +246,38 @@ const browseTables = () => {
 
 .landing__field input::placeholder {
   color: #666;
+}
+
+.landing__optional {
+  color: #666;
+  font-weight: 400;
+}
+
+.landing__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.landing__checkbox input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: #e94560;
+  cursor: pointer;
+}
+
+.landing__checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #a0a0b0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.landing__checkbox input:checked + label {
+  color: #fff;
 }
 
 .landing__actions {

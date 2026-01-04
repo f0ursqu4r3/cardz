@@ -1,63 +1,72 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Users, RefreshCw, Globe, Lock } from 'lucide-vue-next'
-
-interface TableInfo {
-  code: string
-  name: string
-  playerCount: number
-  maxPlayers: number
-  isPublic: boolean
-  createdAt: string
-}
+import type { ServerMessage, PublicRoomInfo } from '../../shared/types'
 
 const router = useRouter()
-const tables = ref<TableInfo[]>([])
+const tables = ref<PublicRoomInfo[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 const playerName = ref('')
 
-// Mock data for now - will be replaced with WebSocket connection
-const mockTables: TableInfo[] = [
-  {
-    code: 'ABC123',
-    name: 'Poker Night',
-    playerCount: 3,
-    maxPlayers: 8,
-    isPublic: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    code: 'XYZ789',
-    name: 'Card Club',
-    playerCount: 5,
-    maxPlayers: 6,
-    isPublic: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    code: 'DEF456',
-    name: 'Casual Games',
-    playerCount: 2,
-    maxPlayers: 4,
-    isPublic: true,
-    createdAt: new Date().toISOString(),
-  },
-]
+// WebSocket connection for fetching public rooms
+let ws: WebSocket | null = null
+const wsUrl = `ws://${window.location.hostname}:9001`
 
-const fetchTables = async () => {
-  loading.value = true
-  error.value = null
+const connectWebSocket = () => {
+  if (ws?.readyState === WebSocket.OPEN) {
+    requestRoomList()
+    return
+  }
 
-  try {
-    // TODO: Replace with actual WebSocket/API call
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    tables.value = mockTables
-  } catch {
-    error.value = 'Failed to load tables. Please try again.'
-  } finally {
+  ws = new WebSocket(wsUrl)
+
+  ws.onopen = () => {
+    console.log('[browser] WebSocket connected')
+    requestRoomList()
+  }
+
+  ws.onmessage = (event) => {
+    try {
+      const msg: ServerMessage = JSON.parse(event.data)
+      if (msg.type === 'room:list') {
+        tables.value = msg.rooms
+        loading.value = false
+        error.value = null
+      }
+    } catch (e) {
+      console.error('[browser] Failed to parse message:', e)
+    }
+  }
+
+  ws.onerror = () => {
+    console.error('[browser] WebSocket error')
+    error.value = 'Failed to connect to server'
     loading.value = false
+  }
+
+  ws.onclose = () => {
+    console.log('[browser] WebSocket closed')
+  }
+}
+
+const requestRoomList = () => {
+  if (ws?.readyState === WebSocket.OPEN) {
+    loading.value = true
+    error.value = null
+    ws.send(JSON.stringify({ type: 'room:list' }))
+  } else {
+    error.value = 'Not connected to server'
+    loading.value = false
+  }
+}
+
+const fetchTables = () => {
+  if (ws?.readyState === WebSocket.OPEN) {
+    requestRoomList()
+  } else {
+    connectWebSocket()
   }
 }
 
@@ -74,8 +83,26 @@ const goBack = () => {
   router.push({ name: 'landing' })
 }
 
+const formatTimeAgo = (timestamp: number): string => {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000)
+  if (seconds < 60) return 'Just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
 onMounted(() => {
-  fetchTables()
+  connectWebSocket()
+})
+
+onUnmounted(() => {
+  if (ws) {
+    ws.close()
+    ws = null
+  }
 })
 </script>
 
@@ -138,11 +165,11 @@ onMounted(() => {
           <div class="browser__table-info">
             <h3 class="browser__table-name">
               {{ table.name }}
-              <span v-if="!table.isPublic" class="browser__table-private">
-                <Lock :size="14" />
-              </span>
             </h3>
-            <span class="browser__table-code">{{ table.code }}</span>
+            <div class="browser__table-meta">
+              <span class="browser__table-code">{{ table.code }}</span>
+              <span class="browser__table-time">{{ formatTimeAgo(table.createdAt) }}</span>
+            </div>
           </div>
           <div class="browser__table-players">
             <Users :size="16" />
@@ -364,8 +391,10 @@ onMounted(() => {
   margin: 0 0 0.25rem;
 }
 
-.browser__table-private {
-  color: #a0a0b0;
+.browser__table-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .browser__table-code {
@@ -373,6 +402,11 @@ onMounted(() => {
   color: #666;
   font-family: monospace;
   letter-spacing: 0.05em;
+}
+
+.browser__table-time {
+  font-size: 0.75rem;
+  color: #555;
 }
 
 .browser__table-players {

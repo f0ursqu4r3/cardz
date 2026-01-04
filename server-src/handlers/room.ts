@@ -1,4 +1,4 @@
-import type { RoomCreate, RoomJoin } from '../../shared/types'
+import type { RoomCreate, RoomJoin, RoomListRequest } from '../../shared/types'
 import type { RoomManager } from '../room'
 import type { ClientData, GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom } from '../utils/broadcast'
@@ -25,13 +25,19 @@ export function handleRoomCreate(
     }
   }
 
-  const room = roomManager.createRoom(clientData.id, msg.playerName, msg.sessionId)
+  const room = roomManager.createRoom(
+    clientData.id,
+    msg.playerName,
+    msg.sessionId,
+    msg.tableName,
+    msg.isPublic,
+  )
   clientData.roomCode = room.code
   clientData.name = msg.playerName
 
   const state = room.gameState.getState()
   console.log(
-    `[room:create] ${room.code} - cards: ${state.cards.length}, stacks: ${state.stacks.length}`,
+    `[room:create] ${room.code} (${room.isPublic ? 'public' : 'private'}) - cards: ${state.cards.length}, stacks: ${state.stacks.length}`,
   )
 
   send(ws, {
@@ -145,4 +151,20 @@ export function handleDisconnect(clientData: ClientData, roomManager: RoomManage
   }
 
   roomManager.removeClient(clientData.id)
+}
+
+/**
+ * Handle request for public room list
+ */
+export function handleRoomList(
+  ws: GenericWebSocket,
+  _msg: RoomListRequest,
+  roomManager: RoomManager,
+): void {
+  const rooms = roomManager.getPublicRooms()
+
+  send(ws, {
+    type: 'room:list',
+    rooms,
+  })
 }

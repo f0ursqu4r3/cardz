@@ -38,7 +38,7 @@ export interface UseWebSocketReturn {
   // Actions
   connect: () => void
   disconnect: () => void
-  createRoom: (playerName: string) => void
+  createRoom: (playerName: string, options?: { tableName?: string; isPublic?: boolean }) => void
   joinRoom: (roomCode: string, playerName: string) => void
   leaveRoom: () => void
   send: (message: ClientMessage) => void
@@ -191,10 +191,16 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
   }
 
   // Room actions
-  const createRoom = (playerName: string) => {
+  const createRoom = (playerName: string, options?: { tableName?: string; isPublic?: boolean }) => {
     const sessionId = getSessionId()
-    console.log('[ws] creating room for:', playerName)
-    send({ type: 'room:create', playerName, sessionId })
+    console.log('[ws] creating room for:', playerName, options?.isPublic ? '(public)' : '(private)')
+    send({
+      type: 'room:create',
+      playerName,
+      sessionId,
+      tableName: options?.tableName,
+      isPublic: options?.isPublic,
+    })
   }
 
   const joinRoom = (code: string, playerName: string) => {

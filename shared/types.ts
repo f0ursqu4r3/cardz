@@ -70,6 +70,8 @@ export interface GameState {
 export interface RoomCreate {
   type: 'room:create'
   playerName: string
+  tableName?: string
+  isPublic?: boolean
   sessionId?: string // For reconnection after refresh
 }
 
@@ -82,6 +84,10 @@ export interface RoomJoin {
 
 export interface RoomLeave {
   type: 'room:leave'
+}
+
+export interface RoomListRequest {
+  type: 'room:list'
 }
 
 // ============================================================================
@@ -118,6 +124,19 @@ export interface RoomError {
   type: 'room:error'
   code: 'NOT_FOUND' | 'FULL' | 'INVALID_CODE'
   message: string
+}
+
+export interface PublicRoomInfo {
+  code: string
+  name: string
+  playerCount: number
+  maxPlayers: number
+  createdAt: number
+}
+
+export interface RoomListResponse {
+  type: 'room:list'
+  rooms: PublicRoomInfo[]
 }
 
 // ============================================================================
@@ -556,6 +575,7 @@ export type ClientMessage =
   | RoomCreate
   | RoomJoin
   | RoomLeave
+  | RoomListRequest
   | CardMoveIntent
   | CardLock
   | CardUnlock
@@ -587,6 +607,7 @@ export type ServerMessage =
   | PlayerJoined
   | PlayerLeft
   | RoomError
+  | RoomListResponse
   | CardMoved
   | CardMoveRejected
   | CardLocked

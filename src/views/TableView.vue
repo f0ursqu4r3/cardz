@@ -35,6 +35,8 @@ const cardStore = useCardStore()
 // Room info from route
 const routeRoomCode = computed(() => (route.params.code as string)?.toUpperCase() || null)
 const playerName = computed(() => (route.query.name as string) || 'Player')
+const tableName = computed(() => (route.query.tableName as string) || '')
+const isPublicTable = computed(() => route.query.public === 'true')
 const isNewTable = computed(() => route.name === 'table-new')
 
 // WebSocket connection
@@ -656,7 +658,10 @@ onMounted(() => {
     (connected) => {
       if (connected) {
         if (isNewTable.value) {
-          ws.createRoom(playerName.value)
+          ws.createRoom(playerName.value, {
+            tableName: tableName.value || undefined,
+            isPublic: isPublicTable.value || undefined,
+          })
         } else if (routeRoomCode.value) {
           ws.joinRoom(routeRoomCode.value, playerName.value)
         }
