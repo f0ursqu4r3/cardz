@@ -21,6 +21,9 @@
 [x] zone card settings (size, spacing, etc)
 [x] should not be able to select cards in the middle of a stack
 [x] stack height should be based on number of cards, not pixel height
+[x] zones with non-stack layouts should support pulling any card, not just top/bottom
+[x] zone card layouts (additional layouts: fan, circle, etc)
+[x] zone card settings (additional settings: rotation, random offset, grid spacing, etc)
 
 ## Social Features
 

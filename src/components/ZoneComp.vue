@@ -16,6 +16,7 @@ import {
   AlignVerticalJustifyStart,
   Grid3X3,
   Circle,
+  CircleDot,
 } from 'lucide-vue-next'
 import { useCardStore } from '@/stores/cards'
 import type { Zone, ZoneLayout } from '@/types'
@@ -100,8 +101,48 @@ const onSpacingChange = (event: Event) => {
   const target = event.target as HTMLInputElement
   const spacing = parseFloat(target.value)
   const cardSettings = {
+    ...props.zone.cardSettings,
     cardScale: props.zone.cardSettings?.cardScale ?? 1.0,
     cardSpacing: spacing,
+  }
+  cardStore.updateZone(props.zone.id, { cardSettings })
+  emit('zone:update', props.zone.id, { cardSettings })
+}
+
+const onRotationChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const rotation = parseFloat(target.value)
+  const cardSettings = {
+    ...props.zone.cardSettings,
+    cardScale: props.zone.cardSettings?.cardScale ?? 1.0,
+    cardSpacing: props.zone.cardSettings?.cardSpacing ?? 0.5,
+    cardRotation: rotation,
+  }
+  cardStore.updateZone(props.zone.id, { cardSettings })
+  emit('zone:update', props.zone.id, { cardSettings })
+}
+
+const onRandomOffsetChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const randomOffset = parseFloat(target.value)
+  const cardSettings = {
+    ...props.zone.cardSettings,
+    cardScale: props.zone.cardSettings?.cardScale ?? 1.0,
+    cardSpacing: props.zone.cardSettings?.cardSpacing ?? 0.5,
+    randomOffset,
+  }
+  cardStore.updateZone(props.zone.id, { cardSettings })
+  emit('zone:update', props.zone.id, { cardSettings })
+}
+
+const onRandomRotationChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const randomRotation = parseFloat(target.value)
+  const cardSettings = {
+    ...props.zone.cardSettings,
+    cardScale: props.zone.cardSettings?.cardScale ?? 1.0,
+    cardSpacing: props.zone.cardSettings?.cardSpacing ?? 0.5,
+    randomRotation,
   }
   cardStore.updateZone(props.zone.id, { cardSettings })
   emit('zone:update', props.zone.id, { cardSettings })
@@ -300,6 +341,15 @@ defineExpose({ openModal })
                 <Circle :size="14" />
                 Fan
               </button>
+              <button
+                class="zone-modal__layout-btn"
+                :class="{ 'zone-modal__layout-btn--active': zone.layout === 'circle' }"
+                @click="setLayout('circle')"
+                title="Arrange cards in a circle"
+              >
+                <CircleDot :size="14" />
+                Circle
+              </button>
             </div>
           </div>
           <div v-if="zone.layout !== 'stack'" class="zone-modal__field">
@@ -317,6 +367,57 @@ defineExpose({ openModal })
               />
               <span class="zone-modal__slider-label">Spread</span>
             </div>
+          </div>
+          <div class="zone-modal__field">
+            <span class="zone-modal__label">Card Rotation</span>
+            <div class="zone-modal__slider-row">
+              <span class="zone-modal__slider-label">-180°</span>
+              <input
+                type="range"
+                class="zone-modal__slider"
+                min="-180"
+                max="180"
+                step="15"
+                :value="zone.cardSettings?.cardRotation ?? 0"
+                @input="onRotationChange"
+              />
+              <span class="zone-modal__slider-label">180°</span>
+            </div>
+            <span class="zone-modal__value">{{ zone.cardSettings?.cardRotation ?? 0 }}°</span>
+          </div>
+          <div class="zone-modal__field">
+            <span class="zone-modal__label">Random Offset</span>
+            <div class="zone-modal__slider-row">
+              <span class="zone-modal__slider-label">None</span>
+              <input
+                type="range"
+                class="zone-modal__slider"
+                min="0"
+                max="30"
+                step="2"
+                :value="zone.cardSettings?.randomOffset ?? 0"
+                @input="onRandomOffsetChange"
+              />
+              <span class="zone-modal__slider-label">Max</span>
+            </div>
+            <span class="zone-modal__value">{{ zone.cardSettings?.randomOffset ?? 0 }}px</span>
+          </div>
+          <div class="zone-modal__field">
+            <span class="zone-modal__label">Random Rotation</span>
+            <div class="zone-modal__slider-row">
+              <span class="zone-modal__slider-label">None</span>
+              <input
+                type="range"
+                class="zone-modal__slider"
+                min="0"
+                max="45"
+                step="5"
+                :value="zone.cardSettings?.randomRotation ?? 0"
+                @input="onRandomRotationChange"
+              />
+              <span class="zone-modal__slider-label">Max</span>
+            </div>
+            <span class="zone-modal__value">±{{ zone.cardSettings?.randomRotation ?? 0 }}°</span>
           </div>
           <label class="zone-modal__field zone-modal__field--row">
             <span class="zone-modal__label">Locked</span>
@@ -724,5 +825,12 @@ defineExpose({ openModal })
   border-radius: 50%;
   border: none;
   cursor: pointer;
+}
+
+.zone-modal__value {
+  font-size: 10px;
+  color: #888;
+  text-align: center;
+  margin-top: 2px;
 }
 </style>

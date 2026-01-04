@@ -325,8 +325,14 @@ export class GameStateManager {
     faceUp: boolean,
     visibility: 'public' | 'owner' | 'hidden' = 'public',
     ownerId: string | null = null,
-    layout: 'stack' | 'row' | 'column' | 'grid' | 'fan' = 'stack',
-    cardSettings: { cardScale: number; cardSpacing: number } = { cardScale: 1.0, cardSpacing: 0.5 },
+    layout: 'stack' | 'row' | 'column' | 'grid' | 'fan' | 'circle' = 'stack',
+    cardSettings: {
+      cardScale: number
+      cardSpacing: number
+      cardRotation?: number
+      randomOffset?: number
+      randomRotation?: number
+    } = { cardScale: 1.0, cardSpacing: 0.5 },
   ): ZoneState {
     const zone: ZoneState = {
       id: this.state.nextZoneId++,

@@ -178,13 +178,26 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     const card = cardStore.cards[index]
     if (!card) return false
 
-    // If card is in a stack, only allow dragging from top
+    // If card is in a stack, check if we can pick it
     if (card.stackId !== null) {
       const stack = cardStore.stacks.find((item) => item.id === card.stackId)
       if (!stack) return false
 
-      const topId = stack.cardIds[stack.cardIds.length - 1]
-      if (topId !== card.id) return false
+      // Check if this stack belongs to a zone with a non-stack layout
+      let canPickAnyCard = false
+      if (stack.kind === 'zone' && stack.zoneId !== undefined) {
+        const zone = cardStore.zones.find((z) => z.id === stack.zoneId)
+        if (zone && zone.layout !== 'stack') {
+          // Non-stack layouts allow picking any visible card
+          canPickAnyCard = true
+        }
+      }
+
+      // For stack layout or free stacks, only allow dragging from top
+      if (!canPickAnyCard) {
+        const topId = stack.cardIds[stack.cardIds.length - 1]
+        if (topId !== card.id) return false
+      }
 
       // Notify server that card is being removed from stack
       send({ type: 'stack:remove_card', cardId: card.id })

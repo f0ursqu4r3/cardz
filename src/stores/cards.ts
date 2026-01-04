@@ -76,6 +76,34 @@ export const useCardStore = defineStore('cards', () => {
         const cardCount = stack.cardIds.length
         const settings = zone.cardSettings || { cardScale: 1.0, cardSpacing: 0.5 }
         const spacing = settings.cardSpacing // 0 to 1 range
+        const baseRotation = settings.cardRotation ?? 0
+        const randomOffset = settings.randomOffset ?? 0
+        const randomRotation = settings.randomRotation ?? 0
+
+        // Helper to apply random offset and rotation to a card
+        const applyRandomization = (
+          card: CardData,
+          baseX: number,
+          baseY: number,
+          baseRot: number,
+        ) => {
+          // Use card ID as seed for consistent randomization
+          const seed = card.id * 1000
+          const pseudoRandom1 = Math.sin(seed) * 10000
+          const pseudoRandom2 = Math.sin(seed + 1) * 10000
+          const pseudoRandom3 = Math.sin(seed + 2) * 10000
+
+          const offsetX =
+            randomOffset > 0 ? (pseudoRandom1 % 1) * randomOffset * 2 - randomOffset : 0
+          const offsetY =
+            randomOffset > 0 ? (pseudoRandom2 % 1) * randomOffset * 2 - randomOffset : 0
+          const rotOffset =
+            randomRotation > 0 ? (pseudoRandom3 % 1) * randomRotation * 2 - randomRotation : 0
+
+          card.x = baseX + offsetX
+          card.y = baseY + offsetY
+          card.rotation = baseRot + baseRotation + rotOffset
+        }
 
         if (layout === 'stack') {
           // Original stack behavior - center cards
@@ -89,8 +117,9 @@ export const useCardStore = defineStore('cards', () => {
             if (!card) return
             card.stackId = stack.id
             card.isInDeck = true
-            card.x = stack.anchorX + idx * STACK_OFFSET_X
-            card.y = stack.anchorY + idx * STACK_OFFSET_Y
+            const baseX = stack.anchorX + idx * STACK_OFFSET_X
+            const baseY = stack.anchorY + idx * STACK_OFFSET_Y
+            applyRandomization(card, baseX, baseY, 0)
           })
         } else if (layout === 'row') {
           // Arrange cards horizontally with overlap (spacing controls overlap)
@@ -107,8 +136,8 @@ export const useCardStore = defineStore('cards', () => {
             if (!card) return
             card.stackId = stack.id
             card.isInDeck = true
-            card.x = startX + idx * overlap
-            card.y = startY
+            const baseX = startX + idx * overlap
+            applyRandomization(card, baseX, startY, 0)
           })
         } else if (layout === 'column') {
           // Arrange cards vertically with overlap (spacing controls overlap)
@@ -125,8 +154,8 @@ export const useCardStore = defineStore('cards', () => {
             if (!card) return
             card.stackId = stack.id
             card.isInDeck = true
-            card.x = startX
-            card.y = startY + idx * overlap
+            const baseY = startY + idx * overlap
+            applyRandomization(card, startX, baseY, 0)
           })
         } else if (layout === 'grid') {
           // Arrange cards in a grid (spacing controls gap)
@@ -149,8 +178,9 @@ export const useCardStore = defineStore('cards', () => {
             card.isInDeck = true
             const col = idx % cols
             const row = Math.floor(idx / cols)
-            card.x = startX + col * gapX
-            card.y = startY + row * gapY
+            const baseX = startX + col * gapX
+            const baseY = startY + row * gapY
+            applyRandomization(card, baseX, baseY, 0)
           })
         } else if (layout === 'fan') {
           // Arrange cards in a fan/arc pattern (spacing controls arc width)
@@ -170,8 +200,34 @@ export const useCardStore = defineStore('cards', () => {
             card.stackId = stack.id
             card.isInDeck = true
             const angle = startAngle - idx * angleStep
-            card.x = centerX + Math.cos(angle) * radius - CARD_W / 2
-            card.y = centerY - Math.sin(angle) * radius - CARD_H / 2
+            const baseX = centerX + Math.cos(angle) * radius - CARD_W / 2
+            const baseY = centerY - Math.sin(angle) * radius - CARD_H / 2
+            // Fan cards rotate to follow the arc
+            const fanRotation = -(startAngle - angle) * (180 / Math.PI)
+            applyRandomization(card, baseX, baseY, fanRotation)
+          })
+        } else if (layout === 'circle') {
+          // Arrange cards in a circle pattern
+          const centerX = zone.x + zone.width / 2
+          const centerY = zone.y + zone.height / 2
+          const radius = Math.min(zone.width, zone.height) / 2 - CARD_W / 2 - 10
+          const angleStep = cardCount > 0 ? (Math.PI * 2) / cardCount : 0
+          const startAngle = -Math.PI / 2 // Start from top
+
+          stack.anchorX = centerX
+          stack.anchorY = centerY
+
+          stack.cardIds.forEach((id, idx) => {
+            const card = cards.value.find((item) => item.id === id)
+            if (!card) return
+            card.stackId = stack.id
+            card.isInDeck = true
+            const angle = startAngle + idx * angleStep
+            const baseX = centerX + Math.cos(angle) * radius - CARD_W / 2
+            const baseY = centerY + Math.sin(angle) * radius - CARD_H / 2
+            // Circle cards can optionally rotate to face outward
+            const circleRotation = (angle + Math.PI / 2) * (180 / Math.PI)
+            applyRandomization(card, baseX, baseY, circleRotation)
           })
         }
         return

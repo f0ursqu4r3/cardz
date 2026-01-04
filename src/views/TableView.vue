@@ -119,6 +119,24 @@ const getStackSize = (card: (typeof cardStore.cards)[0]): number => {
   return stack ? stack.cardIds.length : 1
 }
 
+// Get the transform for a card (combines drag tilt with zone layout rotation)
+const getCardTransform = (card: (typeof cardStore.cards)[0], index: number): string | undefined => {
+  const isDragging = interaction.drag.activeIndex.value === index
+  const isThrowing = interaction.physics.throwingCardId.value === card.id
+
+  if (isDragging || isThrowing) {
+    // During drag/throw, use physics tilt
+    return `rotate(${interaction.physics.tilt.value}deg)`
+  }
+
+  // Apply zone layout rotation if present
+  if (card.rotation !== undefined && card.rotation !== 0) {
+    return `rotate(${card.rotation}deg)`
+  }
+
+  return undefined
+}
+
 // Get the position for a card that's being held by another player
 // Card follows the holder's cursor, centered under it
 // For stack drags, maintains the card's offset within the stack
@@ -515,9 +533,12 @@ interaction.setHandCardDropHandler((event) => {
     // If multiple cards were dropped, create a stack from them
     if (result.removedCards.length > 1) {
       const cardIds = result.removedCards.map((r) => r.cardId)
+      const firstCard = result.removedCards[0]!
       ws.send({
         type: 'stack:create',
         cardIds,
+        anchorX: firstCard.x,
+        anchorY: firstCard.y,
       })
     }
 
@@ -916,11 +937,7 @@ onBeforeUnmount(() => {
             left: `${getLockedCardPosition(card)?.x ?? card.x}px`,
             top: `${getLockedCardPosition(card)?.y ?? card.y}px`,
             zIndex: interaction.getCardZ(index),
-            transform:
-              interaction.drag.activeIndex.value === index ||
-              interaction.physics.throwingCardId.value === card.id
-                ? `rotate(${interaction.physics.tilt.value}deg)`
-                : undefined,
+            transform: getCardTransform(card, index),
           }"
           @pointerdown="interaction.onCardPointerDown($event, index)"
           @pointermove="interaction.onCardPointerMove"
