@@ -308,6 +308,69 @@ export function stopAutoSave(code: string): void {
   }
 }
 
+// Debounced save tracking - saves shortly after changes occur
+const debouncedSaves = new Map<
+  string,
+  {
+    timeout: ReturnType<typeof setTimeout>
+    getState: () => { metadata: TableMetadata; gameState: GameState } | null
+  }
+>()
+
+// How long to wait after a change before saving (2 seconds)
+const DEBOUNCE_DELAY_MS = 2000
+
+/**
+ * Schedule a debounced save for a table.
+ * Call this whenever a change is made to the table.
+ * Multiple calls within the debounce window will reset the timer.
+ */
+export function scheduleSave(
+  code: string,
+  getState: () => { metadata: TableMetadata; gameState: GameState } | null,
+): void {
+  // Clear existing debounced save if any
+  const existing = debouncedSaves.get(code)
+  if (existing) {
+    clearTimeout(existing.timeout)
+  }
+
+  const timeout = setTimeout(() => {
+    debouncedSaves.delete(code)
+    const state = getState()
+    if (state) {
+      saveTable(code, state.metadata, state.gameState)
+    }
+  }, DEBOUNCE_DELAY_MS)
+
+  debouncedSaves.set(code, { timeout, getState })
+}
+
+/**
+ * Cancel any pending debounced save for a table
+ */
+export function cancelScheduledSave(code: string): void {
+  const existing = debouncedSaves.get(code)
+  if (existing) {
+    clearTimeout(existing.timeout)
+    debouncedSaves.delete(code)
+  }
+}
+
+/**
+ * Flush all pending debounced saves immediately (call on shutdown)
+ */
+export function flushPendingSaves(): void {
+  for (const [code, { timeout, getState }] of debouncedSaves) {
+    clearTimeout(timeout)
+    const state = getState()
+    if (state) {
+      saveTable(code, state.metadata, state.gameState)
+    }
+  }
+  debouncedSaves.clear()
+}
+
 /**
  * Clean up old tables (older than maxAge)
  */

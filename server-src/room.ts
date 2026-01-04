@@ -11,6 +11,9 @@ import {
   stopAutoSave,
   cleanupOldTables,
   getDefaultSettings,
+  scheduleSave,
+  cancelScheduledSave,
+  flushPendingSaves,
   type TableMetadata,
 } from './persistence'
 
@@ -91,6 +94,33 @@ export class RoomManager {
   }
 
   /**
+   * Mark a room as dirty and schedule a save.
+   * Call this after any change to the room's game state.
+   */
+  markDirty(roomCode: string): void {
+    const room = this.rooms.get(roomCode)
+    if (!room) return
+
+    scheduleSave(roomCode, () => {
+      const r = this.rooms.get(roomCode)
+      if (!r) return null
+      return {
+        metadata: {
+          code: r.code,
+          name: r.name,
+          isPublic: r.isPublic,
+          maxPlayers: r.maxPlayers,
+          createdAt: r.createdAt,
+          updatedAt: Date.now(),
+          createdBy: r.createdBy,
+          settings: r.settings,
+        },
+        gameState: r.gameState.getState(),
+      }
+    })
+  }
+
+  /**
    * Create a new room
    */
   createRoom(
@@ -136,6 +166,22 @@ export class RoomManager {
     if (sessionId) {
       this.sessionToPlayer.set(sessionId, { roomCode: code, playerId })
     }
+
+    // Save immediately to persist the new room
+    saveTable(
+      code,
+      {
+        code: room.code,
+        name: room.name,
+        isPublic: room.isPublic,
+        maxPlayers: room.maxPlayers,
+        createdAt: room.createdAt,
+        updatedAt: Date.now(),
+        createdBy: room.createdBy,
+        settings: room.settings,
+      },
+      room.gameState.getState(),
+    )
 
     // Start auto-saving this room
     startAutoSave(code, () => {
@@ -594,6 +640,8 @@ export class RoomManager {
       clearTimeout(timeout)
     }
     this.emptyRoomCleanups.clear()
+    // Flush any pending debounced saves
+    flushPendingSaves()
     // Save all rooms before disposing
     for (const [code, room] of this.rooms) {
       saveTable(
@@ -611,6 +659,7 @@ export class RoomManager {
         room.gameState.getState(),
       )
       stopAutoSave(code)
+      cancelScheduledSave(code)
       room.locks.dispose()
     }
     this.rooms.clear()

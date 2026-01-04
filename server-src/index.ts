@@ -178,6 +178,7 @@ const server = Bun.serve<ClientData>({
           // Card actions
           case 'card:move':
             handleCardMove(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
             break
           case 'card:lock':
             handleCardLock(ws as any, msg, room, clients as any)
@@ -187,14 +188,17 @@ const server = Bun.serve<ClientData>({
             break
           case 'card:flip':
             handleCardFlip(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
             break
 
           // Stack actions
           case 'stack:create':
             handleStackCreate(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
             break
           case 'stack:move':
             handleStackMove(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
             break
           case 'stack:lock':
             handleStackLock(ws as any, msg, room, clients as any)
@@ -204,46 +208,59 @@ const server = Bun.serve<ClientData>({
             break
           case 'stack:add_card':
             handleStackAddCard(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
             break
           case 'stack:remove_card':
             handleStackRemoveCard(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
             break
           case 'stack:merge':
             handleStackMerge(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
             break
           case 'stack:shuffle':
             handleStackShuffle(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
             break
           case 'stack:flip':
             handleStackFlip(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
             break
 
           // Zone actions
           case 'zone:create':
             handleZoneCreate(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
             break
           case 'zone:update':
             handleZoneUpdate(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
             break
           case 'zone:delete':
             handleZoneDelete(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
             break
           case 'zone:add_card':
             handleZoneAddCard(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
             break
 
           // Hand actions
           case 'hand:add':
             handleHandAdd(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
             break
           case 'hand:remove':
             handleHandRemove(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
             break
           case 'hand:reorder':
             handleHandReorder(ws as any, msg, room)
+            roomManager.markDirty(room.code)
             break
           case 'hand:add_stack':
             handleHandAddStack(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
             break
 
           // Selection actions
@@ -259,6 +276,7 @@ const server = Bun.serve<ClientData>({
               room,
               clients as any,
             )
+            roomManager.markDirty(room.code)
             break
 
           // Cursor updates (throttled)
