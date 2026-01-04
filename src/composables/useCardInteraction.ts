@@ -376,6 +376,14 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
         if (anchorCard) {
           const newStack = cardStore.stackSelection(anchorCard.x, anchorCard.y)
           if (newStack) {
+            // Send stack:create to server
+            send({
+              type: 'stack:create',
+              cardIds: newStack.cardIds,
+              anchorX: newStack.anchorX,
+              anchorY: newStack.anchorY,
+            })
+
             // Clean up selection drag state
             selectionStartPositions.value.clear()
             selectionDragStart.value = null

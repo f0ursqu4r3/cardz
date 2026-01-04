@@ -501,6 +501,10 @@ export interface CursorUpdated {
 // State Sync Messages
 // ============================================================================
 
+export interface StateRequest {
+  type: 'state:request'
+}
+
 export interface StateSync {
   type: 'state:sync'
   state: GameState
@@ -574,6 +578,7 @@ export type ClientMessage =
   | HandAddStack
   | SelectionStack
   | CursorUpdate
+  | StateRequest
 
 export type ServerMessage =
   | RoomCreated

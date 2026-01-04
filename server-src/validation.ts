@@ -258,6 +258,14 @@ export const CursorUpdateSchema = z.object({
 })
 
 // ============================================================================
+// State Sync Message Schemas (Client → Server)
+// ============================================================================
+
+export const StateRequestSchema = z.object({
+  type: z.literal('state:request'),
+})
+
+// ============================================================================
 // Combined Client Message Schema
 // ============================================================================
 
@@ -288,6 +296,7 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   HandAddStackSchema,
   SelectionStackSchema,
   CursorUpdateSchema,
+  StateRequestSchema,
 ])
 
 // ============================================================================

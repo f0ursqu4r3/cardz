@@ -275,6 +275,23 @@ const server = Bun.serve<ClientData>({
             )
             break
           }
+
+          // State sync request
+          case 'state:request': {
+            const state = room.gameState.getState()
+            const playerHand = state.hands.find((h) => h.playerId === clientData.id)
+            const handCounts = state.hands.map((h) => ({
+              playerId: h.playerId,
+              count: h.cardIds.length,
+            }))
+            send(ws as any, {
+              type: 'state:sync',
+              state,
+              yourHand: playerHand?.cardIds ?? [],
+              handCounts,
+            })
+            break
+          }
         }
       } catch (err) {
         console.error(`[error] Handler error for ${msg.type}:`, err)

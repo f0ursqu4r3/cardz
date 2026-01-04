@@ -430,10 +430,8 @@ ws.onMessage((message: ServerMessage) => {
     }
 
     case 'state:sync':
-      // Full state sync from server (e.g., after reconnection)
-      if (ws.gameState.value) {
-        cardStore.syncFromServer(ws.gameState.value, ws.handCardIds.value)
-      }
+      // Full state sync from server (e.g., periodic sync or after reconnection)
+      cardStore.syncFromServer(message.state, message.yourHand)
       break
 
     case 'hand:card_added_other':
@@ -644,6 +642,10 @@ const onCanvasPointerUp = (event: PointerEvent) => {
   }
 }
 
+// Periodic state sync interval (every 30 seconds)
+const STATE_SYNC_INTERVAL = 30_000
+let syncInterval: ReturnType<typeof setInterval> | null = null
+
 // Connect to room on mount
 onMounted(() => {
   ws.connect()
@@ -664,6 +666,13 @@ onMounted(() => {
     { immediate: true },
   )
 
+  // Start periodic state sync
+  syncInterval = setInterval(() => {
+    if (ws.isConnected.value && ws.roomCode.value) {
+      ws.send({ type: 'state:request' })
+    }
+  }, STATE_SYNC_INTERVAL)
+
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
 })
@@ -671,6 +680,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   interaction.drag.cancelRaf()
   ws.disconnect()
+  if (syncInterval) {
+    clearInterval(syncInterval)
+    syncInterval = null
+  }
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('keyup', onKeyUp)
 })
