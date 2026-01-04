@@ -74,7 +74,13 @@ export function handleRoomJoin(
     }
   }
 
-  const result = roomManager.joinRoom(msg.roomCode, clientData.id, msg.playerName, msg.sessionId)
+  // Use loadOrCreateRoom to support loading persisted rooms after server restart
+  const result = roomManager.loadOrCreateRoom(
+    msg.roomCode,
+    clientData.id,
+    msg.playerName,
+    msg.sessionId,
+  )
 
   if ('error' in result) {
     send(ws, {

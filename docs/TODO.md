@@ -7,7 +7,7 @@
 [x] table visibility (public/private)
 [x] table settings (background)
 [x] improved table browser (search, filters, sorting)
-[ ] table settings (music)
+[ ] table settings (music) _FUTURE_
 
 ## Cards & Zones
 

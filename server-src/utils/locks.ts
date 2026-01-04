@@ -127,6 +127,14 @@ export class LockManager {
   }
 
   /**
+   * Release all locks (e.g., on table reset)
+   */
+  releaseAll(): void {
+    this.cardLocks.clear()
+    this.stackLocks.clear()
+  }
+
+  /**
    * Refresh the expiration time for a lock
    */
   refreshCardLock(cardId: number, playerId: string): boolean {
