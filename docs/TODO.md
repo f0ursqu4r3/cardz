@@ -1,10 +1,25 @@
-# todo
+# TODO List
 
-1. multi-select from hand
-2. zone card layouts (row, column, grid, fan, etc)
-3. zone card settings (size, spacing, etc)
-4. additional entities (counters, tokens, etc)
-5. table settings (background, music, etc)
-6. chat system
-7. improved table browser (search, filters, etc)
-8. table visibility (public/private)
+## Table Management
+
+- server-side persistence of tables and game state
+- button to reset table to initial state
+- table visibility (public/private)
+- table settings (background, music, etc)
+- improved table browser (search, filters, etc)
+
+## Cards & Zones
+
+- zone visibility settings (player specific zones, hidden zones, etc)
+- multi-select from hand
+- zone card layouts (row, column, grid, fan, etc)
+- zone card settings (size, spacing, etc)
+
+## Social Features
+
+- some way for players to know how many cards are in other player's hands
+- chat system
+
+## Game Entities
+
+- additional entities (counters, tokens, etc)
