@@ -202,13 +202,9 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       }
 
       // Notify server that card is being removed from stack
+      // Server will handle zone layout reset if needed
       send({ type: 'stack:remove_card', cardId: card.id })
-      const result = cardStore.removeFromStack(card.id)
-
-      // If zone layout was reset to stack, notify server
-      if (result?.layoutReset && result?.zoneId !== undefined) {
-        send({ type: 'zone:update', zoneId: result.zoneId, updates: { layout: 'stack' } })
-      }
+      cardStore.removeFromStack(card.id)
     }
 
     const { x, y } = drag.getPending()

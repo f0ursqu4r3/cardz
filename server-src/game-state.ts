@@ -208,7 +208,9 @@ export class GameStateManager {
     return { x: card.x, y: card.y, z: card.z, faceUp: card.faceUp }
   }
 
-  removeCardFromStack(cardId: number): { stackId: number; stackDeleted: boolean } | null {
+  removeCardFromStack(
+    cardId: number,
+  ): { stackId: number; stackDeleted: boolean; zoneLayoutReset?: { zoneId: number } } | null {
     const card = this.getCard(cardId)
     if (!card || card.stackId === null) return null
 
@@ -216,16 +218,27 @@ export class GameStateManager {
     if (!stack) return null
 
     const stackId = stack.id
+
+    // Check if we need to reset zone layout to stack
+    let zoneLayoutReset: { zoneId: number } | undefined
+    if (stack.kind === 'zone' && stack.zoneId !== undefined) {
+      const zone = this.getZone(stack.zoneId)
+      if (zone && zone.layout !== 'stack') {
+        zone.layout = 'stack'
+        zoneLayoutReset = { zoneId: zone.id }
+      }
+    }
+
     stack.cardIds = stack.cardIds.filter((id) => id !== cardId)
     card.stackId = null
 
     // Delete empty stacks
     if (stack.cardIds.length === 0) {
       this.state.stacks = this.state.stacks.filter((s) => s.id !== stackId)
-      return { stackId, stackDeleted: true }
+      return { stackId, stackDeleted: true, zoneLayoutReset }
     }
 
-    return { stackId, stackDeleted: false }
+    return { stackId, stackDeleted: false, zoneLayoutReset }
   }
 
   mergeStacks(

@@ -354,6 +354,11 @@ ws.onMessage((message: ServerMessage) => {
       if (message.stackDeleted) {
         cardStore.removeStack(message.stackId)
       }
+      // Handle zone layout reset
+      if (message.zoneLayoutReset) {
+        cardStore.updateZone(message.zoneLayoutReset.zoneId, { layout: 'stack' })
+      }
+      cardStore.updateAllStacks()
       break
     }
 

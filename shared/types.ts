@@ -386,6 +386,7 @@ export interface StackCardRemoved {
   stackId: number
   cardId: number
   stackDeleted: boolean
+  zoneLayoutReset?: { zoneId: number }
   playerId: string
 }
 
