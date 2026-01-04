@@ -49,6 +49,7 @@ export type BunWebSocket = ServerWebSocket<ClientData>
 
 const server = Bun.serve<ClientData>({
   port: PORT,
+  hostname: '0.0.0.0', // Listen on all network interfaces for remote connections
 
   fetch(req, server) {
     const url = new URL(req.url)
@@ -296,7 +297,11 @@ const server = Bun.serve<ClientData>({
   },
 })
 
-console.log(`🃏 Cardz server running on ws://localhost:${server.port}`)
+console.log(`🃏 Cardz server running on port ${server.port}`)
+console.log(`   Local:   ws://localhost:${server.port}`)
+console.log(
+  `   Network: ws://0.0.0.0:${server.port} (use your machine's IP for remote connections)`,
+)
 
 // Graceful shutdown
 process.on('SIGINT', () => {
