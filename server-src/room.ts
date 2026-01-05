@@ -12,6 +12,7 @@ import {
   cleanupOldTables,
   getDefaultSettings,
   scheduleSave,
+  saveNow,
   cancelScheduledSave,
   flushPendingSaves,
   type TableMetadata,
@@ -102,6 +103,33 @@ export class RoomManager {
     if (!room) return
 
     scheduleSave(roomCode, () => {
+      const r = this.rooms.get(roomCode)
+      if (!r) return null
+      return {
+        metadata: {
+          code: r.code,
+          name: r.name,
+          isPublic: r.isPublic,
+          maxPlayers: r.maxPlayers,
+          createdAt: r.createdAt,
+          updatedAt: Date.now(),
+          createdBy: r.createdBy,
+          settings: r.settings,
+        },
+        gameState: r.gameState.getState(),
+      }
+    })
+  }
+
+  /**
+   * Mark a room as dirty and save immediately.
+   * Use for "hero" actions like zone create/delete, table reset, deck imports.
+   */
+  markDirtyImmediate(roomCode: string): void {
+    const room = this.rooms.get(roomCode)
+    if (!room) return
+
+    saveNow(roomCode, () => {
       const r = this.rooms.get(roomCode)
       if (!r) return null
       return {

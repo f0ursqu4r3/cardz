@@ -187,10 +187,19 @@ const viewport = useViewport(canvasRef)
 // Track if space is held for panning
 const spaceHeld = ref(false)
 
+// Track activity for state sync debouncing
+let lastActivityTime = Date.now()
+const trackActivity = () => {
+  lastActivityTime = Date.now()
+}
+
 // Set up card interaction with WebSocket send function
 const interaction = useCardInteraction({
   handRef: handRef,
-  sendMessage: (msg: ClientMessage) => ws.send(msg),
+  sendMessage: (msg: ClientMessage) => {
+    trackActivity()
+    ws.send(msg)
+  },
 })
 
 // Remote throw physics for other players' card throws
@@ -432,6 +441,13 @@ ws.onMessage((message: ServerMessage) => {
       break
 
     case 'zone:card_added': {
+      // Update the card state first (sets stackId, faceUp, z)
+      cardStore.updateCardFromServer(message.cardState.cardId, {
+        z: message.cardState.z,
+        faceUp: message.cardState.faceUp,
+        stackId: message.stackId,
+      })
+
       // Handle stack creation or update
       if (message.stackCreated) {
         // Create a new stack for this zone
@@ -448,22 +464,20 @@ ws.onMessage((message: ServerMessage) => {
           }
           cardStore.stacks.push(newStack)
           zone.stackId = message.stackId
+          // Update positions for the new stack (applies zone layout)
+          cardStore.updateStackPositions(newStack)
         }
       } else {
         // Add to existing stack
         const existingStack = cardStore.stacks.find((s) => s.id === message.stackId)
-        if (existingStack && !existingStack.cardIds.includes(message.cardState.cardId)) {
-          existingStack.cardIds.push(message.cardState.cardId)
+        if (existingStack) {
+          if (!existingStack.cardIds.includes(message.cardState.cardId)) {
+            existingStack.cardIds.push(message.cardState.cardId)
+          }
+          // Always update positions to apply zone layout (even if card was already added locally)
+          cardStore.updateStackPositions(existingStack)
         }
       }
-      // Update the card state
-      cardStore.updateCardFromServer(message.cardState.cardId, {
-        x: message.cardState.x,
-        y: message.cardState.y,
-        z: message.cardState.z,
-        faceUp: message.cardState.faceUp,
-        stackId: message.stackId,
-      })
       break
     }
 
@@ -529,6 +543,7 @@ interaction.setHandCardDropHandler((event) => {
 
   // If cards were removed from hand (dropped on table), notify server
   if (result.removedCards && result.removedCards.length > 0) {
+    trackActivity()
     for (const removed of result.removedCards) {
       ws.send({
         type: 'hand:remove',
@@ -555,6 +570,7 @@ interaction.setHandCardDropHandler((event) => {
     handCompRef.value?.clearHandSelection()
   } else if (result.removedCard) {
     // Single card removed from hand
+    trackActivity()
     ws.send({
       type: 'hand:remove',
       cardId: result.removedCard.cardId,
@@ -587,6 +603,7 @@ const addZone = () => {
   const centerY = bounds.y + bounds.height / 2 - 50
 
   // Send to server
+  trackActivity()
   ws.send({
     type: 'zone:create',
     x: centerX,
@@ -600,6 +617,7 @@ const addZone = () => {
 
 // Handle zone update from ZoneComp (label, faceUp, locked, layout, cardSettings, etc.)
 const onZoneUpdate = (zoneId: number, updates: Partial<Zone>) => {
+  trackActivity()
   ws.send({
     type: 'zone:update',
     zoneId,
@@ -609,6 +627,7 @@ const onZoneUpdate = (zoneId: number, updates: Partial<Zone>) => {
 
 // Handle zone delete from ZoneComp
 const onZoneDelete = (zoneId: number) => {
+  trackActivity()
   ws.send({
     type: 'zone:delete',
     zoneId,
@@ -764,8 +783,9 @@ const onCanvasPointerUp = (event: PointerEvent) => {
   }
 }
 
-// Periodic state sync interval (every 30 seconds)
+// Periodic state sync - only after inactivity
 const STATE_SYNC_INTERVAL = 30_000
+const INACTIVITY_THRESHOLD = 5_000 // Only sync after 5 seconds of inactivity
 let syncInterval: ReturnType<typeof setInterval> | null = null
 
 // Connect to room on mount
@@ -791,10 +811,13 @@ onMounted(() => {
     { immediate: true },
   )
 
-  // Start periodic state sync
+  // Start periodic state sync - only syncs after inactivity
   syncInterval = setInterval(() => {
     if (ws.isConnected.value && ws.roomCode.value) {
-      ws.send({ type: 'state:request' })
+      const timeSinceActivity = Date.now() - lastActivityTime
+      if (timeSinceActivity >= INACTIVITY_THRESHOLD) {
+        ws.send({ type: 'state:request' })
+      }
     }
   }, STATE_SYNC_INTERVAL)
 

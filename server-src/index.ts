@@ -230,7 +230,7 @@ const server = Bun.serve<ClientData>({
           // Zone actions
           case 'zone:create':
             handleZoneCreate(ws as any, msg, room, clients as any)
-            roomManager.markDirty(room.code)
+            roomManager.markDirtyImmediate(room.code)
             break
           case 'zone:update':
             handleZoneUpdate(ws as any, msg, room, clients as any)
@@ -238,7 +238,7 @@ const server = Bun.serve<ClientData>({
             break
           case 'zone:delete':
             handleZoneDelete(ws as any, msg, room, clients as any)
-            roomManager.markDirty(room.code)
+            roomManager.markDirtyImmediate(room.code)
             break
           case 'zone:add_card':
             handleZoneAddCard(ws as any, msg, room, clients as any)

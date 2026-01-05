@@ -314,11 +314,15 @@ const debouncedSaves = new Map<
   {
     timeout: ReturnType<typeof setTimeout>
     getState: () => { metadata: TableMetadata; gameState: GameState } | null
+    actionCount: number
   }
 >()
 
 // How long to wait after a change before saving (2 seconds)
 const DEBOUNCE_DELAY_MS = 2000
+
+// Save every N actions regardless of debounce
+const ACTIONS_PER_SAVE = 20
 
 /**
  * Schedule a debounced save for a table.
@@ -335,6 +339,19 @@ export function scheduleSave(
     clearTimeout(existing.timeout)
   }
 
+  // Track action count
+  const actionCount = (existing?.actionCount ?? 0) + 1
+
+  // If we've hit the action threshold, save immediately
+  if (actionCount >= ACTIONS_PER_SAVE) {
+    debouncedSaves.delete(code)
+    const state = getState()
+    if (state) {
+      saveTable(code, state.metadata, state.gameState)
+    }
+    return
+  }
+
   const timeout = setTimeout(() => {
     debouncedSaves.delete(code)
     const state = getState()
@@ -343,7 +360,29 @@ export function scheduleSave(
     }
   }, DEBOUNCE_DELAY_MS)
 
-  debouncedSaves.set(code, { timeout, getState })
+  debouncedSaves.set(code, { timeout, getState, actionCount })
+}
+
+/**
+ * Save a table immediately, bypassing the debounce.
+ * Use for "hero" actions like zone create/delete, table reset, etc.
+ */
+export function saveNow(
+  code: string,
+  getState: () => { metadata: TableMetadata; gameState: GameState } | null,
+): void {
+  // Cancel any pending debounced save
+  const existing = debouncedSaves.get(code)
+  if (existing) {
+    clearTimeout(existing.timeout)
+    debouncedSaves.delete(code)
+  }
+
+  // Save immediately
+  const state = getState()
+  if (state) {
+    saveTable(code, state.metadata, state.gameState)
+  }
 }
 
 /**

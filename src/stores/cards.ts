@@ -172,12 +172,33 @@ export const useCardStore = defineStore('cards', () => {
             applyRandomization(card, startX, baseY, 0)
           })
         } else if (layout === 'grid') {
-          // Arrange cards in a grid
+          // Arrange cards in a grid, keeping it as square as possible
           // At spacingMultiplier=1.0, gaps equal card dimensions (edge-to-edge)
           const gapX = CARD_W * spacingMultiplier
           const gapY = CARD_H * spacingMultiplier
-          const cols = Math.max(1, Math.floor((zone.width + gapX - CARD_W) / gapX))
-          const rows = Math.ceil(cardCount / cols)
+
+          // Calculate ideal square grid dimensions
+          const sqrtCount = Math.sqrt(cardCount)
+          let cols = Math.ceil(sqrtCount)
+          let rows = Math.ceil(cardCount / cols)
+
+          // Adjust to fit within zone bounds if needed
+          const maxCols = Math.max(1, Math.floor((zone.width + gapX - CARD_W) / gapX))
+          const maxRows = Math.max(1, Math.floor((zone.height + gapY - CARD_H) / gapY))
+
+          if (cols > maxCols) {
+            cols = maxCols
+            rows = Math.ceil(cardCount / cols)
+          }
+          if (rows > maxRows) {
+            rows = maxRows
+            cols = Math.ceil(cardCount / rows)
+          }
+
+          // Ensure at least 1 column
+          cols = Math.max(1, cols)
+          rows = Math.ceil(cardCount / cols)
+
           const totalWidth = CARD_W + Math.max(0, cols - 1) * gapX
           const totalHeight = CARD_H + Math.max(0, rows - 1) * gapY
           const startX = zone.x + (zone.width - totalWidth) / 2

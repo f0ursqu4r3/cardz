@@ -43,6 +43,9 @@ export function handleTableReset(
     return
   }
 
+  // Save immediately - this is a hero action
+  roomManager.markDirtyImmediate(clientData.roomCode)
+
   // Broadcast reset to all players
   broadcastToRoom(roomManager.getClients(), clientData.roomCode, {
     type: 'table:reset',
