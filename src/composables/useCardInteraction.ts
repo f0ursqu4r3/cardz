@@ -111,18 +111,25 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       const idx = Math.round(posInCol / step)
       return Math.max(0, Math.min(cardCount - 1, idx))
     } else if (layout === 'grid') {
-      const cols = Math.max(1, Math.floor(zone.width / (CARD_W * spacingMultiplier + 10)))
-      const stepX = CARD_W * spacingMultiplier
-      const stepY = CARD_H * spacingMultiplier
+      // Match the grid calculation from getZoneCardPosition in cards.ts
+      const gapX = CARD_W * spacingMultiplier
+      const gapY = CARD_H * spacingMultiplier
+      const sqrtCount = Math.sqrt(cardCount)
+      let cols = Math.ceil(sqrtCount)
+      const maxCols = Math.max(1, Math.floor((zone.width + gapX - CARD_W) / gapX))
+      if (cols > maxCols) cols = maxCols
+      cols = Math.max(1, cols)
       const rows = Math.ceil(cardCount / cols)
-      const totalWidth = CARD_W + Math.max(0, cols - 1) * stepX
-      const totalHeight = CARD_H + Math.max(0, rows - 1) * stepY
+      const totalWidth = CARD_W + Math.max(0, cols - 1) * gapX
+      const totalHeight = CARD_H + Math.max(0, rows - 1) * gapY
       const startX = (zone.width - totalWidth) / 2
       const startY = (zone.height - totalHeight) / 2
 
-      const col = Math.round((relX - startX) / stepX)
-      const row = Math.round((relY - startY) / stepY)
-      const idx = row * cols + col
+      const col = Math.round((relX - startX) / gapX)
+      const row = Math.round((relY - startY) / gapY)
+      const clampedCol = Math.max(0, Math.min(cols - 1, col))
+      const clampedRow = Math.max(0, Math.min(rows - 1, row))
+      const idx = clampedRow * cols + clampedCol
       return Math.max(0, Math.min(cardCount - 1, idx))
     } else {
       // For fan, circle, and stack layouts, just use distance-based calculation

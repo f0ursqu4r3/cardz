@@ -158,6 +158,12 @@ const getCardTransform = (card: (typeof cardStore.cards)[0], index: number): str
     return `rotate(${interaction.physics.tilt.value}deg)`
   }
 
+  // Check for zone reorder position (has adjusted rotation)
+  const reorderPos = zoneReorderPositions.value.get(card.id)
+  if (reorderPos) {
+    return `rotate(${reorderPos.rotation}deg)`
+  }
+
   // Apply zone layout rotation if present
   if (card.rotation !== undefined && card.rotation !== 0) {
     return `rotate(${card.rotation}deg)`
@@ -199,6 +205,15 @@ const getLockedCardPosition = (
     x: cursor.x - CARD_W / 2,
     y: cursor.y - CARD_H / 2,
   }
+}
+
+// Get adjusted position for a card during zone reordering
+// Returns the shifted position if this card needs to move, otherwise null
+const getZoneReorderPosition = (
+  card: (typeof cardStore.cards)[0],
+): { x: number; y: number; rotation: number } | null => {
+  const adjusted = zoneReorderPositions.value.get(card.id)
+  return adjusted ?? null
 }
 
 // Custom cursor based on player color (sets up global style via side effect)
@@ -575,6 +590,95 @@ const isHandReordering = computed(() => {
 })
 
 const handDragPosition = computed(() => interaction.drag.position.value)
+
+// Zone reorder ghost card
+const isZoneReordering = computed(() => {
+  return interaction.zoneDragSource.value !== null && interaction.zoneDropTargetIndex.value !== null
+})
+
+const zoneGhostCard = computed(() => {
+  if (!isZoneReordering.value) return null
+  const source = interaction.zoneDragSource.value
+  if (!source) return null
+
+  // Get the card being dragged
+  const stack = cardStore.stacks.find((s) => s.id === source.stackId)
+  if (!stack) return null
+  const cardId = stack.cardIds[source.cardIndex]
+  if (cardId === undefined) return null
+  const card = cardStore.cards.find((c) => c.id === cardId)
+  if (!card) return null
+
+  // Get the target position
+  const targetIndex = interaction.zoneDropTargetIndex.value
+  if (targetIndex === null) return null
+
+  const position = cardStore.getZoneCardPosition(source.zoneId, targetIndex, stack.cardIds.length)
+  if (!position) return null
+
+  return {
+    col: card.col,
+    row: card.row,
+    x: position.x,
+    y: position.y,
+    rotation: position.rotation,
+  }
+})
+
+// Calculate adjusted positions for cards during zone reordering
+// Other cards shift to make room for the ghost card
+const zoneReorderPositions = computed(() => {
+  const positions = new Map<number, { x: number; y: number; rotation: number }>()
+  if (!isZoneReordering.value) return positions
+
+  const source = interaction.zoneDragSource.value
+  if (!source) return positions
+
+  const targetIndex = interaction.zoneDropTargetIndex.value
+  if (targetIndex === null) return positions
+
+  const stack = cardStore.stacks.find((s) => s.id === source.stackId)
+  if (!stack) return positions
+
+  const fromIndex = source.cardIndex
+  const toIndex = targetIndex
+
+  // For each card in the zone stack, calculate where it should appear
+  // The dragged card is hidden (handled separately), other cards shift
+  stack.cardIds.forEach((cardId, currentIndex) => {
+    // Skip the card being dragged - it follows the cursor
+    if (currentIndex === fromIndex) return
+
+    // Calculate the visual index this card should appear at
+    let visualIndex = currentIndex
+
+    if (fromIndex < toIndex) {
+      // Dragging forward: cards between fromIndex and toIndex shift back one spot
+      if (currentIndex > fromIndex && currentIndex <= toIndex) {
+        visualIndex = currentIndex - 1
+      }
+    } else if (fromIndex > toIndex) {
+      // Dragging backward: cards between toIndex and fromIndex shift forward one spot
+      if (currentIndex >= toIndex && currentIndex < fromIndex) {
+        visualIndex = currentIndex + 1
+      }
+    }
+
+    // Only add to map if position changed
+    if (visualIndex !== currentIndex) {
+      const position = cardStore.getZoneCardPosition(
+        source.zoneId,
+        visualIndex,
+        stack.cardIds.length,
+      )
+      if (position) {
+        positions.set(cardId, position)
+      }
+    }
+  })
+
+  return positions
+})
 
 // Wire up hand card drop handler
 interaction.setHandCardDropHandler((event) => {
@@ -1037,6 +1141,7 @@ onBeforeUnmount(() => {
             shuffling:
               cardStore.shufflingStackId !== null && card.stackId === cardStore.shufflingStackId,
             'locked-by-other': shouldShowLockGlow(card),
+            'zone-reorder-shift': zoneReorderPositions.get(card.id) !== undefined,
           }"
           :style="{
             '--col': shouldShowFaceDown(card) ? CARD_BACK_COL : card.col,
@@ -1044,8 +1149,8 @@ onBeforeUnmount(() => {
             '--shuffle-seed': card.id % 10,
             '--lock-color': getCardLockColor(card),
             '--stack-size': isStackBottom(card) ? getStackSize(card) : 1,
-            left: `${getLockedCardPosition(card)?.x ?? card.x}px`,
-            top: `${getLockedCardPosition(card)?.y ?? card.y}px`,
+            left: `${getZoneReorderPosition(card)?.x ?? getLockedCardPosition(card)?.x ?? card.x}px`,
+            top: `${getZoneReorderPosition(card)?.y ?? getLockedCardPosition(card)?.y ?? card.y}px`,
             zIndex: interaction.getCardZ(index),
             transform: getCardTransform(card, index),
           }"
@@ -1067,6 +1172,20 @@ onBeforeUnmount(() => {
             left: `${handDragPosition.x}px`,
             top: `${handDragPosition.y}px`,
             zIndex: 2000,
+          }"
+        />
+
+        <!-- Ghost card for zone reordering (shows drop target position) -->
+        <Card
+          v-if="zoneGhostCard"
+          class="zone-ghost"
+          :style="{
+            '--col': zoneGhostCard.col,
+            '--row': zoneGhostCard.row,
+            left: `${zoneGhostCard.x}px`,
+            top: `${zoneGhostCard.y}px`,
+            transform: `rotate(${zoneGhostCard.rotation}deg)`,
+            zIndex: 1500,
           }"
         />
 
@@ -1410,5 +1529,22 @@ onBeforeUnmount(() => {
 .hand-ghost {
   pointer-events: none;
   cursor: grabbing;
+}
+
+.zone-ghost {
+  pointer-events: none;
+  opacity: 0.6;
+  filter: brightness(1.2);
+  box-shadow:
+    0 0 0 2px rgba(100, 200, 255, 0.8),
+    0 0 15px rgba(100, 200, 255, 0.5);
+  border-radius: 4px;
+}
+
+.zone-reorder-shift {
+  transition:
+    left 0.15s ease-out,
+    top 0.15s ease-out,
+    transform 0.15s ease-out;
 }
 </style>

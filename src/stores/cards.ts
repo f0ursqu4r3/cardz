@@ -303,6 +303,90 @@ export const useCardStore = defineStore('cards', () => {
     stacks.value.forEach((stack) => updateStackPositions(stack))
   }
 
+  // Calculate position for a card at a given index in a zone layout (for ghost card)
+  const getZoneCardPosition = (
+    zoneId: number,
+    cardIndex: number,
+    cardCount: number,
+  ): { x: number; y: number; rotation: number } | null => {
+    const zone = zones.value.find((z) => z.id === zoneId)
+    if (!zone) return null
+
+    const layout = zone.layout || 'stack'
+    const settings = zone.cardSettings || { cardScale: 1.0, cardSpacing: 0.5 }
+    const spacing = settings.cardSpacing
+    const spacingMultiplier = spacing < 0.5 ? 0.3 + spacing * 1.4 : 1.0 + (spacing - 0.5) * 1.4
+
+    if (layout === 'stack') {
+      const totalOffsetY = Math.max(0, cardCount - 1) * Math.abs(STACK_OFFSET_Y)
+      const centerX = zone.x + (zone.width - CARD_W) / 2
+      const centerY = zone.y + (zone.height - CARD_H) / 2
+      const anchorY = centerY + totalOffsetY / 2
+      return {
+        x: centerX + cardIndex * STACK_OFFSET_X,
+        y: anchorY + cardIndex * STACK_OFFSET_Y,
+        rotation: 0,
+      }
+    } else if (layout === 'row') {
+      const step = CARD_W * spacingMultiplier
+      const totalWidth = CARD_W + Math.max(0, cardCount - 1) * step
+      const startX = zone.x + (zone.width - totalWidth) / 2
+      const startY = zone.y + (zone.height - CARD_H) / 2
+      return { x: startX + cardIndex * step, y: startY, rotation: 0 }
+    } else if (layout === 'column') {
+      const step = CARD_H * spacingMultiplier
+      const totalHeight = CARD_H + Math.max(0, cardCount - 1) * step
+      const startX = zone.x + (zone.width - CARD_W) / 2
+      const startY = zone.y + (zone.height - totalHeight) / 2
+      return { x: startX, y: startY + cardIndex * step, rotation: 0 }
+    } else if (layout === 'grid') {
+      const gapX = CARD_W * spacingMultiplier
+      const gapY = CARD_H * spacingMultiplier
+      const sqrtCount = Math.sqrt(cardCount)
+      let cols = Math.ceil(sqrtCount)
+      const maxCols = Math.max(1, Math.floor((zone.width + gapX - CARD_W) / gapX))
+      if (cols > maxCols) cols = maxCols
+      cols = Math.max(1, cols)
+      const rows = Math.ceil(cardCount / cols)
+      const totalWidth = CARD_W + Math.max(0, cols - 1) * gapX
+      const totalHeight = CARD_H + Math.max(0, rows - 1) * gapY
+      const startX = zone.x + (zone.width - totalWidth) / 2
+      const startY = zone.y + (zone.height - totalHeight) / 2
+      const col = cardIndex % cols
+      const row = Math.floor(cardIndex / cols)
+      return { x: startX + col * gapX, y: startY + row * gapY, rotation: 0 }
+    } else if (layout === 'fan') {
+      const zoneCenterX = zone.x + zone.width / 2
+      const zoneCenterY = zone.y + zone.height / 2
+      const radius = Math.max(150, zone.height * 1.5)
+      const baseArcSpan = Math.PI * 0.3 * spacingMultiplier
+      const arcSpan = Math.min(baseArcSpan, cardCount * 0.12)
+      const startAngle = Math.PI / 2 + arcSpan / 2
+      const angleStep = cardCount > 1 ? arcSpan / (cardCount - 1) : 0
+      const arcCenterX = zoneCenterX
+      const arcCenterY = zoneCenterY + radius - CARD_H / 2
+      const angle = startAngle - cardIndex * angleStep
+      const x = arcCenterX + Math.cos(angle) * radius - CARD_W / 2
+      const y = arcCenterY - Math.sin(angle) * radius - CARD_H / 2
+      const rotation = (Math.PI / 2 - angle) * (180 / Math.PI)
+      return { x, y, rotation }
+    } else if (layout === 'circle') {
+      const centerX = zone.x + zone.width / 2
+      const centerY = zone.y + zone.height / 2
+      const baseRadius = Math.min(zone.width, zone.height) / 2 - CARD_W / 2 - 10
+      const radius = baseRadius * spacingMultiplier
+      const angleStep = cardCount > 0 ? (Math.PI * 2) / cardCount : 0
+      const startAngle = -Math.PI / 2
+      const angle = startAngle + cardIndex * angleStep
+      const x = centerX + Math.cos(angle) * radius - CARD_W / 2
+      const y = centerY + Math.sin(angle) * radius - CARD_H / 2
+      const rotation = (angle + Math.PI / 2) * (180 / Math.PI)
+      return { x, y, rotation }
+    }
+
+    return null
+  }
+
   // Stack operations
   const removeFromStack = (cardId: number): void => {
     const card = cards.value.find((item) => item.id === cardId)
@@ -937,6 +1021,7 @@ export const useCardStore = defineStore('cards', () => {
     // Zone operations
     getZoneStack,
     getZoneCardCount,
+    getZoneCardPosition,
     createZone,
     deleteZone,
     updateZone,
