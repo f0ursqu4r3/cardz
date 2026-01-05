@@ -120,6 +120,7 @@ watch(
   () => props.visible,
   (visible) => {
     if (visible) {
+      hoveredId.value = null
       isAnimating.value = true
       setTimeout(() => {
         isAnimating.value = false

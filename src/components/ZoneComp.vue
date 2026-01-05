@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import {
   Lock,
   LockOpen,
@@ -25,6 +25,7 @@ const props = defineProps<{
   zone: Zone
   isDragging: boolean
   currentPlayerId?: string | null
+  openSettings?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -35,6 +36,7 @@ const emit = defineEmits<{
   dblclick: [event: MouseEvent]
   'zone:update': [zoneId: number, updates: Partial<Omit<Zone, 'id' | 'stackId'>>]
   'zone:delete': [zoneId: number]
+  'settings:close': []
 }>()
 
 const cardStore = useCardStore()
@@ -53,7 +55,18 @@ const openModal = () => {
 
 const closeModal = () => {
   showModal.value = false
+  emit('settings:close')
 }
+
+// Watch for external trigger to open settings
+watch(
+  () => props.openSettings,
+  (shouldOpen) => {
+    if (shouldOpen && !showModal.value) {
+      openModal()
+    }
+  },
+)
 
 const onLabelKeydown = (event: KeyboardEvent) => {
   if (event.key === 'Enter') {

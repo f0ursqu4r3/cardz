@@ -54,6 +54,7 @@ const showSettings = ref(false)
 const showPlayers = ref(false)
 const showChat = ref(false)
 const showInstructions = ref(false)
+const editingZoneId = ref<number | null>(null)
 
 // Get current player's color for cursor
 const playerColor = computed(() => {
@@ -853,10 +854,26 @@ const onCardRightClick = (event: MouseEvent, index: number) => {
     return
   }
 
-  // If card is in a stack, show stack menu
+  // If card is in a stack, check if it's in a zone with non-stack layout
   if (card.stackId !== null) {
     const stack = cardStore.stacks.find((s) => s.id === card.stackId)
     if (stack) {
+      // Check if stack is in a zone with a non-stack layout
+      const zone = cardStore.zones.find((z) => z.stackId === stack.id)
+      if (zone && zone.layout !== 'stack') {
+        // For non-stack zone layouts (grid, row, column, fan, circle),
+        // show card menu since user clicked a specific visible card
+        radialMenu.open(event.clientX, event.clientY, {
+          type: 'card',
+          cardId: card.id,
+          isInStack: true,
+          isInZone: true,
+          isFaceUp: card.faceUp,
+        })
+        return
+      }
+
+      // Stack layout - show stack menu
       radialMenu.open(event.clientX, event.clientY, {
         type: 'stack',
         stackId: stack.id,
@@ -871,6 +888,7 @@ const onCardRightClick = (event: MouseEvent, index: number) => {
     type: 'card',
     cardId: card.id,
     isInStack: false,
+    isInZone: false,
     isFaceUp: card.faceUp,
   })
 }
@@ -880,9 +898,11 @@ const onZoneRightClick = (event: MouseEvent, zoneId: number) => {
   event.preventDefault()
   event.stopPropagation()
 
+  const zone = cardStore.zones.find((z) => z.id === zoneId)
   radialMenu.open(event.clientX, event.clientY, {
     type: 'zone',
     zoneId,
+    locked: zone?.locked ?? false,
   })
 }
 
@@ -1037,8 +1057,7 @@ const handleZoneAction = (action: string, zoneId: number) => {
 
   switch (action) {
     case 'zone-settings':
-      // Open zone settings - could emit an event or set a ref
-      // For now, this is a placeholder
+      editingZoneId.value = zoneId
       break
     case 'zone-lock':
       ws.send({ type: 'zone:update', zoneId, updates: { locked: !zone.locked } })
@@ -1581,12 +1600,14 @@ onBeforeUnmount(() => {
           :zone="zone"
           :is-dragging="isZoneDragging(zone.id)"
           :current-player-id="ws.playerId.value"
+          :open-settings="editingZoneId === zone.id"
           @pointerdown="interaction.onZonePointerDown($event, zone.id)"
           @pointermove="interaction.onZonePointerMove"
           @pointerup="interaction.onZonePointerUp"
           @contextmenu="onZoneRightClick($event, zone.id)"
           @zone:update="onZoneUpdate"
           @zone:delete="onZoneDelete"
+          @settings:close="editingZoneId = null"
         />
 
         <Card

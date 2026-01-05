@@ -2,9 +2,9 @@ import { ref, computed } from 'vue'
 import type { RadialMenuItem } from '@/components/ui/RadialMenu.vue'
 
 export type RadialMenuTarget =
-  | { type: 'card'; cardId: number; isInStack: boolean; isFaceUp: boolean }
+  | { type: 'card'; cardId: number; isInStack: boolean; isInZone: boolean; isFaceUp: boolean }
   | { type: 'stack'; stackId: number; cardCount: number }
-  | { type: 'zone'; zoneId: number }
+  | { type: 'zone'; zoneId: number; locked: boolean }
   | { type: 'selection'; cardIds: number[] }
   | { type: 'hand-card'; cardId: number; isFaceUp: boolean }
   | { type: 'hand-selection'; cardIds: number[] }
@@ -46,17 +46,14 @@ export function useRadialMenu() {
         label: t.isFaceUp ? 'Flip face down' : 'Flip face up',
         icon: 'rotate-cw',
       },
-    ]
-
-    if (!t.isInStack) {
-      items.push({
+      {
         id: 'to-hand',
         label: 'Add to hand',
         icon: 'hand',
-      })
-    }
+      },
+    ]
 
-    if (t.isInStack) {
+    if (t.isInStack && !t.isInZone) {
       items.push({
         id: 'pick-up',
         label: 'Pick up from stack',
@@ -102,13 +99,8 @@ export function useRadialMenu() {
     ]
   }
 
-  function getZoneMenuItems(_t: Extract<RadialMenuTarget, { type: 'zone' }>): RadialMenuItem[] {
-    return [
-      {
-        id: 'zone-settings',
-        label: 'Zone settings',
-        icon: 'settings',
-      },
+  function getZoneMenuItems(t: Extract<RadialMenuTarget, { type: 'zone' }>): RadialMenuItem[] {
+    const items: RadialMenuItem[] = [
       {
         id: 'zone-lock',
         label: 'Toggle lock',
@@ -124,13 +116,23 @@ export function useRadialMenu() {
         label: 'Shuffle zone',
         icon: 'shuffle',
       },
-      {
-        id: 'zone-delete',
-        label: 'Delete zone',
-        icon: 'trash',
-        danger: true,
-      },
     ]
+    if (!t.locked) {
+      items.push(
+        {
+          id: 'zone-settings',
+          label: 'Zone settings',
+          icon: 'settings',
+        },
+        {
+          id: 'zone-delete',
+          label: 'Delete zone',
+          icon: 'trash',
+          danger: true,
+        },
+      )
+    }
+    return items
   }
 
   function getSelectionMenuItems(
