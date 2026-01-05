@@ -18,6 +18,9 @@ RUN bun run build-only
 FROM oven/bun:1-slim AS production
 WORKDIR /app
 
+# Install curl for healthcheck (optional, Railway doesn't require it)
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # Copy server package files
 COPY server-src/package.json ./server-src/
 COPY shared/ ./shared/
@@ -38,14 +41,15 @@ RUN mkdir -p /app/data
 
 # Set environment variables
 ENV NODE_ENV=production
+# PORT will be set by Railway, default to 9001 for local testing
 ENV PORT=9001
 
-# Expose the port
-EXPOSE 9001
+# Expose the port (Railway uses PORT env var, this is just documentation)
+EXPOSE $PORT
 
-# Health check
+# Health check (Railway has its own healthcheck, this is for local Docker)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:9001/health || exit 1
+  CMD curl -f http://localhost:${PORT}/health || exit 1
 
 # Start the server
 WORKDIR /app/server-src

@@ -7,3 +7,8 @@ healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
+
+# Railway will set PORT env var - server reads from process.env.PORT
+# This tells Railway which internal port to route traffic to
+[deploy.env]
+PORT = "9001"
