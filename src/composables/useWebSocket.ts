@@ -60,7 +60,7 @@ export interface UseWebSocketReturn {
   offMessage: (handler: (message: ServerMessage) => void) => void
 }
 
-const DEFAULT_WS_URL = `ws://${window.location.hostname}:9001`
+const DEFAULT_WS_URL = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:9001`
 const SESSION_ID_KEY = 'cardz_session_id'
 
 /**
