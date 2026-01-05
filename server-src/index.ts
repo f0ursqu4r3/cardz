@@ -430,6 +430,25 @@ const server = Bun.serve<ClientData>({
             break
           }
 
+          case 'chat:typing': {
+            const player = room.players.get(clientData.id)
+            if (!player) break
+
+            // Broadcast typing status to other players in the room
+            broadcastToRoom(
+              clients as any,
+              room.code,
+              {
+                type: 'chat:typing_status',
+                playerId: clientData.id,
+                playerName: player.name,
+                isTyping: msg.isTyping,
+              },
+              clientData.id, // Exclude sender
+            )
+            break
+          }
+
           // Table management
           case 'table:reset':
             handleTableReset(ws as any, msg, roomManager)

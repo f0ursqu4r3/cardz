@@ -9,6 +9,7 @@ export function useHand(
   canvasRef: Ref<HTMLElement | null> | null,
   handRef: Ref<HTMLElement | null>,
   drag: ReturnType<typeof useDrag>,
+  spaceHeld?: Ref<boolean>,
 ) {
   const cardStore = useCardStore()
 
@@ -127,6 +128,9 @@ export function useHand(
 
   // Hand card event handlers
   const onHandCardPointerDown = (event: PointerEvent, cardId: number) => {
+    // If space is held, let canvas handle panning
+    if (spaceHeld?.value) return
+
     // Only accept left-click (0)
     if (event.button !== 0) return
 

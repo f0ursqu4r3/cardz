@@ -81,6 +81,7 @@ const closePanel = () => {
             <li><kbd>Shift</kbd> + drag — Move entire stack</li>
             <li><kbd>Double-click</kbd> — Flip card/stack</li>
             <li><kbd>Ctrl</kbd> + click — Select multiple cards</li>
+            <li><kbd>Right-click</kbd> — Open context menu</li>
             <li>Hover over card <span class="instructions__time">250ms</span> — Stack cards</li>
           </ul>
 
@@ -89,6 +90,7 @@ const closePanel = () => {
             <li>Shake while dragging — Shuffle stack</li>
             <li>Drop on another stack — Merge stacks</li>
             <li>Drag top card — Pull from stack</li>
+            <li><kbd>Right-click</kbd> — Stack options (shuffle, spread, draw)</li>
           </ul>
 
           <h4>Hand</h4>
@@ -97,7 +99,7 @@ const closePanel = () => {
             <li>Drag card out of hand — Play card face-up</li>
             <li><kbd>Shift</kbd> + drag card out — Play card face-down</li>
             <li><kbd>Ctrl</kbd> + click — Select multiple in hand</li>
-            <li>Right-click — Context menu</li>
+            <li><kbd>Right-click</kbd> — Play face-up or face-down</li>
           </ul>
 
           <h4>Zones</h4>
@@ -106,12 +108,14 @@ const closePanel = () => {
             <li>Drag zone header — Move zone</li>
             <li>Drag corner handle — Resize zone</li>
             <li>Drag card within zone — Reorder cards (non-stack layouts)</li>
+            <li><kbd>Right-click</kbd> — Zone settings &amp; options</li>
           </ul>
 
           <h4>Viewport</h4>
           <ul class="instructions__list">
             <li><kbd>Middle-click</kbd> + drag — Pan view</li>
             <li><kbd>Scroll wheel</kbd> — Zoom in/out</li>
+            <li><kbd>Right-click</kbd> canvas — Create zone, reset view</li>
           </ul>
         </div>
 
@@ -136,7 +140,9 @@ const closePanel = () => {
           <ul class="instructions__list">
             <li>Drop card on hand zone — Add to hand</li>
             <li>Drag card out of hand — Play card face-up</li>
-            <li>Long-press + drag out — Play card face-down</li>
+            <li>
+              Long-press <span class="instructions__time">500ms</span> + drag out — Play face-down
+            </li>
           </ul>
 
           <h4>Zones</h4>

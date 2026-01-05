@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
+import { ref, nextTick, watch, onMounted, onUnmounted, computed } from 'vue'
 import { MessageCircle, Send, X, ChevronDown } from 'lucide-vue-next'
 import type { ChatMessage } from '../../../shared/types'
 
 const props = defineProps<{
   messages: ChatMessage[]
   isOpen: boolean
+  typingPlayers?: Map<string, string> // playerId -> playerName
 }>()
 
 const emit = defineEmits<{
   send: [message: string]
+  typing: [isTyping: boolean]
   'update:isOpen': [value: boolean]
 }>()
 
@@ -65,6 +67,7 @@ const sendMessage = () => {
   if (!text) return
   emit('send', text)
   messageText.value = ''
+  emit('typing', false) // Stop typing indicator when message sent
 }
 
 const handleKeydown = (e: KeyboardEvent) => {
@@ -73,6 +76,44 @@ const handleKeydown = (e: KeyboardEvent) => {
     sendMessage()
   }
 }
+
+// Typing indicator logic
+let typingTimeout: number | null = null
+const isTyping = ref(false)
+
+const handleInput = () => {
+  const hasText = messageText.value.trim().length > 0
+
+  if (hasText && !isTyping.value) {
+    isTyping.value = true
+    emit('typing', true)
+  }
+
+  // Clear existing timeout
+  if (typingTimeout) {
+    window.clearTimeout(typingTimeout)
+  }
+
+  // Set timeout to stop typing indicator after 2 seconds of no input
+  if (hasText) {
+    typingTimeout = window.setTimeout(() => {
+      isTyping.value = false
+      emit('typing', false)
+    }, 2000)
+  } else if (isTyping.value) {
+    isTyping.value = false
+    emit('typing', false)
+  }
+}
+
+// Computed typing indicator text
+const typingIndicatorText = computed(() => {
+  if (!props.typingPlayers || props.typingPlayers.size === 0) return ''
+  const names = Array.from(props.typingPlayers.values())
+  if (names.length === 1) return `${names[0]} is typing...`
+  if (names.length === 2) return `${names[0]} and ${names[1]} are typing...`
+  return `${names.slice(0, 2).join(', ')} and ${names.length - 2} more are typing...`
+})
 
 const formatTime = (timestamp: number): string => {
   return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -145,6 +186,11 @@ onUnmounted(() => {
         <ChevronDown :size="16" />
       </button>
 
+      <!-- Typing indicator -->
+      <div v-if="typingIndicatorText" class="chat__typing">
+        {{ typingIndicatorText }}
+      </div>
+
       <div class="chat__input-area">
         <input
           ref="inputRef"
@@ -154,6 +200,7 @@ onUnmounted(() => {
           placeholder="Type a message..."
           maxlength="500"
           @keydown="handleKeydown"
+          @input="handleInput"
         />
         <button class="chat__send" :disabled="!messageText.trim()" @click="sendMessage">
           <Send :size="16" />
@@ -339,6 +386,24 @@ onUnmounted(() => {
 .chat__scroll-bottom:hover {
   background: rgba(60, 60, 75, 0.95);
   color: #fff;
+}
+
+.chat__typing {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  color: #888;
+  font-style: italic;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .chat__input-area {

@@ -13,6 +13,7 @@ interface CardInteractionOptions {
   addToHand?: (event: PointerEvent, cardId: number) => boolean
   handRef?: Ref<HTMLElement | null>
   sendMessage?: (msg: ClientMessage) => void
+  spaceHeld?: Ref<boolean>
 }
 
 export function useCardInteraction(options: CardInteractionOptions = {}) {
@@ -411,6 +412,9 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
 
   // Pointer event handlers
   const onCardPointerDown = (event: PointerEvent, index: number) => {
+    // If space is held, let canvas handle panning
+    if (options.spaceHeld?.value) return
+
     // Left-click (0) only (Shift modifier used for stack drag)
     if (event.button !== 0) return
 
@@ -943,6 +947,9 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
 
   // Zone interaction handlers
   const onZonePointerDown = (event: PointerEvent, zoneId: number) => {
+    // If space is held, let canvas handle panning
+    if (options.spaceHeld?.value) return
+
     if (event.button !== 0) return
 
     const zone = cardStore.zones.find((z) => z.id === zoneId)

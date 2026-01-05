@@ -685,6 +685,11 @@ export interface ChatSend {
   message: string
 }
 
+export interface ChatTyping {
+  type: 'chat:typing'
+  isTyping: boolean
+}
+
 // ============================================================================
 // Chat Messages (Server → Client)
 // ============================================================================
@@ -702,6 +707,13 @@ export interface ChatMessage {
 export interface ChatHistory {
   type: 'chat:history'
   messages: Omit<ChatMessage, 'type'>[]
+}
+
+export interface ChatTypingStatus {
+  type: 'chat:typing_status'
+  playerId: string
+  playerName: string
+  isTyping: boolean
 }
 
 // ============================================================================
@@ -766,6 +778,7 @@ export type ClientMessage =
   | TableUpdateVisibility
   | TableUpdateName
   | ChatSend
+  | ChatTyping
 
 export type ServerMessage =
   | RoomCreated
@@ -812,6 +825,7 @@ export type ServerMessage =
   | TableInfo
   | ChatMessage
   | ChatHistory
+  | ChatTypingStatus
 
 // ============================================================================
 // Constants

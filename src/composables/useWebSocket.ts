@@ -38,6 +38,7 @@ export interface UseWebSocketReturn {
   handCounts: Ref<Map<string, number>>
   cursors: Ref<Map<string, { x: number; y: number; state: 'default' | 'grab' | 'grabbing' }>>
   chatMessages: Ref<ChatMessage[]>
+  typingPlayers: Ref<Map<string, string>> // playerId -> playerName
 
   // Table settings
   tableSettings: Ref<TableSettings>
@@ -60,6 +61,7 @@ export interface UseWebSocketReturn {
 
   // Chat
   sendChat: (message: string) => void
+  sendTyping: (isTyping: boolean) => void
 
   // Event handlers
   onMessage: (handler: (message: ServerMessage) => void) => void
@@ -141,6 +143,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     Map<string, { x: number; y: number; state: 'default' | 'grab' | 'grabbing' }>
   >(new Map())
   const chatMessages = ref<ChatMessage[]>([])
+  const typingPlayers = ref<Map<string, string>>(new Map())
 
   // Table settings
   const tableSettings = ref<TableSettings>({ background: 'green-felt' })
@@ -237,6 +240,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     handCounts.value.clear()
     cursors.value.clear()
     chatMessages.value = []
+    typingPlayers.value.clear()
     tableSettings.value = { background: 'green-felt' }
     tableName.value = ''
     tableIsPublic.value = false
@@ -279,6 +283,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     handCounts.value.clear()
     cursors.value.clear()
     chatMessages.value = []
+    typingPlayers.value.clear()
     tableSettings.value = { background: 'green-felt' }
     tableName.value = ''
     tableIsPublic.value = false
@@ -306,6 +311,10 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     if (message.trim()) {
       send({ type: 'chat:send', message: message.trim() })
     }
+  }
+
+  const sendTyping = (isTyping: boolean) => {
+    send({ type: 'chat:typing', isTyping })
   }
 
   // Message handling
@@ -777,6 +786,16 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
         chatMessages.value = [...newMessages, ...chatMessages.value]
         break
 
+      case 'chat:typing_status':
+        if (message.isTyping) {
+          typingPlayers.value.set(message.playerId, message.playerName)
+        } else {
+          typingPlayers.value.delete(message.playerId)
+        }
+        // Trigger reactivity
+        typingPlayers.value = new Map(typingPlayers.value)
+        break
+
       // Errors
       case 'error':
         console.error('[ws] error:', message.code, message.message)
@@ -810,6 +829,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     handCounts,
     cursors,
     chatMessages,
+    typingPlayers,
     tableSettings,
     tableName,
     tableIsPublic,
@@ -824,6 +844,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     updateTableVisibility,
     updateTableName,
     sendChat,
+    sendTyping,
     onMessage,
     offMessage,
   }

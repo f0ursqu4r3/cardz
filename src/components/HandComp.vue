@@ -9,6 +9,7 @@ const props = defineProps<{
   canvasRef: HTMLElement | null
   drag: ReturnType<typeof useDrag>
   isDropTarget: boolean
+  spaceHeld?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -19,9 +20,15 @@ const emit = defineEmits<{
 const cardStore = useCardStore()
 const handRef = defineModel<HTMLElement | null>('handRef', { required: true })
 const canvasRef = computed<HTMLElement | null>(() => props.canvasRef)
+const spaceHeldRef = computed(() => props.spaceHeld ?? false)
 
 // Use the hand composable
-const hand = useHand(canvasRef, handRef as Ref<HTMLElement | null>, props.drag)
+const hand = useHand(
+  canvasRef,
+  handRef as Ref<HTMLElement | null>,
+  props.drag,
+  spaceHeldRef as Ref<boolean>,
+)
 
 // Check if a specific card is being dragged from hand
 const isDraggingCard = (cardId: number) => {

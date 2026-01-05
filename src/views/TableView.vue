@@ -247,6 +247,7 @@ const interaction = useCardInteraction({
     trackActivity()
     ws.send(msg)
   },
+  spaceHeld: spaceHeld,
 })
 
 // Remote throw physics for other players' card throws
@@ -1693,6 +1694,7 @@ onBeforeUnmount(() => {
         :canvas-ref="canvasRef"
         :drag="interaction.drag"
         :is-drop-target="interaction.isOverHand.value"
+        :space-held="spaceHeld"
         @card-pointer-up="onPointerUp"
         @card-context-menu="onHandCardRightClick"
       />
@@ -1707,8 +1709,10 @@ onBeforeUnmount(() => {
     <ChatPanel
       v-if="ws.isConnected.value"
       :messages="ws.chatMessages.value"
+      :typing-players="ws.typingPlayers.value"
       v-model:is-open="showChat"
       @send="ws.sendChat"
+      @typing="ws.sendTyping"
     />
 
     <!-- Instructions Panel -->

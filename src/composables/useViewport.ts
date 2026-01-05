@@ -6,10 +6,9 @@ export interface ViewportState {
   zoom: number
 }
 
-const MIN_ZOOM = 0.25
+const MIN_ZOOM = 0.1
 const MAX_ZOOM = 2
 const ZOOM_SENSITIVITY = 0.001
-const ZOOM_STEP = 1.25 // Multiplier for zoom in/out buttons
 
 export function useViewport(canvasRef: Ref<HTMLElement | null>) {
   const panX = ref(0)
@@ -68,11 +67,10 @@ export function useViewport(canvasRef: Ref<HTMLElement | null>) {
     const worldX = (relX - panX.value) / zoom.value
     const worldY = (relY - panY.value) / zoom.value
 
-    // Apply zoom
-    const newZoom = Math.min(
-      MAX_ZOOM,
-      Math.max(MIN_ZOOM, zoom.value * (1 - delta * ZOOM_SENSITIVITY)),
-    )
+    // Apply zoom and snap to 10% increments
+    const rawZoom = zoom.value * (1 - delta * ZOOM_SENSITIVITY)
+    const snappedZoom = Math.round(rawZoom * 10) / 10
+    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, snappedZoom))
 
     // Adjust pan to keep the point under cursor
     panX.value = relX - worldX * newZoom
@@ -80,18 +78,10 @@ export function useViewport(canvasRef: Ref<HTMLElement | null>) {
     zoom.value = newZoom
   }
 
-  // Handle wheel events (zoom with ctrl, pan otherwise)
+  // Handle wheel events (always zoom)
   const onWheel = (event: WheelEvent) => {
     event.preventDefault()
-
-    if (event.ctrlKey || event.metaKey) {
-      // Zoom
-      zoomAt(event.clientX, event.clientY, event.deltaY)
-    } else {
-      // Pan
-      panX.value -= event.deltaX
-      panY.value -= event.deltaY
-    }
+    zoomAt(event.clientX, event.clientY, event.deltaY)
   }
 
   // Start panning (middle mouse or space+drag)
@@ -123,7 +113,7 @@ export function useViewport(canvasRef: Ref<HTMLElement | null>) {
     zoom.value = 1
   }
 
-  // Zoom in by step amount, centered on viewport
+  // Zoom in by 10%, centered on viewport
   const zoomIn = () => {
     const rect = canvasRef.value?.getBoundingClientRect()
     if (!rect) return
@@ -135,8 +125,8 @@ export function useViewport(canvasRef: Ref<HTMLElement | null>) {
     const worldX = (centerX - panX.value) / zoom.value
     const worldY = (centerY - panY.value) / zoom.value
 
-    // Apply zoom
-    const newZoom = Math.min(MAX_ZOOM, zoom.value * ZOOM_STEP)
+    // Apply zoom (+10%)
+    const newZoom = Math.min(MAX_ZOOM, Math.round((zoom.value + 0.1) * 10) / 10)
 
     // Adjust pan to keep center point
     panX.value = centerX - worldX * newZoom
@@ -144,7 +134,7 @@ export function useViewport(canvasRef: Ref<HTMLElement | null>) {
     zoom.value = newZoom
   }
 
-  // Zoom out by step amount, centered on viewport
+  // Zoom out by 10%, centered on viewport
   const zoomOut = () => {
     const rect = canvasRef.value?.getBoundingClientRect()
     if (!rect) return
@@ -156,8 +146,8 @@ export function useViewport(canvasRef: Ref<HTMLElement | null>) {
     const worldX = (centerX - panX.value) / zoom.value
     const worldY = (centerY - panY.value) / zoom.value
 
-    // Apply zoom
-    const newZoom = Math.max(MIN_ZOOM, zoom.value / ZOOM_STEP)
+    // Apply zoom (-10%)
+    const newZoom = Math.max(MIN_ZOOM, Math.round((zoom.value - 0.1) * 10) / 10)
 
     // Adjust pan to keep center point
     panX.value = centerX - worldX * newZoom

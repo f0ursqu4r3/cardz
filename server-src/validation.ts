@@ -343,6 +343,11 @@ export const ChatSendSchema = z.object({
   message: z.string().min(1).max(500).trim(),
 })
 
+export const ChatTypingSchema = z.object({
+  type: z.literal('chat:typing'),
+  isTyping: z.boolean(),
+})
+
 // ============================================================================
 // Combined Client Message Schema
 // ============================================================================
@@ -383,6 +388,7 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   TableUpdateVisibilitySchema,
   TableUpdateNameSchema,
   ChatSendSchema,
+  ChatTypingSchema,
 ])
 
 // ============================================================================
