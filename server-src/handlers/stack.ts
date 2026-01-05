@@ -291,7 +291,6 @@ export function handleStackRemoveCard(
     stackId: result.stackId,
     cardId: msg.cardId,
     stackDeleted: result.stackDeleted,
-    zoneLayoutReset: result.zoneLayoutReset,
     playerId: clientData.id,
   })
 }

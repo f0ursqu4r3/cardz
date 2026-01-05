@@ -367,10 +367,6 @@ ws.onMessage((message: ServerMessage) => {
       if (message.stackDeleted) {
         cardStore.removeStack(message.stackId)
       }
-      // Handle zone layout reset
-      if (message.zoneLayoutReset) {
-        cardStore.updateZone(message.zoneLayoutReset.zoneId, { layout: 'stack' })
-      }
       cardStore.updateAllStacks()
       break
     }
@@ -416,14 +412,9 @@ ws.onMessage((message: ServerMessage) => {
           anchorY: message.stackUpdate.anchorY,
         })
       }
-      if (message.cardUpdates) {
-        message.cardUpdates.forEach((update) => {
-          cardStore.updateCardFromServer(update.cardId, {
-            x: update.x,
-            y: update.y,
-          })
-        })
-      }
+      // Recalculate card positions based on zone's layout
+      // (server sends basic stack positions, but client needs to apply zone layout)
+      cardStore.updateAllStacks()
       break
 
     case 'zone:deleted':

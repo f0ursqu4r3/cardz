@@ -273,10 +273,7 @@ export const useCardStore = defineStore('cards', () => {
   }
 
   // Stack operations
-  const removeFromStack = (
-    cardId: number,
-    resetZoneLayout = true,
-  ): { zoneId?: number; layoutReset?: boolean } | undefined => {
+  const removeFromStack = (cardId: number): void => {
     const card = cards.value.find((item) => item.id === cardId)
     if (!card || card.stackId === null) return
 
@@ -287,16 +284,6 @@ export const useCardStore = defineStore('cards', () => {
 
     if (!stack) return
 
-    // Check if we need to reset zone layout to stack
-    let result: { zoneId?: number; layoutReset?: boolean } | undefined
-    if (resetZoneLayout && stack.kind === 'zone' && stack.zoneId !== undefined) {
-      const zone = zones.value.find((z) => z.id === stack.zoneId)
-      if (zone && zone.layout !== 'stack') {
-        zone.layout = 'stack'
-        result = { zoneId: zone.id, layoutReset: true }
-      }
-    }
-
     stack.cardIds = stack.cardIds.filter((value) => value !== cardId)
     if (stack.cardIds.length === 0) {
       // Clear zone reference if this was a zone stack
@@ -306,11 +293,9 @@ export const useCardStore = defineStore('cards', () => {
       }
       stacks.value = stacks.value.filter((item) => item.id !== stack.id)
     } else {
-      // Update remaining cards positions after layout reset
+      // Update remaining cards positions
       updateStackPositions(stack)
     }
-
-    return result
   }
 
   const addCardToStack = (cardId: number, stack: Stack) => {
