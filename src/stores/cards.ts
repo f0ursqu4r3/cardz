@@ -429,13 +429,8 @@ export const useCardStore = defineStore('cards', () => {
       if (zone) {
         card.faceUp = zone.faceUp
       }
-    } else if (stack.cardIds.length > 0) {
-      // Match faceUp value of existing cards in stack
-      const firstCardInStack = cards.value.find((c) => c.id === stack.cardIds[0])
-      if (firstCardInStack) {
-        card.faceUp = firstCardInStack.faceUp
-      }
     }
+    // For non-zone stacks, preserve the card's current faceUp state (allow mixed)
 
     if (!stack.cardIds.includes(cardId)) {
       stack.cardIds.push(cardId)
@@ -632,16 +627,16 @@ export const useCardStore = defineStore('cards', () => {
     }
   }
 
-  // Flip all cards in a stack
+  // Flip the top card in a stack
   const flipStack = (stackId: number) => {
     const stack = stacks.value.find((s) => s.id === stackId)
-    if (!stack) return
-    stack.cardIds.forEach((id) => {
-      const card = cards.value.find((c) => c.id === id)
-      if (card) {
-        card.faceUp = !card.faceUp
-      }
-    })
+    if (!stack || stack.cardIds.length === 0) return
+    // Top card is the last one in the array
+    const topCardId = stack.cardIds[stack.cardIds.length - 1]
+    const card = cards.value.find((c) => c.id === topCardId)
+    if (card) {
+      card.faceUp = !card.faceUp
+    }
   }
 
   // Selection management

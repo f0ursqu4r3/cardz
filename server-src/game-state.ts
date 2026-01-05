@@ -325,19 +325,15 @@ export class GameStateManager {
 
   flipStack(stackId: number): { cardUpdates: { cardId: number; faceUp: boolean }[] } | null {
     const stack = this.getStack(stackId)
-    if (!stack) return null
+    if (!stack || stack.cardIds.length === 0) return null
 
-    // Reverse order and flip all cards
-    stack.cardIds.reverse()
+    // Only flip the top card (last in array)
+    const topCardId = stack.cardIds[stack.cardIds.length - 1]
+    const card = this.getCard(topCardId)
+    if (!card) return null
 
-    const cardUpdates: { cardId: number; faceUp: boolean }[] = []
-    for (const cardId of stack.cardIds) {
-      const card = this.getCard(cardId)
-      if (card) {
-        card.faceUp = !card.faceUp
-        cardUpdates.push({ cardId: card.id, faceUp: card.faceUp })
-      }
-    }
+    card.faceUp = !card.faceUp
+    const cardUpdates = [{ cardId: card.id, faceUp: card.faceUp }]
 
     return { cardUpdates }
   }

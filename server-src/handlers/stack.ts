@@ -244,17 +244,9 @@ export function handleStackAddCard(
     return
   }
 
-  // Get the orientation of the top card in the stack
-  let stackFaceUp: boolean | undefined
-  if (stack.cardIds.length > 0) {
-    const topCardId = stack.cardIds[stack.cardIds.length - 1]
-    const topCard = gameState.getCard(topCardId)
-    if (topCard) {
-      stackFaceUp = topCard.faceUp
-    }
-  }
-
-  const result = gameState.addCardToStack(msg.stackId, msg.cardId, stackFaceUp)
+  // For non-zone stacks, preserve the card's current faceUp state (allow mixed)
+  // Zone stacks will set faceUp based on zone settings in gameState.addCardToStack
+  const result = gameState.addCardToStack(msg.stackId, msg.cardId, undefined)
   if (!result) {
     send(ws, {
       type: 'error',
