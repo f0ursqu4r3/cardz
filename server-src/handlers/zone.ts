@@ -124,8 +124,7 @@ export function handleZoneDelete(
   broadcastToRoom(clients, room.code, {
     type: 'zone:deleted',
     zoneId: msg.zoneId,
-    stackDeleted: result.stackDeleted,
-    scatteredCards: result.scatteredCards,
+    convertedStack: result.convertedStack,
     playerId: clientData.id,
   })
 }

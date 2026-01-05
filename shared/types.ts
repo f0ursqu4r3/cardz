@@ -354,6 +354,12 @@ export interface StackFlip {
   stackId: number
 }
 
+export interface StackSetFaces {
+  type: 'stack:set_faces'
+  stackId: number
+  faceUp: boolean
+}
+
 export interface StackReorder {
   type: 'stack:reorder'
   stackId: number
@@ -430,6 +436,14 @@ export interface StackFlipped {
   type: 'stack:flipped'
   stackId: number
   cardUpdates: { cardId: number; faceUp: boolean }[]
+  playerId: string
+}
+
+export interface StackFacesSet {
+  type: 'stack:faces_set'
+  stackId: number
+  faceUp: boolean
+  cardIds: number[]
   playerId: string
 }
 
@@ -516,8 +530,7 @@ export interface ZoneUpdated {
 export interface ZoneDeleted {
   type: 'zone:deleted'
   zoneId: number
-  stackDeleted: number | null
-  scatteredCards: { cardId: number; x: number; y: number }[]
+  convertedStack: { stackId: number; anchorX: number; anchorY: number } | null
   playerId: string
 }
 
@@ -760,6 +773,7 @@ export type ClientMessage =
   | StackMerge
   | StackShuffle
   | StackFlip
+  | StackSetFaces
   | StackReorder
   | ZoneCreate
   | ZoneUpdate
@@ -801,6 +815,7 @@ export type ServerMessage =
   | StacksMerged
   | StackShuffled
   | StackFlipped
+  | StackFacesSet
   | StackReordered
   | ZoneCreated
   | ZoneUpdated

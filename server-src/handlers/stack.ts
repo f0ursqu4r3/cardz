@@ -8,6 +8,7 @@ import type {
   StackMerge,
   StackShuffle,
   StackFlip,
+  StackSetFaces,
   StackReorder,
 } from '../../shared/types'
 import type { Room } from '../room'
@@ -432,6 +433,46 @@ export function handleStackFlip(
     type: 'stack:flipped',
     stackId: msg.stackId,
     cardUpdates: result.cardUpdates,
+    playerId: clientData.id,
+  })
+}
+
+export function handleStackSetFaces(
+  ws: GenericWebSocket,
+  msg: StackSetFaces,
+  room: Room,
+  clients: Map<string, GenericWebSocket>,
+): void {
+  const clientData = getClientData(ws)
+  const { locks, gameState } = room
+
+  const lockedBy = locks.isStackLocked(msg.stackId)
+  if (lockedBy && lockedBy !== clientData.id) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'stack:set_faces',
+      code: 'STACK_LOCKED',
+      message: 'Stack is locked by another player',
+    })
+    return
+  }
+
+  const result = gameState.setStackFaces(msg.stackId, msg.faceUp)
+  if (!result) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'stack:set_faces',
+      code: 'NOT_FOUND',
+      message: 'Stack not found',
+    })
+    return
+  }
+
+  broadcastToRoom(clients, room.code, {
+    type: 'stack:faces_set',
+    stackId: msg.stackId,
+    faceUp: msg.faceUp,
+    cardIds: result.cardIds,
     playerId: clientData.id,
   })
 }

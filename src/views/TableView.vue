@@ -413,6 +413,10 @@ ws.onMessage((message: ServerMessage) => {
       if (stack && !stack.cardIds.includes(message.cardId)) {
         stack.cardIds.push(message.cardId)
       }
+      // If this is a zone stack, update positions to apply zone layout
+      if (stack) {
+        cardStore.updateStackPositions(stack)
+      }
       break
     }
 
@@ -472,6 +476,12 @@ ws.onMessage((message: ServerMessage) => {
       })
       break
 
+    case 'stack:faces_set':
+      message.cardIds.forEach((cardId) => {
+        cardStore.updateCardFromServer(cardId, { faceUp: message.faceUp })
+      })
+      break
+
     case 'zone:created':
       cardStore.addZoneFromServer(message.zone)
       break
@@ -489,19 +499,21 @@ ws.onMessage((message: ServerMessage) => {
       cardStore.updateAllStacks()
       break
 
-    case 'zone:deleted':
+    case 'zone:deleted': {
       cardStore.removeZone(message.zoneId)
-      if (message.stackDeleted !== null) {
-        cardStore.removeStack(message.stackDeleted)
+      // Convert zone stack to free stack
+      if (message.convertedStack) {
+        const stack = cardStore.stacks.find((s) => s.id === message.convertedStack!.stackId)
+        if (stack) {
+          stack.kind = 'free'
+          stack.zoneId = undefined
+          stack.anchorX = message.convertedStack.anchorX
+          stack.anchorY = message.convertedStack.anchorY
+          cardStore.updateStackPositions(stack)
+        }
       }
-      message.scatteredCards.forEach((update) => {
-        cardStore.updateCardFromServer(update.cardId, {
-          x: update.x,
-          y: update.y,
-          stackId: null,
-        })
-      })
       break
+    }
 
     case 'zone:card_added': {
       // Update the card state first (sets stackId, faceUp, z)
@@ -1029,12 +1041,21 @@ const handleStackAction = (action: string, stackId: number) => {
       })
       break
     }
-    case 'flip-all':
-      // Flip all cards in stack individually
+    case 'all-face-up':
+      // Set all cards in stack to face up
       stack.cardIds.forEach((cardId) => {
-        cardStore.flipCard(cardId)
-        ws.send({ type: 'card:flip', cardId })
+        const card = cardStore.cards.find((c) => c.id === cardId)
+        if (card) card.faceUp = true
       })
+      ws.send({ type: 'stack:set_faces', stackId, faceUp: true })
+      break
+    case 'all-face-down':
+      // Set all cards in stack to face down
+      stack.cardIds.forEach((cardId) => {
+        const card = cardStore.cards.find((c) => c.id === cardId)
+        if (card) card.faceUp = false
+      })
+      ws.send({ type: 'stack:set_faces', stackId, faceUp: false })
       break
     case 'draw-top': {
       // Draw just the top card from stack

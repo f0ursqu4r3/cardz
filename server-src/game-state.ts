@@ -338,6 +338,22 @@ export class GameStateManager {
     return { cardUpdates }
   }
 
+  setStackFaces(stackId: number, faceUp: boolean): { cardIds: number[] } | null {
+    const stack = this.getStack(stackId)
+    if (!stack || stack.cardIds.length === 0) return null
+
+    const cardIds: number[] = []
+    for (const cardId of stack.cardIds) {
+      const card = this.getCard(cardId)
+      if (card && card.faceUp !== faceUp) {
+        card.faceUp = faceUp
+        cardIds.push(cardId)
+      }
+    }
+
+    return { cardIds }
+  }
+
   reorderStack(
     stackId: number,
     fromIndex: number,
@@ -460,39 +476,45 @@ export class GameStateManager {
   }
 
   deleteZone(zoneId: number): {
-    stackDeleted: number | null
-    scatteredCards: { cardId: number; x: number; y: number }[]
+    convertedStack: { stackId: number; anchorX: number; anchorY: number } | null
   } | null {
     const zone = this.getZone(zoneId)
     if (!zone) return null
 
-    let stackDeleted: number | null = null
-    const scatteredCards: { cardId: number; x: number; y: number }[] = []
+    let convertedStack: { stackId: number; anchorX: number; anchorY: number } | null = null
 
-    // Handle stack in zone
+    // Convert zone stack to free stack
     if (zone.stackId !== null) {
       const stack = this.getStack(zone.stackId)
-      if (stack) {
-        // Scatter cards around zone center
-        for (let i = 0; i < stack.cardIds.length; i++) {
-          const card = this.getCard(stack.cardIds[i])
+      if (stack && stack.cardIds.length > 0) {
+        // Convert to free stack at zone center
+        stack.kind = 'free'
+        stack.zoneId = undefined
+        stack.anchorX = zone.x + zone.width / 2
+        stack.anchorY = zone.y + zone.height / 2
+
+        // Reposition cards in standard stack layout
+        const STACK_OFFSET_X = 0.3
+        const STACK_OFFSET_Y = -0.3
+        stack.cardIds.forEach((cardId, idx) => {
+          const card = this.getCard(cardId)
           if (card) {
-            card.stackId = null
-            // Scatter with some offset
-            card.x = zone.x + zone.width / 2 + (Math.random() - 0.5) * 50
-            card.y = zone.y + zone.height / 2 + (Math.random() - 0.5) * 50
+            card.x = stack.anchorX + idx * STACK_OFFSET_X
+            card.y = stack.anchorY + idx * STACK_OFFSET_Y
             card.z = ++this.state.zCounter
-            scatteredCards.push({ cardId: card.id, x: card.x, y: card.y })
           }
-        }
-        stackDeleted = zone.stackId
+        })
+
+        convertedStack = { stackId: stack.id, anchorX: stack.anchorX, anchorY: stack.anchorY }
+      } else if (stack) {
+        // Empty stack, just delete it
         this.state.stacks = this.state.stacks.filter((s) => s.id !== zone.stackId)
       }
     }
 
     this.state.zones = this.state.zones.filter((z) => z.id !== zoneId)
 
-    return { stackDeleted, scatteredCards }
+    return { convertedStack }
   }
 
   addCardToZone(

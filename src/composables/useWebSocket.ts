@@ -567,6 +567,17 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
         }
         break
 
+      case 'stack:faces_set':
+        if (gameState.value) {
+          message.cardIds.forEach((cardId) => {
+            const card = gameState.value!.cards.find((c) => c.id === cardId)
+            if (card) {
+              card.faceUp = message.faceUp
+            }
+          })
+        }
+        break
+
       // Zone events
       case 'zone:created':
         if (gameState.value) {
@@ -602,19 +613,18 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
       case 'zone:deleted':
         if (gameState.value) {
           gameState.value.zones = gameState.value.zones.filter((z) => z.id !== message.zoneId)
-          if (message.stackDeleted !== null) {
-            gameState.value.stacks = gameState.value.stacks.filter(
-              (s) => s.id !== message.stackDeleted,
+          // Convert zone stack to free stack
+          if (message.convertedStack) {
+            const stack = gameState.value.stacks.find(
+              (s) => s.id === message.convertedStack!.stackId,
             )
-          }
-          message.scatteredCards.forEach((update) => {
-            const card = gameState.value!.cards.find((c) => c.id === update.cardId)
-            if (card) {
-              card.x = update.x
-              card.y = update.y
-              card.stackId = null
+            if (stack) {
+              stack.kind = 'free'
+              stack.zoneId = undefined
+              stack.anchorX = message.convertedStack.anchorX
+              stack.anchorY = message.convertedStack.anchorY
             }
-          })
+          }
         }
         break
 

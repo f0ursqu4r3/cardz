@@ -175,6 +175,12 @@ export const StackFlipSchema = z.object({
   stackId: z.number().int(),
 })
 
+export const StackSetFacesSchema = z.object({
+  type: z.literal('stack:set_faces'),
+  stackId: z.number().int(),
+  faceUp: z.boolean(),
+})
+
 export const StackReorderSchema = z.object({
   type: z.literal('stack:reorder'),
   stackId: z.number().int(),
@@ -370,6 +376,7 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   StackMergeSchema,
   StackShuffleSchema,
   StackFlipSchema,
+  StackSetFacesSchema,
   StackReorderSchema,
   ZoneCreateSchema,
   ZoneUpdateSchema,

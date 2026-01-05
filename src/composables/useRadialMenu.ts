@@ -82,9 +82,14 @@ export function useRadialMenu() {
         icon: 'arrow-up-from-line',
       },
       {
-        id: 'flip-all',
-        label: 'Flip all cards',
-        icon: 'layers',
+        id: 'all-face-up',
+        label: 'All face up',
+        icon: 'eye',
+      },
+      {
+        id: 'all-face-down',
+        label: 'All face down',
+        icon: 'eye-off',
       },
       {
         id: 'draw-top',
