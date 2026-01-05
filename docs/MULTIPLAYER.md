@@ -38,10 +38,12 @@ Server-authoritative multiplayer architecture for cardz.
 | `room:create`        | C→S       | Create a new room                |
 | `room:join`          | C→S       | Join existing room by code       |
 | `room:leave`         | C→S       | Leave current room               |
+| `room:list`          | C→S       | Request list of public rooms     |
 | `room:created`       | S→C       | Room created, includes room code |
 | `room:joined`        | S→C       | Successfully joined room         |
 | `room:player_joined` | S→C       | Another player joined            |
 | `room:player_left`   | S→C       | Another player left              |
+| `room:list`          | S→C       | List of public rooms             |
 | `room:error`         | S→C       | Room operation failed            |
 
 ### Session Messages
@@ -51,16 +53,24 @@ Server-authoritative multiplayer architecture for cardz.
 interface RoomCreate {
   type: 'room:create'
   playerName: string
+  tableName?: string
+  isPublic?: boolean
+  sessionId?: string // For reconnection after refresh
 }
 
 interface RoomJoin {
   type: 'room:join'
   roomCode: string
   playerName: string
+  sessionId?: string // For reconnection after refresh
 }
 
 interface RoomLeave {
   type: 'room:leave'
+}
+
+interface RoomListRequest {
+  type: 'room:list'
 }
 
 // Server → Client
@@ -77,6 +87,7 @@ interface RoomJoined {
   playerId: string
   players: Player[]
   state: GameState
+  cursors: { playerId: string; x: number; y: number; state: CursorState }[]
 }
 
 interface PlayerJoined {
@@ -89,10 +100,91 @@ interface PlayerLeft {
   playerId: string
 }
 
+interface PublicRoomInfo {
+  code: string
+  name: string
+  playerCount: number
+  maxPlayers: number
+  createdAt: number
+  background?: TableBackground
+}
+
+interface RoomListResponse {
+  type: 'room:list'
+  rooms: PublicRoomInfo[]
+}
+
 interface RoomError {
   type: 'room:error'
   code: 'NOT_FOUND' | 'FULL' | 'INVALID_CODE'
   message: string
+}
+```
+
+---
+
+## Table Management
+
+### Table Settings & Visibility
+
+```typescript
+type TableBackground = 'green-felt' | 'blue-felt' | 'red-felt' | 'wood-oak' | 'wood-dark' | 'slate'
+
+interface TableSettings {
+  background: TableBackground
+}
+
+// Client → Server
+interface TableReset {
+  type: 'table:reset'
+}
+
+interface TableUpdateSettings {
+  type: 'table:update_settings'
+  settings: Partial<TableSettings>
+}
+
+interface TableUpdateVisibility {
+  type: 'table:update_visibility'
+  isPublic: boolean
+}
+
+interface TableUpdateName {
+  type: 'table:update_name'
+  name: string
+}
+
+// Server → Client
+interface TableResetComplete {
+  type: 'table:reset'
+  state: GameState
+}
+
+interface TableSettingsUpdated {
+  type: 'table:settings_updated'
+  settings: TableSettings
+  playerId: string
+}
+
+interface TableVisibilityUpdated {
+  type: 'table:visibility_updated'
+  isPublic: boolean
+  playerId: string
+}
+
+interface TableNameUpdated {
+  type: 'table:name_updated'
+  name: string
+  playerId: string
+}
+
+interface TableInfo {
+  type: 'table:info'
+  name: string
+  isPublic: boolean
+  settings: TableSettings
+  createdAt: number
+  createdBy: string
 }
 ```
 
@@ -106,6 +198,7 @@ interface Player {
   name: string
   connected: boolean
   color: string // For cursor/highlight color
+  sessionId?: string // For reconnection after refresh
 }
 
 interface CardState {
@@ -131,6 +224,17 @@ interface StackState {
   lockedBy: string | null // Player currently dragging this stack
 }
 
+type ZoneVisibility = 'public' | 'owner' | 'hidden'
+
+type ZoneLayout = 'stack' | 'row' | 'column' | 'grid' | 'fan' | 'circle'
+
+interface ZoneCardSettings {
+  cardScale: number // 0.5 to 1.5 (default 1.0)
+  cardSpacing: number // 0 to 1.0 (default 0.5)
+  randomOffset?: number // 0 to 50 pixels
+  randomRotation?: number // 0 to 45 degrees
+}
+
 interface ZoneState {
   id: number
   x: number
@@ -141,6 +245,10 @@ interface ZoneState {
   faceUp: boolean
   locked: boolean
   stackId: number | null
+  visibility: ZoneVisibility // Who can see cards in this zone
+  ownerId: string | null // Player who owns this zone (for 'owner' visibility)
+  layout: ZoneLayout // How cards are arranged in the zone
+  cardSettings: ZoneCardSettings // Card size and spacing settings
 }
 
 interface HandState {
@@ -430,6 +538,10 @@ interface ZoneCreate {
   height: number
   label: string
   faceUp: boolean
+  visibility?: ZoneVisibility
+  ownerId?: string | null
+  layout?: ZoneLayout
+  cardSettings?: ZoneCardSettings
 }
 
 // Server → All Clients
@@ -455,6 +567,10 @@ interface ZoneUpdate {
     label?: string
     faceUp?: boolean
     locked?: boolean
+    visibility?: ZoneVisibility
+    ownerId?: string | null
+    layout?: ZoneLayout
+    cardSettings?: ZoneCardSettings
   }
 }
 
@@ -546,6 +662,7 @@ interface HandRemove {
   cardId: number
   x: number
   y: number
+  faceUp: boolean
 }
 
 // Server → All Clients
@@ -626,16 +743,19 @@ interface SelectionStacked {
 
 ---
 
-## Presence & Cursors (Optional)
+## Presence & Cursors
 
 Real-time cursor positions for collaborative feel.
 
 ```typescript
-// Client → Server (Throttled, ~10-20 Hz)
+type CursorState = 'default' | 'grab' | 'grabbing'
+
+// Client → Server (Throttled, ~20 Hz)
 interface CursorUpdate {
   type: 'cursor:update'
   x: number
   y: number
+  state: CursorState
 }
 
 // Server → Other Clients
@@ -644,6 +764,38 @@ interface CursorUpdated {
   playerId: string
   x: number
   y: number
+  state: CursorState
+}
+```
+
+---
+
+## Chat System
+
+Real-time text chat between players.
+
+```typescript
+// Client → Server
+interface ChatSend {
+  type: 'chat:send'
+  message: string
+}
+
+// Server → All Clients
+interface ChatMessage {
+  type: 'chat:message'
+  id: string
+  playerId: string
+  playerName: string
+  playerColor: string
+  message: string
+  timestamp: number
+}
+
+// Server → Client (on join)
+interface ChatHistory {
+  type: 'chat:history'
+  messages: Omit<ChatMessage, 'type'>[]
 }
 ```
 
@@ -907,12 +1059,26 @@ cardz/
 
 ---
 
+## Implemented Features ✅
+
+- [x] **Room Management**: Create, join, leave rooms with unique codes
+- [x] **Public/Private Tables**: Table visibility with public room browser
+- [x] **Table Settings**: Background themes (felt, wood, slate)
+- [x] **Table Reset**: Reset table to initial state
+- [x] **Table Naming**: Editable table names
+- [x] **Chat System**: Real-time messaging with history
+- [x] **Cursor Presence**: See other players' cursors with state indicators
+- [x] **Zone Visibility**: Public, owner-only, and hidden zones
+- [x] **Zone Layouts**: Stack, row, column, grid, fan, circle arrangements
+- [x] **Zone Card Settings**: Scale, spacing, random offset/rotation
+- [x] **SQLite Persistence**: Game state persisted to database
+- [x] **Session Reconnection**: Reconnect after page refresh
+
 ## Future Considerations
 
 - [ ] **Spectator Mode**: Read-only observers
 - [ ] **Turn System**: Optional turn-based mode
 - [ ] **Card Reveal**: Show card to specific player(s)
-- [ ] **Private Zones**: Areas only visible to zone owner
 - [ ] **Action History**: Undo/redo with server validation
 - [ ] **Permissions**: Host controls (kick, lock table, etc.)
 - [ ] **Voice/Video**: WebRTC integration

@@ -1,6 +1,6 @@
 # cardz
 
-A card manipulation sandbox with drag-and-drop interactions, stacking mechanics, and deck management.
+A multiplayer card manipulation sandbox with drag-and-drop interactions, stacking mechanics, zones, and real-time collaboration.
 
 ---
 
@@ -10,55 +10,83 @@ A card manipulation sandbox with drag-and-drop interactions, stacking mechanics,
 
 A single playing card that can be moved, stacked, and organized.
 
-| Property   | Type             | Description                                 |
-| ---------- | ---------------- | ------------------------------------------- |
-| `id`       | `number`         | Unique identifier                           |
-| `col`      | `number`         | Sprite column in tilemap (0-4)              |
-| `row`      | `number`         | Sprite row in tilemap (0-4)                 |
-| `x`        | `number`         | X position on canvas (pixels)               |
-| `y`        | `number`         | Y position on canvas (pixels)               |
-| `z`        | `number`         | Base z-index for rendering order            |
-| `stackId`  | `number \| null` | ID of stack this card belongs to, or `null` |
-| `isInDeck` | `boolean`        | Whether card is part of any stack           |
-| `faceUp`   | `boolean`        | Whether card face is visible                |
-| `inHand`   | `boolean`        | Whether card is in player's hand            |
+| Property   | Type             | Description                                      |
+| ---------- | ---------------- | ------------------------------------------------ |
+| `id`       | `number`         | Unique identifier                                |
+| `col`      | `number`         | Sprite column in tilemap (0-12)                  |
+| `row`      | `number`         | Sprite row in tilemap (0-4)                      |
+| `x`        | `number`         | X position on canvas (pixels)                    |
+| `y`        | `number`         | Y position on canvas (pixels)                    |
+| `z`        | `number`         | Base z-index for rendering order                 |
+| `stackId`  | `number \| null` | ID of stack this card belongs to, or `null`      |
+| `isInDeck` | `boolean`        | Whether card is part of any stack                |
+| `faceUp`   | `boolean`        | Whether card face is visible                     |
+| `inHand`   | `boolean`        | Whether card is in player's hand                 |
+| `lockedBy` | `string \| null` | Player ID currently dragging this card           |
+| `rotation` | `number`         | Rotation angle in degrees (used in zone layouts) |
 
 ### Stack
 
 A collection of cards sharing a common anchor position.
 
-| Property  | Type               | Description                              |
-| --------- | ------------------ | ---------------------------------------- |
-| `id`      | `number`           | Unique identifier                        |
-| `cardIds` | `number[]`         | Ordered list of card IDs (bottom to top) |
-| `anchorX` | `number`           | X position of stack anchor               |
-| `anchorY` | `number`           | Y position of stack anchor               |
-| `kind`    | `'zone' \| 'free'` | Stack type (see below)                   |
+| Property   | Type               | Description                              |
+| ---------- | ------------------ | ---------------------------------------- |
+| `id`       | `number`           | Unique identifier                        |
+| `cardIds`  | `number[]`         | Ordered list of card IDs (bottom to top) |
+| `anchorX`  | `number`           | X position of stack anchor               |
+| `anchorY`  | `number`           | Y position of stack anchor               |
+| `kind`     | `'zone' \| 'free'` | Stack type (see below)                   |
+| `zoneId`   | `number`           | Reference to parent zone (if applicable) |
+| `lockedBy` | `string \| null`   | Player currently dragging this stack     |
 
 **Stack Kinds:**
 
-- `zone` — Anchored to a UI element (e.g., deck zone). Position updates when UI moves.
+- `zone` — Anchored to a zone. Position updates when zone moves.
 - `free` — Anchored to canvas coordinates. Created when cards are stacked freely.
 
-### Canvas
+### Zone
 
-The play area where cards exist and can be manipulated.
+A designated area for organizing and displaying cards.
 
-| Property | Type     | Description             |
-| -------- | -------- | ----------------------- |
-| `width`  | `number` | Canvas width in pixels  |
-| `height` | `number` | Canvas height in pixels |
+| Property       | Type               | Description                                     |
+| -------------- | ------------------ | ----------------------------------------------- |
+| `id`           | `number`           | Unique identifier                               |
+| `x`            | `number`           | Position X on canvas                            |
+| `y`            | `number`           | Position Y on canvas                            |
+| `width`        | `number`           | Zone width in pixels                            |
+| `height`       | `number`           | Zone height in pixels                           |
+| `label`        | `string`           | Display name for the zone                       |
+| `faceUp`       | `boolean`          | Default card orientation when dropped           |
+| `locked`       | `boolean`          | Prevent moving/resizing when locked             |
+| `stackId`      | `number \| null`   | Associated stack ID                             |
+| `visibility`   | `ZoneVisibility`   | Who can see cards (`public`, `owner`, `hidden`) |
+| `ownerId`      | `string \| null`   | Player who owns this zone                       |
+| `layout`       | `ZoneLayout`       | Card arrangement style                          |
+| `cardSettings` | `ZoneCardSettings` | Card display settings                           |
 
-### Deck Zone
+**Zone Visibility Options:**
 
-A designated drop target for organizing cards.
+- `public` — All players can see cards in this zone
+- `owner` — Only the zone owner can see card faces
+- `hidden` — Card faces hidden from all players
 
-| Property | Type     | Description                 |
-| -------- | -------- | --------------------------- |
-| `x`      | `number` | Position relative to canvas |
-| `y`      | `number` | Position relative to canvas |
-| `width`  | `number` | Hit area width              |
-| `height` | `number` | Hit area height             |
+**Zone Layouts:**
+
+- `stack` — Traditional overlapping stack
+- `row` — Horizontal arrangement
+- `column` — Vertical arrangement
+- `grid` — Grid arrangement
+- `fan` — Fanned arc display
+- `circle` — Circular arrangement
+
+**Zone Card Settings:**
+
+| Setting          | Type     | Description                             |
+| ---------------- | -------- | --------------------------------------- |
+| `cardScale`      | `number` | Card size multiplier (0.5 to 1.5)       |
+| `cardSpacing`    | `number` | Spacing between cards (0 to 1.0)        |
+| `randomOffset`   | `number` | Random position jitter (0 to 50 pixels) |
+| `randomRotation` | `number` | Random rotation (0 to 45 degrees)       |
 
 ### Hand
 
@@ -67,14 +95,25 @@ The player's personal hand zone, displayed at the bottom of the screen.
 | Property  | Type       | Description                            |
 | --------- | ---------- | -------------------------------------- |
 | `cardIds` | `number[]` | Ordered list of card IDs (left→right)  |
-| Position  | Fixed      | Centered at bottom of canvas           |
+| Position  | Fixed      | Centered at bottom of viewport         |
 | Layout    | Horizontal | Cards overlap with `HAND_CARD_OVERLAP` |
 
 **Hand Behavior:**
 
-- Cards in hand are always face-up to the player
+- Cards in hand are always face-up to the owning player
+- Other players see only the card count, not the cards
 - Cards removed from stacks/selection when added to hand
 - Drag card out of hand zone to place on canvas
+- Multi-select supported in hand
+
+### Canvas
+
+The play area where cards exist and can be manipulated.
+
+| Property | Type     | Description            |
+| -------- | -------- | ---------------------- |
+| `width`  | `number` | Canvas width (3000px)  |
+| `height` | `number` | Canvas height (3000px) |
 
 ---
 
@@ -167,21 +206,27 @@ Cards are rendered with the following z-index priority (highest on top):
 
 ## Constants
 
-| Name                | Value | Description                                   |
-| ------------------- | ----- | --------------------------------------------- |
-| `CARD_W`            | `42`  | Card width in pixels                          |
-| `CARD_H`            | `60`  | Card height in pixels                         |
-| `STACK_HOVER_MS`    | `250` | Time to hover before stack-ready (ms)         |
-| `LONG_PRESS_MS`     | `500` | Time to hold before stack drag initiates (ms) |
-| `STACK_OFFSET_X`    | `0`   | Horizontal offset per card in stack (px)      |
-| `STACK_OFFSET_Y`    | `-1`  | Vertical offset per card in stack (px)        |
-| `CARD_BACK_COL`     | `13`  | Tilemap column for card back sprite           |
-| `CARD_BACK_ROW`     | `1`   | Tilemap row for card back sprite              |
-| `SHAKE_THRESHOLD`   | `15`  | Min movement (px) to register direction       |
-| `SHAKE_REVERSALS`   | `4`   | Direction changes needed to trigger shake     |
-| `SHAKE_WINDOW_MS`   | `500` | Time window for shake detection (ms)          |
-| `HAND_CARD_OVERLAP` | `28`  | Horizontal overlap between cards in hand (px) |
-| `HAND_PADDING`      | `16`  | Padding around hand zone (px)                 |
+| Name                     | Value | Description                                   |
+| ------------------------ | ----- | --------------------------------------------- |
+| `CARD_W`                 | `42`  | Card width in pixels                          |
+| `CARD_H`                 | `60`  | Card height in pixels                         |
+| `STACK_HOVER_MS`         | `250` | Time to hover before stack-ready (ms)         |
+| `LONG_PRESS_MS`          | `500` | Time to hold before stack drag initiates (ms) |
+| `STACK_OFFSET_X`         | `0`   | Horizontal offset per card in stack (px)      |
+| `STACK_OFFSET_Y`         | `-1`  | Vertical offset per card in stack (px)        |
+| `STACK_MAX_VISUAL_DEPTH` | `10`  | Max cards to show edge offset for in stack    |
+| `CARD_BACK_COL`          | `13`  | Tilemap column for card back sprite           |
+| `CARD_BACK_ROW`          | `1`   | Tilemap row for card back sprite              |
+| `SHAKE_THRESHOLD`        | `15`  | Min movement (px) to register direction       |
+| `SHAKE_REVERSALS`        | `4`   | Direction changes needed to trigger shake     |
+| `SHAKE_WINDOW_MS`        | `500` | Time window for shake detection (ms)          |
+| `HAND_CARD_OVERLAP`      | `28`  | Horizontal overlap between cards in hand (px) |
+| `HAND_PADDING`           | `16`  | Padding around hand zone (px)                 |
+| `ZONE_MIN_WIDTH`         | `63`  | Minimum zone width (1.5x card width)          |
+| `ZONE_MIN_HEIGHT`        | `90`  | Minimum zone height (1.5x card height)        |
+| `ZONE_DEFAULT_WIDTH`     | `120` | Default zone width (2x card height)           |
+| `ZONE_DEFAULT_HEIGHT`    | `120` | Default zone height (2x card height)          |
+| `CURSOR_THROTTLE_MS`     | `50`  | Throttle cursor updates (client-side)         |
 
 ---
 
@@ -189,14 +234,25 @@ Cards are rendered with the following z-index priority (highest on top):
 
 ### Card States
 
-| State        | Class           | Visual                                        |
-| ------------ | --------------- | --------------------------------------------- |
-| Default      | `.card`         | Drop shadow, grab cursor                      |
-| Dragging     | `.dragging`     | Grabbing cursor, elevated z-index             |
-| In Stack     | `.in-deck`      | Part of a stack                               |
-| Stack Target | `.stack-target` | Yellow outline + glow (hover-ready indicator) |
-| Face Down    | `.face-down`    | Shows card back sprite                        |
-| Selected     | `.selected`     | Blue outline + glow                           |
+| State          | Class             | Visual                                        |
+| -------------- | ----------------- | --------------------------------------------- |
+| Default        | `.card`           | Drop shadow, grab cursor                      |
+| Dragging       | `.dragging`       | Grabbing cursor, elevated z-index             |
+| In Stack       | `.in-deck`        | Part of a stack                               |
+| Stack Target   | `.stack-target`   | Yellow outline + glow (hover-ready indicator) |
+| Face Down      | `.face-down`      | Shows card back sprite                        |
+| Selected       | `.selected`       | Blue outline + glow                           |
+| Locked (Other) | `.locked`         | Dimmed, shows other player's color            |
+| Shuffling      | `.shuffling-card` | CSS animation during shuffle                  |
+
+### Zone States
+
+| State   | Visual                                    |
+| ------- | ----------------------------------------- |
+| Default | Dotted border, label at top               |
+| Locked  | Lock icon shown                           |
+| Hover   | Highlight when card dragged over          |
+| Private | Eye icon indicates visibility restriction |
 
 ---
 
@@ -251,12 +307,24 @@ flowchart TD
 
 ---
 
+## Implemented Features ✅
+
+- [x] **Shuffle** — Shake held stack to randomize card order
+- [x] **Flip** — Double-click/tap to flip cards or stacks
+- [x] **Multi-select** — Ctrl+click to select multiple free cards
+- [x] **Zone layouts** — Stack, row, column, grid, fan, circle arrangements
+- [x] **Zone visibility** — Public, owner-only, and hidden zones
+- [x] **Real-time multiplayer** — Server-authoritative state with WebSocket sync
+- [x] **Chat system** — In-game messaging with history
+- [x] **Remote cursors** — See other players' cursor positions
+- [x] **Table persistence** — SQLite storage for game state
+- [x] **Table settings** — Background themes (felt, wood, slate)
+
 ## Future Considerations
 
-- [ ] **Shuffle** — Randomize card order in a stack
 - [ ] **Deal** — Animate cards from deck to positions
-- [ ] **Flip** — Show card face/back
-- [ ] **Fan** — Spread stack for visibility
-- [ ] **Multi-select** — Drag multiple free cards
+- [ ] **Fan spread** — Interactive spread view for stacks
 - [ ] **Snap zones** — Predefined drop areas with rules
-- [ ] **Undo/Redo** — Action history
+- [ ] **Undo/Redo** — Action history with server validation
+- [ ] **Custom decks** — Upload custom card images
+- [ ] **Game entities** — Counters, tokens, dice, timers

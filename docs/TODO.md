@@ -1,34 +1,77 @@
 # Todo List
 
-## Table Management
+## Completed Features ✅
 
-[x] server-side persistence of tables and game state (SQLite)
-[x] button to reset table to initial state
-[x] table visibility (public/private)
-[x] table settings (background)
-[x] improved table browser (search, filters, sorting)
-[x] minimap "current view" rectangle should be contained within the minimap view bounds
-[x] table name should be editable from the table view
-[ ] player cursors still do not show if the player refreshes the page
-[ ] table settings (music) _FUTURE_
+### Table Management
 
-## Cards & Zones
+- [x] Server-side persistence of tables and game state (SQLite)
+- [x] Button to reset table to initial state
+- [x] Table visibility (public/private)
+- [x] Table settings (background themes)
+- [x] Improved table browser (search, filters, sorting)
+- [x] Minimap with "current view" rectangle contained within bounds
+- [x] Table name editable from the table view
 
-[x] cards in-hand order is reset when the server "syncs" the table
-[x] zone visibility settings (player specific zones, hidden zones, etc)
-[x] multi-select from hand
-[x] zone card layouts (row, column, grid, fan, etc)
-[x] zone card settings (size, spacing, etc)
-[x] should not be able to select cards in the middle of a stack
-[x] stack height should be based on number of cards, not pixel height
-[x] zones with non-stack layouts should support pulling any card, not just top/bottom
-[x] zone card layouts (additional layouts: fan, circle, etc)
+### Cards & Zones
 
-## Social Features
+- [x] Cards in-hand order preserved on server sync
+- [x] Zone visibility settings (public, owner-only, hidden)
+- [x] Multi-select from hand
+- [x] Zone card layouts (stack, row, column, grid, fan, circle)
+- [x] Zone card settings (scale, spacing, random offset, random rotation)
+- [x] Cannot select cards in the middle of a stack
+- [x] Stack height based on number of cards, not pixel height
+- [x] Non-stack layouts support pulling any card
+- [x] Shuffle stacks by shaking
 
-[x] some way for players to know how many cards are in other player's hands
-[x] chat system
+### Social Features
 
-## Game Entities
+- [x] Hand card counts visible to other players
+- [x] Chat system with history
+- [x] Remote player cursors with state indicators (default, grab, grabbing)
+- [x] Player names and colors
 
-[ ] additional entities (counters, tokens, timers, etc)
+---
+
+## In Progress / Known Issues 🔧
+
+### Multiplayer
+
+- [ ] Player cursors may not show immediately after page refresh
+- [ ] Session reconnection could be more robust
+
+---
+
+## Future Features 🚀
+
+### Table Management
+
+- [ ] Table settings (ambient music/sounds)
+- [ ] Table templates (save/load table configurations)
+- [ ] Undo/redo action history
+
+### Game Entities
+
+- [ ] Additional entities (counters, tokens, dice, timers)
+- [ ] Custom card decks (upload images)
+- [ ] Card annotations/markers
+
+### Social Features
+
+- [ ] Spectator mode (read-only observers)
+- [ ] Turn system (optional turn-based mode)
+- [ ] Voice/video chat (WebRTC)
+- [ ] Private messaging between players
+
+### Advanced Card Mechanics
+
+- [ ] Card reveal (show card to specific players)
+- [ ] Deal animation (distribute cards from deck)
+- [ ] Fan spread (view all cards in stack)
+- [ ] Peek at cards without revealing
+
+### Host Controls
+
+- [ ] Kick/ban players
+- [ ] Lock table (prevent new joins)
+- [ ] Permission system (who can move cards, create zones, etc.)
