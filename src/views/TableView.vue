@@ -1001,7 +1001,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="table-view" :class="cursorClass">
+  <div class="table-view" :class="cursorClass" @contextmenu.prevent>
     <!-- Header bar -->
     <header class="table-header">
       <div class="table-header__left">
