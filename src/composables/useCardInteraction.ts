@@ -156,24 +156,22 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       return Math.max(0, Math.min(cardCount - 1, idx))
     } else if (layout === 'circle') {
       // Circle layout - calculate based on angle from center
+      // Uses ~330 degrees (11/12 of circle) with a gap at the bottom
       const centerX = zone.width / 2
       const centerY = zone.height / 2
-      const angleStep = cardCount > 0 ? (Math.PI * 2) / cardCount : 0
-      const startAngle = -Math.PI / 2
+      const arcSpan = Math.PI * 2 * (11 / 12)
+      const angleStep = cardCount > 1 ? arcSpan / (cardCount - 1) : 0
+      const startAngle = -Math.PI / 2 - arcSpan / 2 // Center the arc at top
 
       // Calculate angle from center to drop position
       const dx = relX - centerX
       const dy = relY - centerY
-      let dropAngle = Math.atan2(dy, dx)
+      const dropAngle = Math.atan2(dy, dx)
 
-      // Normalize angle relative to start angle
-      let relativeAngle = dropAngle - startAngle
-      if (relativeAngle < 0) relativeAngle += Math.PI * 2
-
-      // Convert angle to index
+      // Convert angle to index relative to start angle
       if (angleStep === 0) return 0
-      const idx = Math.round(relativeAngle / angleStep)
-      return Math.max(0, Math.min(cardCount - 1, idx % cardCount))
+      const idx = Math.round((dropAngle - startAngle) / angleStep)
+      return Math.max(0, Math.min(cardCount - 1, idx))
     } else {
       // For stack layout, use distance-based calculation
       // Find closest card position

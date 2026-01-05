@@ -252,14 +252,16 @@ export const useCardStore = defineStore('cards', () => {
             applyRandomization(card, baseX, baseY, fanRotation)
           })
         } else if (layout === 'circle') {
-          // Arrange cards in a circle pattern
+          // Arrange cards in a circle pattern with a gap at the bottom
           const centerX = zone.x + zone.width / 2
           const centerY = zone.y + zone.height / 2
           // Spacing affects radius - tighter = smaller circle, spread = larger circle
           const baseRadius = Math.min(zone.width, zone.height) / 2 - CARD_W / 2 - 10
           const radius = baseRadius * spacingMultiplier
-          const angleStep = cardCount > 0 ? (Math.PI * 2) / cardCount : 0
-          const startAngle = -Math.PI / 2 // Start from top
+          // Use ~330 degrees (11/12 of circle) to leave a gap at the bottom
+          const arcSpan = Math.PI * 2 * (11 / 12)
+          const angleStep = cardCount > 1 ? arcSpan / (cardCount - 1) : 0
+          const startAngle = -Math.PI / 2 - arcSpan / 2 // Center the arc at top
 
           stack.anchorX = centerX
           stack.anchorY = centerY
@@ -375,8 +377,10 @@ export const useCardStore = defineStore('cards', () => {
       const centerY = zone.y + zone.height / 2
       const baseRadius = Math.min(zone.width, zone.height) / 2 - CARD_W / 2 - 10
       const radius = baseRadius * spacingMultiplier
-      const angleStep = cardCount > 0 ? (Math.PI * 2) / cardCount : 0
-      const startAngle = -Math.PI / 2
+      // Use ~330 degrees (11/12 of circle) to leave a gap at the bottom
+      const arcSpan = Math.PI * 2 * (11 / 12)
+      const angleStep = cardCount > 1 ? arcSpan / (cardCount - 1) : 0
+      const startAngle = -Math.PI / 2 - arcSpan / 2 // Center the arc at top
       const angle = startAngle + cardIndex * angleStep
       const x = centerX + Math.cos(angle) * radius - CARD_W / 2
       const y = centerY + Math.sin(angle) * radius - CARD_H / 2
