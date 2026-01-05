@@ -288,14 +288,15 @@ describe('useHand', () => {
       expect(drag.isDragging.value).toBe(false) // Should not start drag
     })
 
-    it('handles right-click for face-down drag', () => {
+    it('handles Shift+click for face-down drag', () => {
       cardStore.createCards(2)
       cardStore.addToHand(1)
 
       const hand = useHand(canvasRef, handRef, drag)
 
       const event = createMockPointerEvent('pointerdown', {
-        button: 2, // Right click
+        button: 0, // Left click
+        shiftKey: true, // Shift held
         pointerId: 1,
         clientX: 350,
         clientY: 560,
@@ -309,14 +310,14 @@ describe('useHand', () => {
       expect(hand.drawFaceDown.value).toBe(true)
     })
 
-    it('ignores middle-click', () => {
+    it('ignores right-click', () => {
       cardStore.createCards(1)
       cardStore.addToHand(1)
 
       const hand = useHand(canvasRef, handRef, drag)
 
       const event = createMockPointerEvent('pointerdown', {
-        button: 1, // Middle click
+        button: 2, // Right click
         pointerId: 1,
       })
 

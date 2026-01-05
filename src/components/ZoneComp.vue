@@ -31,6 +31,7 @@ const emit = defineEmits<{
   pointerdown: [event: PointerEvent]
   pointermove: [event: PointerEvent]
   pointerup: [event: PointerEvent]
+  contextmenu: [event: MouseEvent]
   dblclick: [event: MouseEvent]
   'zone:update': [zoneId: number, updates: Partial<Omit<Zone, 'id' | 'stackId'>>]
   'zone:delete': [zoneId: number]
@@ -179,7 +180,7 @@ defineExpose({ openModal })
     @pointerup="emit('pointerup', $event)"
     @pointercancel="emit('pointerup', $event)"
     @dblclick.stop="handleDoubleClick"
-    @contextmenu.prevent
+    @contextmenu="emit('contextmenu', $event)"
   >
     <div class="zone__header">
       <span class="zone__label">{{ zone.label }}</span>

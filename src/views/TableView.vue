@@ -12,12 +12,15 @@ import TableSettingsPanel from '@/components/ui/TableSettingsPanel.vue'
 import PlayersPanel from '@/components/ui/PlayersPanel.vue'
 import ChatPanel from '@/components/ui/ChatPanel.vue'
 import InstructionsPanel from '@/components/ui/InstructionsPanel.vue'
+import RadialMenu from '@/components/ui/RadialMenu.vue'
+import type { RadialMenuItem } from '@/components/ui/RadialMenu.vue'
 import { useCardStore } from '@/stores/cards'
 import { useCardInteraction } from '@/composables/useCardInteraction'
 import { useViewport } from '@/composables/useViewport'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useCursor } from '@/composables/useCursor'
 import { useRemoteThrow } from '@/composables/useRemoteThrow'
+import { useRadialMenu, type RadialMenuTarget } from '@/composables/useRadialMenu'
 import { SquarePlus, Copy, Check, LogOut, Users, Wifi, WifiOff, Settings } from 'lucide-vue-next'
 import {
   CARD_BACK_COL,
@@ -247,6 +250,9 @@ const interaction = useCardInteraction({
 
 // Remote throw physics for other players' card throws
 const remoteThrow = useRemoteThrow((id) => cardStore.cards.find((c) => c.id === id))
+
+// Radial context menu
+const radialMenu = useRadialMenu()
 
 // Compute cursor class based on interaction state
 const cursorClass = computed(() => {
@@ -830,6 +836,411 @@ const onZoneDelete = (zoneId: number) => {
   })
 }
 
+// Right-click handler for cards to open radial menu
+const onCardRightClick = (event: MouseEvent, index: number) => {
+  event.preventDefault()
+  event.stopPropagation()
+
+  const card = cardStore.cards[index]
+  if (!card) return
+
+  // If card is part of a selection with multiple cards, use selection menu
+  if (cardStore.isSelected(card.id) && cardStore.getSelectedIds().length > 1) {
+    radialMenu.open(event.clientX, event.clientY, {
+      type: 'selection',
+      cardIds: cardStore.getSelectedIds(),
+    })
+    return
+  }
+
+  // If card is in a stack, show stack menu
+  if (card.stackId !== null) {
+    const stack = cardStore.stacks.find((s) => s.id === card.stackId)
+    if (stack) {
+      radialMenu.open(event.clientX, event.clientY, {
+        type: 'stack',
+        stackId: stack.id,
+        cardCount: stack.cardIds.length,
+      })
+      return
+    }
+  }
+
+  // Single free card
+  radialMenu.open(event.clientX, event.clientY, {
+    type: 'card',
+    cardId: card.id,
+    isInStack: false,
+    isFaceUp: card.faceUp,
+  })
+}
+
+// Right-click handler for zones
+const onZoneRightClick = (event: MouseEvent, zoneId: number) => {
+  event.preventDefault()
+  event.stopPropagation()
+
+  radialMenu.open(event.clientX, event.clientY, {
+    type: 'zone',
+    zoneId,
+  })
+}
+
+// Right-click on canvas (empty space)
+const onCanvasRightClick = (event: MouseEvent) => {
+  event.preventDefault()
+
+  // Convert to world coordinates for zone creation position
+  const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
+  radialMenu.open(event.clientX, event.clientY, {
+    type: 'canvas',
+    worldX: worldPos.x,
+    worldY: worldPos.y,
+  })
+}
+
+// Right-click handler for hand cards
+const onHandCardRightClick = (event: MouseEvent, cardId: number) => {
+  event.preventDefault()
+  event.stopPropagation()
+
+  const card = cardStore.cards.find((c) => c.id === cardId)
+  if (!card) return
+
+  // If card is part of a hand selection with multiple cards, use hand-selection menu
+  if (
+    handCompRef.value?.isHandCardSelected(cardId) &&
+    (handCompRef.value?.handSelectionCount ?? 0) > 1
+  ) {
+    radialMenu.open(event.clientX, event.clientY, {
+      type: 'hand-selection',
+      cardIds: [...(handCompRef.value?.selectedHandCardIds ?? [])],
+    })
+    return
+  }
+
+  // Single hand card
+  radialMenu.open(event.clientX, event.clientY, {
+    type: 'hand-card',
+    cardId: card.id,
+    isFaceUp: card.faceUp,
+  })
+}
+
+// Handle radial menu item selection
+const onRadialMenuSelect = (item: RadialMenuItem) => {
+  const target = radialMenu.target.value
+  if (!target) return
+
+  trackActivity()
+
+  switch (target.type) {
+    case 'card':
+      handleCardAction(item.id, target.cardId)
+      break
+    case 'stack':
+      handleStackAction(item.id, target.stackId)
+      break
+    case 'zone':
+      handleZoneAction(item.id, target.zoneId)
+      break
+    case 'selection':
+      handleSelectionAction(item.id, target.cardIds)
+      break
+    case 'hand-card':
+      handleHandCardAction(item.id, target.cardId)
+      break
+    case 'hand-selection':
+      handleHandSelectionAction(item.id, target.cardIds)
+      break
+    case 'canvas':
+      handleCanvasAction(item.id, target.worldX, target.worldY)
+      break
+  }
+}
+
+const handleCardAction = (action: string, cardId: number) => {
+  const card = cardStore.cards.find((c) => c.id === cardId)
+  if (!card) return
+
+  switch (action) {
+    case 'flip':
+      cardStore.flipCard(cardId)
+      ws.send({ type: 'card:flip', cardId })
+      break
+    case 'to-hand':
+      if (cardStore.addToHand(cardId)) {
+        ws.send({ type: 'hand:add', cardId })
+      }
+      break
+    case 'pick-up':
+      cardStore.removeFromStack(cardId)
+      ws.send({ type: 'stack:remove_card', cardId })
+      break
+  }
+}
+
+const handleStackAction = (action: string, stackId: number) => {
+  const stack = cardStore.stacks.find((s) => s.id === stackId)
+  if (!stack) return
+
+  switch (action) {
+    case 'flip-stack':
+      cardStore.flipStack(stackId)
+      ws.send({ type: 'stack:flip', stackId })
+      break
+    case 'shuffle':
+      cardStore.shuffleStack(stackId)
+      ws.send({ type: 'stack:shuffle', stackId })
+      break
+    case 'spread': {
+      // Spread cards out in a row from the stack position
+      const spacing = CARD_W + 10
+      const startX = stack.anchorX - ((stack.cardIds.length - 1) * spacing) / 2
+      stack.cardIds.forEach((cardId, i) => {
+        const card = cardStore.cards.find((c) => c.id === cardId)
+        if (card) {
+          cardStore.removeFromStack(cardId)
+          card.x = startX + i * spacing
+          card.y = stack.anchorY
+          ws.send({ type: 'card:move', cardId, x: card.x, y: card.y })
+        }
+      })
+      break
+    }
+    case 'flip-all':
+      // Flip all cards in stack individually
+      stack.cardIds.forEach((cardId) => {
+        cardStore.flipCard(cardId)
+        ws.send({ type: 'card:flip', cardId })
+      })
+      break
+    case 'draw-top': {
+      // Draw just the top card from stack
+      const topCardId = stack.cardIds[stack.cardIds.length - 1]
+      if (topCardId !== undefined) {
+        cardStore.addToHand(topCardId)
+        ws.send({ type: 'hand:add', cardId: topCardId })
+      }
+      break
+    }
+    case 'all-to-hand':
+      cardStore.addStackToHand(stackId)
+      ws.send({ type: 'hand:add_stack', stackId })
+      break
+  }
+}
+
+const handleZoneAction = (action: string, zoneId: number) => {
+  const zone = cardStore.zones.find((z) => z.id === zoneId)
+  if (!zone) return
+
+  switch (action) {
+    case 'zone-settings':
+      // Open zone settings - could emit an event or set a ref
+      // For now, this is a placeholder
+      break
+    case 'zone-lock':
+      ws.send({ type: 'zone:update', zoneId, updates: { locked: !zone.locked } })
+      break
+    case 'zone-flip-all':
+      if (zone.stackId !== null) {
+        const stack = cardStore.stacks.find((s) => s.id === zone.stackId)
+        if (stack) {
+          stack.cardIds.forEach((cardId) => {
+            cardStore.flipCard(cardId)
+            ws.send({ type: 'card:flip', cardId })
+          })
+        }
+      }
+      break
+    case 'zone-shuffle':
+      if (zone.stackId !== null) {
+        cardStore.shuffleStack(zone.stackId)
+        ws.send({ type: 'stack:shuffle', stackId: zone.stackId })
+      }
+      break
+    case 'zone-delete':
+      ws.send({ type: 'zone:delete', zoneId })
+      break
+  }
+}
+
+const handleSelectionAction = (action: string, cardIds: number[]) => {
+  switch (action) {
+    case 'stack-selection': {
+      // Find center of selection
+      let sumX = 0,
+        sumY = 0,
+        count = 0
+      cardIds.forEach((id) => {
+        const card = cardStore.cards.find((c) => c.id === id)
+        if (card) {
+          sumX += card.x
+          sumY += card.y
+          count++
+        }
+      })
+      if (count > 0) {
+        const newStack = cardStore.stackSelection(sumX / count, sumY / count)
+        if (newStack) {
+          ws.send({
+            type: 'stack:create',
+            cardIds: newStack.cardIds,
+            anchorX: newStack.anchorX,
+            anchorY: newStack.anchorY,
+          })
+        }
+      }
+      break
+    }
+    case 'flip-selection':
+      cardIds.forEach((cardId) => {
+        cardStore.flipCard(cardId)
+        ws.send({ type: 'card:flip', cardId })
+      })
+      break
+    case 'to-hand':
+      cardIds.forEach((cardId) => {
+        if (cardStore.addToHand(cardId)) {
+          ws.send({ type: 'hand:add', cardId })
+        }
+      })
+      cardStore.clearSelection()
+      break
+    case 'deselect':
+      cardStore.clearSelection()
+      break
+  }
+}
+
+const handleCanvasAction = (action: string, worldX: number, worldY: number) => {
+  switch (action) {
+    case 'create-zone': {
+      // Create zone centered on the click position
+      const x = worldX - ZONE_DEFAULT_WIDTH / 2
+      const y = worldY - ZONE_DEFAULT_HEIGHT / 2
+      ws.send({
+        type: 'zone:create',
+        x,
+        y,
+        width: ZONE_DEFAULT_WIDTH,
+        height: ZONE_DEFAULT_HEIGHT,
+        label: 'New Zone',
+        faceUp: false,
+      })
+      break
+    }
+    case 'deal-card':
+      // TODO: Deal from a deck
+      break
+    case 'reset-view':
+      viewport.resetViewport()
+      break
+  }
+}
+
+const handleHandCardAction = (action: string, cardId: number) => {
+  const card = cardStore.cards.find((c) => c.id === cardId)
+  if (!card) return
+
+  switch (action) {
+    case 'play-to-table': {
+      // Remove from hand and place on table face-up at center of viewport
+      const bounds = viewport.getVisibleBounds()
+      const x = bounds.x + bounds.width / 2 - CARD_W / 2
+      const y = bounds.y + bounds.height / 2 - CARD_H / 2
+      cardStore.removeFromHand(cardId)
+      card.x = x
+      card.y = y
+      card.faceUp = true
+      ws.send({ type: 'hand:remove', cardId, x, y, faceUp: true })
+      break
+    }
+    case 'play-face-down': {
+      // Remove from hand and place on table face-down at center of viewport
+      const bounds = viewport.getVisibleBounds()
+      const x = bounds.x + bounds.width / 2 - CARD_W / 2
+      const y = bounds.y + bounds.height / 2 - CARD_H / 2
+      cardStore.removeFromHand(cardId)
+      card.x = x
+      card.y = y
+      card.faceUp = false
+      ws.send({ type: 'hand:remove', cardId, x, y, faceUp: false })
+      break
+    }
+  }
+}
+
+const handleHandSelectionAction = (action: string, cardIds: number[]) => {
+  switch (action) {
+    case 'play-all-to-table': {
+      // Play all selected cards to table, spread out
+      const bounds = viewport.getVisibleBounds()
+      const startX = bounds.x + bounds.width / 2 - ((cardIds.length - 1) * (CARD_W + 10)) / 2
+      const centerY = bounds.y + bounds.height / 2 - CARD_H / 2
+
+      cardIds.forEach((cardId, i) => {
+        const card = cardStore.cards.find((c) => c.id === cardId)
+        if (card) {
+          const x = startX + i * (CARD_W + 10)
+          const y = centerY
+          cardStore.removeFromHand(cardId)
+          card.x = x
+          card.y = y
+          ws.send({ type: 'hand:remove', cardId, x, y, faceUp: card.faceUp })
+        }
+      })
+      handCompRef.value?.clearHandSelection()
+      break
+    }
+    case 'stack-and-play': {
+      // Create a stack from selected cards and play to table
+      const bounds = viewport.getVisibleBounds()
+      const centerX = bounds.x + bounds.width / 2 - CARD_W / 2
+      const centerY = bounds.y + bounds.height / 2 - CARD_H / 2
+
+      // Remove all from hand first
+      cardIds.forEach((cardId) => {
+        const card = cardStore.cards.find((c) => c.id === cardId)
+        if (card) {
+          cardStore.removeFromHand(cardId)
+          ws.send({ type: 'hand:remove', cardId, x: centerX, y: centerY, faceUp: card.faceUp })
+        }
+      })
+
+      // Create stack
+      const newStack = cardStore.createStackAt(centerX, centerY, 'free')
+      cardIds.forEach((cardId) => {
+        const card = cardStore.cards.find((c) => c.id === cardId)
+        if (card) {
+          newStack.cardIds.push(cardId)
+          card.stackId = newStack.id
+          card.isInDeck = true
+        }
+      })
+      cardStore.updateStackPositions(newStack)
+
+      ws.send({
+        type: 'stack:create',
+        cardIds: newStack.cardIds,
+        anchorX: newStack.anchorX,
+        anchorY: newStack.anchorY,
+      })
+      handCompRef.value?.clearHandSelection()
+      break
+    }
+    case 'flip-selection':
+      cardIds.forEach((cardId) => {
+        cardStore.flipCard(cardId)
+      })
+      break
+    case 'deselect':
+      handCompRef.value?.clearHandSelection()
+      break
+  }
+}
+
 // Canvas dimensions for minimap
 const canvasDimensions = computed(() => {
   const rect = canvasRef.value?.getBoundingClientRect()
@@ -944,6 +1355,9 @@ const onKeyUp = (event: KeyboardEvent) => {
 
 // Canvas pointer handlers for panning
 const onCanvasPointerDown = (event: PointerEvent) => {
+  // Close radial menu on any click
+  radialMenu.close()
+
   // Close any open panels when clicking on canvas
   showSettings.value = false
   showPlayers.value = false
@@ -1140,6 +1554,7 @@ onBeforeUnmount(() => {
       @pointermove="onCanvasPointerMove"
       @pointerup="onCanvasPointerUp"
       @pointercancel="onCanvasPointerUp"
+      @contextmenu="onCanvasRightClick"
     >
       <!-- Table UI (fixed position, not affected by pan/zoom) -->
       <div class="table-ui">
@@ -1169,6 +1584,7 @@ onBeforeUnmount(() => {
           @pointerdown="interaction.onZonePointerDown($event, zone.id)"
           @pointermove="interaction.onZonePointerMove"
           @pointerup="interaction.onZonePointerUp"
+          @contextmenu="onZoneRightClick($event, zone.id)"
           @zone:update="onZoneUpdate"
           @zone:delete="onZoneDelete"
         />
@@ -1210,7 +1626,7 @@ onBeforeUnmount(() => {
           @pointermove="interaction.onCardPointerMove"
           @pointerup="onPointerUp"
           @pointercancel="onPointerUp"
-          @contextmenu="interaction.onCardContextMenu"
+          @contextmenu="onCardRightClick($event, index)"
           @dblclick="interaction.onCardDoubleClick($event, index)"
         />
 
@@ -1257,6 +1673,7 @@ onBeforeUnmount(() => {
         :drag="interaction.drag"
         :is-drop-target="interaction.isOverHand.value"
         @card-pointer-up="onPointerUp"
+        @card-context-menu="onHandCardRightClick"
       />
 
       <!-- Selection count indicator -->
@@ -1275,6 +1692,16 @@ onBeforeUnmount(() => {
 
     <!-- Instructions Panel -->
     <InstructionsPanel v-model:is-open="showInstructions" />
+
+    <!-- Radial Context Menu -->
+    <RadialMenu
+      :visible="radialMenu.visible.value"
+      :x="radialMenu.position.value.x"
+      :y="radialMenu.position.value.y"
+      :items="radialMenu.items.value"
+      @select="onRadialMenuSelect"
+      @close="radialMenu.close()"
+    />
   </div>
 </template>
 

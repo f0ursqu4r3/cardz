@@ -13,6 +13,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   cardPointerUp: [event: PointerEvent]
+  cardContextMenu: [event: MouseEvent, cardId: number]
 }>()
 
 const cardStore = useCardStore()
@@ -46,8 +47,9 @@ const onCardPointerUp = (event: PointerEvent) => {
 }
 
 // Prevent context menu on right-click drag
-const onCardContextMenu = (event: Event) => {
+const onCardContextMenu = (event: MouseEvent, cardId: number) => {
   event.preventDefault()
+  emit('cardContextMenu', event, cardId)
 }
 
 // Expose hand methods for parent component
@@ -102,7 +104,7 @@ defineExpose({
         @pointermove="hand.onHandCardPointerMove"
         @pointerup="onCardPointerUp"
         @pointercancel="onCardPointerUp"
-        @contextmenu="onCardContextMenu"
+        @contextmenu="onCardContextMenu($event, card.id)"
       />
       <!-- Ghost card for reordering -->
       <Card

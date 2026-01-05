@@ -127,8 +127,8 @@ export function useHand(
 
   // Hand card event handlers
   const onHandCardPointerDown = (event: PointerEvent, cardId: number) => {
-    // Accept left-click (0) or right-click (2)
-    if (event.button !== 0 && event.button !== 2) return
+    // Only accept left-click (0)
+    if (event.button !== 0) return
 
     event.preventDefault()
     const targetEl = event.currentTarget as HTMLElement | null
@@ -137,13 +137,13 @@ export function useHand(
     // Ctrl+click or Cmd+click for multi-select
     const isCtrlClick = event.ctrlKey || event.metaKey
 
-    if (isCtrlClick && event.button === 0) {
+    if (isCtrlClick) {
       toggleHandCardSelection(cardId)
       return
     }
 
-    // Right-click: immediately start face-down drag
-    if (event.button === 2) {
+    // Shift+click: immediately start face-down drag
+    if (event.shiftKey) {
       // If card is selected, drag all selected cards face-down
       if (isHandCardSelected(cardId)) {
         // Add the card to selection if not already

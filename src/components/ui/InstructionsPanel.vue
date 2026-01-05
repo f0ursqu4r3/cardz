@@ -94,8 +94,10 @@ const closePanel = () => {
           <h4>Hand</h4>
           <ul class="instructions__list">
             <li>Drop card on hand zone — Add to hand</li>
-            <li>Drag card out of hand — Play card</li>
+            <li>Drag card out of hand — Play card face-up</li>
+            <li><kbd>Shift</kbd> + drag card out — Play card face-down</li>
             <li><kbd>Ctrl</kbd> + click — Select multiple in hand</li>
+            <li>Right-click — Context menu</li>
           </ul>
 
           <h4>Zones</h4>
@@ -133,7 +135,8 @@ const closePanel = () => {
           <h4>Hand</h4>
           <ul class="instructions__list">
             <li>Drop card on hand zone — Add to hand</li>
-            <li>Drag card out of hand — Play card</li>
+            <li>Drag card out of hand — Play card face-up</li>
+            <li>Long-press + drag out — Play card face-down</li>
           </ul>
 
           <h4>Zones</h4>
