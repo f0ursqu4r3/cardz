@@ -113,12 +113,16 @@ export const useCardStore = defineStore('cards', () => {
         }
 
         if (layout === 'stack') {
-          // Original stack behavior - center cards (no randomization for stacks)
-          const cardCount = stack.cardIds.length
-          const stackWidth = CARD_W + Math.max(0, cardCount - 1) * STACK_OFFSET_X
-          const stackHeight = CARD_H + Math.max(0, cardCount - 1) * Math.abs(STACK_OFFSET_Y)
-          stack.anchorX = zone.x + (zone.width - stackWidth) / 2
-          stack.anchorY = zone.y + (zone.height - stackHeight) / 2
+          // Stack layout - center the stack visually in the zone
+          const stackCardCount = stack.cardIds.length
+          // Stack grows upward (negative Y offset), so calculate total visual height
+          const totalOffsetY = Math.max(0, stackCardCount - 1) * Math.abs(STACK_OFFSET_Y)
+          // Center the card (not the anchor) in the zone
+          const centerX = zone.x + (zone.width - CARD_W) / 2
+          const centerY = zone.y + (zone.height - CARD_H) / 2
+          // Anchor is at the bottom card, offset upward by half the stack's visual depth
+          stack.anchorX = centerX
+          stack.anchorY = centerY + totalOffsetY / 2
 
           stack.cardIds.forEach((id, idx) => {
             const card = cards.value.find((item) => item.id === id)
@@ -194,19 +198,23 @@ export const useCardStore = defineStore('cards', () => {
             applyRandomization(card, baseX, baseY, 0)
           })
         } else if (layout === 'fan') {
-          // Arrange cards in a fan/arc pattern
-          // Spacing affects arc width - tighter = smaller arc, spread = wider arc
-          const centerX = zone.x + zone.width / 2
-          const centerY = zone.y + zone.height + 50 // Center below the zone
-          const radius = Math.max(80, zone.height * 0.8)
+          // Arrange cards in a fan/arc pattern (like holding cards in hand)
+          // Arc center is below the visible area so cards fan upward
+          const zoneCenterX = zone.x + zone.width / 2
+          const zoneCenterY = zone.y + zone.height / 2
+          const radius = Math.max(150, zone.height * 1.5)
           // Arc span scales with spacing: tight=narrow fan, spread=wide fan
-          const baseArcSpan = Math.PI * 0.4 * spacingMultiplier
-          const arcSpan = Math.min(baseArcSpan, cardCount * 0.2) // Cap based on card count
+          const baseArcSpan = Math.PI * 0.3 * spacingMultiplier
+          const arcSpan = Math.min(baseArcSpan, cardCount * 0.12) // Cap based on card count
           const startAngle = Math.PI / 2 + arcSpan / 2 // Start from left side
           const angleStep = cardCount > 1 ? arcSpan / (cardCount - 1) : 0
 
-          stack.anchorX = centerX
-          stack.anchorY = zone.y + zone.height / 2
+          // Position arc center below the zone center so the top of the arc is centered
+          const arcCenterX = zoneCenterX
+          const arcCenterY = zoneCenterY + radius - CARD_H / 2
+
+          stack.anchorX = zoneCenterX
+          stack.anchorY = zoneCenterY
 
           stack.cardIds.forEach((id, idx) => {
             const card = cards.value.find((item) => item.id === id)
@@ -214,10 +222,12 @@ export const useCardStore = defineStore('cards', () => {
             card.stackId = stack.id
             card.isInDeck = true
             const angle = startAngle - idx * angleStep
-            const baseX = centerX + Math.cos(angle) * radius - CARD_W / 2
-            const baseY = centerY - Math.sin(angle) * radius - CARD_H / 2
-            // Fan cards rotate to follow the arc
-            const fanRotation = -(startAngle - angle) * (180 / Math.PI)
+            const baseX = arcCenterX + Math.cos(angle) * radius - CARD_W / 2
+            const baseY = arcCenterY - Math.sin(angle) * radius - CARD_H / 2
+            // Fan cards rotate to follow the arc (perpendicular to radius)
+            // At angle PI/2 (top), rotation should be 0
+            // Cards to the left rotate clockwise (negative), cards to the right rotate counter-clockwise (positive)
+            const fanRotation = (Math.PI / 2 - angle) * (180 / Math.PI)
             applyRandomization(card, baseX, baseY, fanRotation)
           })
         } else if (layout === 'circle') {
@@ -769,6 +779,10 @@ export const useCardStore = defineStore('cards', () => {
     nextStackId = state.nextStackId
     nextZoneId = state.nextZoneId
     zCounter = state.zCounter
+
+    // Recalculate card positions based on zone layouts
+    // (server stores simple stack positions, client applies zone layouts)
+    updateAllStacks()
   }
 
   // Update a single card from server
