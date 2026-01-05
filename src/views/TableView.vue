@@ -126,6 +126,28 @@ const getStackSize = (card: (typeof cardStore.cards)[0]): number => {
   return stack ? stack.cardIds.length : 1
 }
 
+// Check if a card should appear face-down (considering zone visibility)
+const shouldShowFaceDown = (card: (typeof cardStore.cards)[0]): boolean => {
+  // If card is already face-down, always show face-down
+  if (!card.faceUp) return true
+
+  // Check if card is in a zone with visibility restrictions
+  if (card.stackId !== null) {
+    const stack = cardStore.stacks.find((s) => s.id === card.stackId)
+    if (stack?.zoneId !== undefined) {
+      const zone = cardStore.zones.find((z) => z.id === stack.zoneId)
+      if (zone) {
+        // 'hidden' visibility: cards always appear face-down to everyone
+        if (zone.visibility === 'hidden') return true
+        // 'owner' visibility: cards appear face-down to non-owners
+        if (zone.visibility === 'owner' && zone.ownerId !== ws.playerId.value) return true
+      }
+    }
+  }
+
+  return false
+}
+
 // Get the transform for a card (combines drag tilt with zone layout rotation)
 const getCardTransform = (card: (typeof cardStore.cards)[0], index: number): string | undefined => {
   const isDragging = interaction.drag.activeIndex.value === index
@@ -998,15 +1020,15 @@ onBeforeUnmount(() => {
             'stack-bottom': isStackBottom(card),
             'stack-target':
               interaction.hover.state.ready && interaction.hover.state.cardId === card.id,
-            'face-down': !card.faceUp,
+            'face-down': shouldShowFaceDown(card),
             selected: cardStore.isSelected(card.id),
             shuffling:
               cardStore.shufflingStackId !== null && card.stackId === cardStore.shufflingStackId,
             'locked-by-other': shouldShowLockGlow(card),
           }"
           :style="{
-            '--col': interaction.getCardCol(index),
-            '--row': interaction.getCardRow(index),
+            '--col': shouldShowFaceDown(card) ? CARD_BACK_COL : card.col,
+            '--row': shouldShowFaceDown(card) ? CARD_BACK_ROW : card.row,
             '--shuffle-seed': card.id % 10,
             '--lock-color': getCardLockColor(card),
             '--stack-size': isStackBottom(card) ? getStackSize(card) : 1,
