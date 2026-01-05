@@ -56,7 +56,12 @@ export function handleZoneUpdate(
     return
   }
 
-  if (zone.locked) {
+  // Allow unlocking a locked zone, but block other updates
+  const isOnlyUnlocking =
+    msg.updates.locked === false &&
+    Object.keys(msg.updates).length === 1
+
+  if (zone.locked && !isOnlyUnlocking) {
     send(ws, {
       type: 'error',
       originalAction: 'zone:update',
