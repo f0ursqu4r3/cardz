@@ -279,6 +279,14 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       stack.zoneId = undefined
       stack.kind = 'free'
       stackDetachedFromZone.value = true
+
+      // Reset rotation on all cards in the stack (they may have layout rotation from fan/circle)
+      for (const cardId of stack.cardIds) {
+        const stackCard = cardStore.cards.find((c) => c.id === cardId)
+        if (stackCard) {
+          stackCard.rotation = 0
+        }
+      }
     }
 
     const { x, y } = drag.getPending()
