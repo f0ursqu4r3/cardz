@@ -15,7 +15,20 @@ const sortBy = ref<'players' | 'newest' | 'oldest'>('players')
 // WebSocket connection for fetching public rooms
 let ws: WebSocket | null = null
 
-const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:9001`
+/**
+ * Get the WebSocket URL, auto-detecting protocol based on page protocol
+ */
+function getWsUrl(): string {
+  if (import.meta.env.VITE_WS_URL) {
+    return import.meta.env.VITE_WS_URL
+  }
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const host = window.location.hostname
+  const port = window.location.protocol === 'https:' ? '' : ':9001'
+  return `${protocol}//${host}${port}`
+}
+
+const wsUrl = getWsUrl()
 
 // Filtered and sorted tables
 const filteredTables = computed(() => {

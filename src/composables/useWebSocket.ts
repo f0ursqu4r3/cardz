@@ -66,7 +66,23 @@ export interface UseWebSocketReturn {
   offMessage: (handler: (message: ServerMessage) => void) => void
 }
 
-const DEFAULT_WS_URL = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:9001`
+/**
+ * Get the WebSocket URL, auto-detecting protocol based on page protocol
+ */
+function getDefaultWsUrl(): string {
+  // Use environment variable if set
+  if (import.meta.env.VITE_WS_URL) {
+    return import.meta.env.VITE_WS_URL
+  }
+  // Auto-detect: use wss:// for HTTPS, ws:// for HTTP
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  // In production (HTTPS), connect to same host; in dev, use port 9001
+  const host = window.location.hostname
+  const port = window.location.protocol === 'https:' ? '' : ':9001'
+  return `${protocol}//${host}${port}`
+}
+
+const DEFAULT_WS_URL = getDefaultWsUrl()
 const SESSION_ID_KEY = 'cardz_session_id'
 
 /**

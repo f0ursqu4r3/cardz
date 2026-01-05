@@ -11,6 +11,8 @@
     "dev:server": "bun run --watch server-src/index.ts",
     "server": "bun run server-src/index.ts",
     "build": "run-p type-check \"build-only {@}\" --",
+    "build:prod": "bun run build && cd server-src && bun install",
+    "start": "cd server-src && NODE_ENV=production bun run index.ts",
     "preview": "vite preview",
     "test:unit": "vitest",
     "build-only": "vite build",

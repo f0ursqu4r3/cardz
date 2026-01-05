@@ -55,11 +55,51 @@ const lastCursorUpdate = new Map<string, number>()
 // Type alias for Bun's WebSocket
 export type BunWebSocket = ServerWebSocket<ClientData>
 
+// Static file serving for production
+const STATIC_DIR = process.env.STATIC_DIR || '../dist'
+const isProduction = process.env.NODE_ENV === 'production'
+
+// MIME types for static files
+const MIME_TYPES: Record<string, string> = {
+  '.html': 'text/html',
+  '.js': 'application/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.eot': 'application/vnd.ms-fontobject',
+}
+
+async function serveStaticFile(pathname: string): Promise<Response | null> {
+  const extname = pathname.substring(pathname.lastIndexOf('.'))
+  const mimeType = MIME_TYPES[extname] || 'application/octet-stream'
+
+  try {
+    const filePath = `${STATIC_DIR}${pathname}`
+    const file = Bun.file(filePath)
+    if (await file.exists()) {
+      return new Response(file, {
+        headers: { 'Content-Type': mimeType },
+      })
+    }
+  } catch {
+    // File not found
+  }
+  return null
+}
+
 const server = Bun.serve<ClientData>({
   port: PORT,
   hostname: '0.0.0.0', // Listen on all network interfaces for remote connections
 
-  fetch(req, server) {
+  async fetch(req, server) {
     const url = new URL(req.url)
 
     // Health check endpoint
@@ -69,20 +109,47 @@ const server = Bun.serve<ClientData>({
       })
     }
 
-    // Upgrade to WebSocket
-    const success = server.upgrade(req, {
-      data: {
-        id: nanoid(),
-        roomCode: null,
-        name: '',
-      } as ClientData,
-    })
+    // Check if this is a WebSocket upgrade request
+    const upgradeHeader = req.headers.get('upgrade')
+    if (upgradeHeader?.toLowerCase() === 'websocket') {
+      const success = server.upgrade(req, {
+        data: {
+          id: nanoid(),
+          roomCode: null,
+          name: '',
+        } as ClientData,
+      })
 
-    if (success) {
-      return undefined
+      if (success) {
+        return undefined
+      }
+
+      return new Response('WebSocket upgrade failed', { status: 400 })
     }
 
-    return new Response('WebSocket upgrade failed', { status: 400 })
+    // In production, serve static files
+    if (isProduction) {
+      // Try to serve the requested file
+      const staticResponse = await serveStaticFile(url.pathname)
+      if (staticResponse) {
+        return staticResponse
+      }
+
+      // For SPA routing, serve index.html for non-file requests
+      if (!url.pathname.includes('.')) {
+        const indexFile = Bun.file(`${STATIC_DIR}/index.html`)
+        if (await indexFile.exists()) {
+          return new Response(indexFile, {
+            headers: { 'Content-Type': 'text/html' },
+          })
+        }
+      }
+
+      return new Response('Not Found', { status: 404 })
+    }
+
+    // In development, just handle WebSocket or return 404
+    return new Response('Not Found', { status: 404 })
   },
 
   websocket: {
