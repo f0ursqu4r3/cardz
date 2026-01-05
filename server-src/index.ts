@@ -26,6 +26,7 @@ import {
   handleStackMerge,
   handleStackShuffle,
   handleStackFlip,
+  handleStackReorder,
 } from './handlers/stack'
 import {
   handleZoneCreate,
@@ -292,6 +293,10 @@ const server = Bun.serve<ClientData>({
             break
           case 'stack:flip':
             handleStackFlip(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
+            break
+          case 'stack:reorder':
+            handleStackReorder(ws as any, msg, room, clients as any)
             roomManager.markDirty(room.code)
             break
 

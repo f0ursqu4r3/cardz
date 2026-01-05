@@ -431,6 +431,18 @@ ws.onMessage((message: ServerMessage) => {
       })
       break
 
+    case 'stack:reordered':
+      cardStore.updateStackFromServer(message.stackId, { cardIds: message.newOrder })
+      message.cardUpdates.forEach((update) => {
+        cardStore.updateCardFromServer(update.cardId, {
+          x: update.x,
+          y: update.y,
+        })
+      })
+      // Recalculate positions with zone layout
+      cardStore.updateAllStacks()
+      break
+
     case 'stack:flipped':
       message.cardUpdates.forEach((update) => {
         cardStore.updateCardFromServer(update.cardId, { faceUp: update.faceUp })

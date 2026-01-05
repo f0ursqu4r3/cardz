@@ -23,6 +23,7 @@
 - [x] Stack height based on number of cards, not pixel height
 - [x] Non-stack layouts support pulling any card
 - [x] Shuffle stacks by shaking
+- [x] Zone card reordering (drag cards within zones to reorder)
 
 ### Social Features
 

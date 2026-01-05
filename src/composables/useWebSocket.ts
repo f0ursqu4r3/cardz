@@ -531,6 +531,22 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
         }
         break
 
+      case 'stack:reordered':
+        if (gameState.value) {
+          const stack = gameState.value.stacks.find((s) => s.id === message.stackId)
+          if (stack) {
+            stack.cardIds = message.newOrder
+          }
+          message.cardUpdates.forEach((update) => {
+            const card = gameState.value!.cards.find((c) => c.id === update.cardId)
+            if (card) {
+              card.x = update.x
+              card.y = update.y
+            }
+          })
+        }
+        break
+
       case 'stack:flipped':
         if (gameState.value) {
           message.cardUpdates.forEach((update) => {

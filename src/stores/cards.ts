@@ -674,6 +674,21 @@ export const useCardStore = defineStore('cards', () => {
     }, 300)
   }
 
+  // Reorder cards within a stack (for zone card reordering)
+  const reorderStack = (stackId: number, fromIndex: number, toIndex: number) => {
+    const stack = stacks.value.find((s) => s.id === stackId)
+    if (!stack) return
+    if (fromIndex < 0 || fromIndex >= stack.cardIds.length) return
+    if (toIndex < 0 || toIndex >= stack.cardIds.length) return
+
+    const [cardId] = stack.cardIds.splice(fromIndex, 1)
+    if (cardId !== undefined) {
+      stack.cardIds.splice(toIndex, 0, cardId)
+    }
+
+    updateStackPositions(stack)
+  }
+
   // Hand operations
   const addToHand = (cardId: number) => {
     const card = cards.value.find((c) => c.id === cardId)
@@ -943,6 +958,7 @@ export const useCardStore = defineStore('cards', () => {
     stackSelection,
     mergeStacks,
     shuffleStack,
+    reorderStack,
     shufflingStackId,
     handCardIds,
     handCards,

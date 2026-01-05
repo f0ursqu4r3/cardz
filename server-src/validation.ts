@@ -175,6 +175,13 @@ export const StackFlipSchema = z.object({
   stackId: z.number().int(),
 })
 
+export const StackReorderSchema = z.object({
+  type: z.literal('stack:reorder'),
+  stackId: z.number().int(),
+  fromIndex: z.number().int().min(0),
+  toIndex: z.number().int().min(0),
+})
+
 // ============================================================================
 // Zone Message Schemas (Client → Server)
 // ============================================================================
@@ -352,6 +359,7 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   StackMergeSchema,
   StackShuffleSchema,
   StackFlipSchema,
+  StackReorderSchema,
   ZoneCreateSchema,
   ZoneUpdateSchema,
   ZoneDeleteSchema,

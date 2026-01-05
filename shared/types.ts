@@ -354,6 +354,13 @@ export interface StackFlip {
   stackId: number
 }
 
+export interface StackReorder {
+  type: 'stack:reorder'
+  stackId: number
+  fromIndex: number
+  toIndex: number
+}
+
 // ============================================================================
 // Stack Messages (Server → Client)
 // ============================================================================
@@ -423,6 +430,14 @@ export interface StackFlipped {
   type: 'stack:flipped'
   stackId: number
   cardUpdates: { cardId: number; faceUp: boolean }[]
+  playerId: string
+}
+
+export interface StackReordered {
+  type: 'stack:reordered'
+  stackId: number
+  newOrder: number[]
+  cardUpdates: { cardId: number; x: number; y: number }[]
   playerId: string
 }
 
@@ -718,6 +733,7 @@ export type ClientMessage =
   | StackMerge
   | StackShuffle
   | StackFlip
+  | StackReorder
   | ZoneCreate
   | ZoneUpdate
   | ZoneDelete
@@ -756,6 +772,7 @@ export type ServerMessage =
   | StacksMerged
   | StackShuffled
   | StackFlipped
+  | StackReordered
   | ZoneCreated
   | ZoneUpdated
   | ZoneDeleted

@@ -39,6 +39,10 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
   // Track if current stack drag detached from a zone (for sending with stack:move)
   const stackDetachedFromZone = ref(false)
 
+  // Zone card reordering state
+  const zoneDragSource = ref<{ zoneId: number; stackId: number; cardIndex: number } | null>(null)
+  const zoneDropTargetIndex = ref<number | null>(null)
+
   // Mutable handler for hand card drop (set after hand composable is created)
   let handCardDropHandler: ((event: PointerEvent) => boolean) | undefined = options.onHandCardDrop
 
@@ -73,6 +77,71 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       y >= zone.y + zone.height - handleSize &&
       y <= zone.y + zone.height
     )
+  }
+
+  // Calculate drop index for zone card reordering
+  const calculateZoneDropIndex = (
+    zone: Zone,
+    stack: { cardIds: number[]; anchorX: number; anchorY: number },
+    dropX: number,
+    dropY: number,
+  ): number => {
+    const layout = zone.layout || 'stack'
+    const cardCount = stack.cardIds.length
+    const settings = zone.cardSettings || { cardScale: 1.0, cardSpacing: 0.5 }
+    const spacing = settings.cardSpacing
+    const spacingMultiplier = spacing < 0.5 ? 0.3 + spacing * 1.4 : 1.0 + (spacing - 0.5) * 1.4
+
+    // Relative position within zone
+    const relX = dropX - zone.x
+    const relY = dropY - zone.y
+
+    if (layout === 'row') {
+      const step = CARD_W * spacingMultiplier
+      const totalWidth = CARD_W + Math.max(0, cardCount - 1) * step
+      const startX = (zone.width - totalWidth) / 2
+      const posInRow = relX - startX
+      const idx = Math.round(posInRow / step)
+      return Math.max(0, Math.min(cardCount - 1, idx))
+    } else if (layout === 'column') {
+      const step = CARD_H * spacingMultiplier
+      const totalHeight = CARD_H + Math.max(0, cardCount - 1) * step
+      const startY = (zone.height - totalHeight) / 2
+      const posInCol = relY - startY
+      const idx = Math.round(posInCol / step)
+      return Math.max(0, Math.min(cardCount - 1, idx))
+    } else if (layout === 'grid') {
+      const cols = Math.max(1, Math.floor(zone.width / (CARD_W * spacingMultiplier + 10)))
+      const stepX = CARD_W * spacingMultiplier
+      const stepY = CARD_H * spacingMultiplier
+      const rows = Math.ceil(cardCount / cols)
+      const totalWidth = CARD_W + Math.max(0, cols - 1) * stepX
+      const totalHeight = CARD_H + Math.max(0, rows - 1) * stepY
+      const startX = (zone.width - totalWidth) / 2
+      const startY = (zone.height - totalHeight) / 2
+
+      const col = Math.round((relX - startX) / stepX)
+      const row = Math.round((relY - startY) / stepY)
+      const idx = row * cols + col
+      return Math.max(0, Math.min(cardCount - 1, idx))
+    } else {
+      // For fan, circle, and stack layouts, just use distance-based calculation
+      // Find closest card position
+      let closestIdx = 0
+      let closestDist = Infinity
+      for (let i = 0; i < cardCount; i++) {
+        const cardId = stack.cardIds[i]
+        const card = cardStore.cards.find((c) => c.id === cardId)
+        if (card) {
+          const dist = Math.hypot(dropX - card.x, dropY - card.y)
+          if (dist < closestDist) {
+            closestDist = dist
+            closestIdx = i
+          }
+        }
+      }
+      return closestIdx
+    }
   }
 
   // Apply pending position during drag
@@ -184,6 +253,10 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     const card = cardStore.cards[index]
     if (!card) return false
 
+    // Reset zone drag state
+    zoneDragSource.value = null
+    zoneDropTargetIndex.value = null
+
     // If card is in a stack, check if we can pick it
     if (card.stackId !== null) {
       const stack = cardStore.stacks.find((item) => item.id === card.stackId)
@@ -198,6 +271,14 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
           // Non-stack layouts allow picking any visible card
           canPickAnyCard = true
           zoneId = zone.id
+
+          // Track zone source for potential reordering
+          const cardIndex = stack.cardIds.indexOf(card.id)
+          zoneDragSource.value = {
+            zoneId: zone.id,
+            stackId: stack.id,
+            cardIndex,
+          }
         }
       }
 
@@ -207,10 +288,13 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
         if (topId !== card.id) return false
       }
 
-      // Notify server that card is being removed from stack
-      // Server will handle zone layout reset if needed
-      send({ type: 'stack:remove_card', cardId: card.id })
-      cardStore.removeFromStack(card.id)
+      // If NOT from a zone with non-stack layout, remove from stack immediately
+      if (!zoneDragSource.value) {
+        // Notify server that card is being removed from stack
+        // Server will handle zone layout reset if needed
+        send({ type: 'stack:remove_card', cardId: card.id })
+        cardStore.removeFromStack(card.id)
+      }
     }
 
     const { x, y } = drag.getPending()
@@ -481,6 +565,26 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       if (options.handRef) {
         isOverHand.value = drag.isInBounds(event, options.handRef)
       }
+
+      // Update zone drop target for reordering
+      if (zoneDragSource.value) {
+        const zone = cardStore.zones.find((z) => z.id === zoneDragSource.value!.zoneId)
+        if (
+          zone &&
+          x >= zone.x &&
+          x <= zone.x + zone.width &&
+          y >= zone.y &&
+          y <= zone.y + zone.height
+        ) {
+          // Calculate drop target index based on zone layout
+          const stack = cardStore.stacks.find((s) => s.id === zoneDragSource.value!.stackId)
+          if (stack && stack.cardIds.length > 0) {
+            zoneDropTargetIndex.value = calculateZoneDropIndex(zone, stack, x, y)
+          }
+        } else {
+          zoneDropTargetIndex.value = null
+        }
+      }
     }
 
     drag.schedulePositionUpdate(applyPendingPosition)
@@ -625,8 +729,41 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       if (card) {
         let stacked = false
 
-        // Try to stack on hover target
-        if (hover.state.ready && hover.state.cardId) {
+        // Check for zone reorder first
+        if (zoneDragSource.value) {
+          const sourceZone = cardStore.zones.find((z) => z.id === zoneDragSource.value!.zoneId)
+          const dropZone = findZoneAtPoint(dropX, dropY)
+
+          // If dropping back in the same zone, reorder
+          if (dropZone && dropZone.id === zoneDragSource.value.zoneId && sourceZone) {
+            const stack = cardStore.stacks.find((s) => s.id === zoneDragSource.value!.stackId)
+            if (stack && zoneDropTargetIndex.value !== null) {
+              const fromIndex = zoneDragSource.value.cardIndex
+              const toIndex = zoneDropTargetIndex.value
+
+              if (fromIndex !== toIndex) {
+                // Apply reorder locally
+                cardStore.reorderStack(stack.id, fromIndex, toIndex)
+                // Send to server
+                send({ type: 'stack:reorder', stackId: stack.id, fromIndex, toIndex })
+              }
+              stacked = true // Card stays in zone
+            }
+          }
+
+          // If dropped elsewhere, need to remove from zone first
+          if (!stacked) {
+            send({ type: 'stack:remove_card', cardId: card.id })
+            cardStore.removeFromStack(card.id)
+          }
+
+          // Reset zone drag state
+          zoneDragSource.value = null
+          zoneDropTargetIndex.value = null
+        }
+
+        // Try to stack on hover target (if not already handled by zone reorder)
+        if (!stacked && hover.state.ready && hover.state.cardId) {
           const targetCard = cardStore.cards.find((c) => c.id === hover.state.cardId)
           const targetHadStack = targetCard?.stackId !== null
 
@@ -713,6 +850,8 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     hover.reset()
     shake.reset()
     isOverHand.value = false
+    zoneDragSource.value = null
+    zoneDropTargetIndex.value = null
     cardStore.updateAllStacks()
   }
 
@@ -801,6 +940,8 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     hover,
     physics,
     isOverHand,
+    zoneDragSource,
+    zoneDropTargetIndex,
     findZoneAtPoint,
     getCardCol,
     getCardRow,

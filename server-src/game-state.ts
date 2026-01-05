@@ -342,6 +342,36 @@ export class GameStateManager {
     return { cardUpdates }
   }
 
+  reorderStack(
+    stackId: number,
+    fromIndex: number,
+    toIndex: number,
+  ): { newOrder: number[]; cardUpdates: { cardId: number; x: number; y: number }[] } | null {
+    const stack = this.getStack(stackId)
+    if (!stack) return null
+    if (fromIndex < 0 || fromIndex >= stack.cardIds.length) return null
+    if (toIndex < 0 || toIndex >= stack.cardIds.length) return null
+
+    // Move card from fromIndex to toIndex
+    const [cardId] = stack.cardIds.splice(fromIndex, 1)
+    stack.cardIds.splice(toIndex, 0, cardId)
+
+    // Update card positions based on new order
+    // (Client will recalculate based on zone layout, but we update server state)
+    const cardUpdates: { cardId: number; x: number; y: number }[] = []
+    for (let i = 0; i < stack.cardIds.length; i++) {
+      const card = this.getCard(stack.cardIds[i])
+      if (card) {
+        // Basic stack position - client will override with zone layout
+        card.x = stack.anchorX
+        card.y = stack.anchorY + i * STACK_OFFSET_Y
+        cardUpdates.push({ cardId: card.id, x: card.x, y: card.y })
+      }
+    }
+
+    return { newOrder: stack.cardIds, cardUpdates }
+  }
+
   // ============================================================================
   // Zone Operations
   // ============================================================================

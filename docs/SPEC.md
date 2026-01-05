@@ -79,6 +79,12 @@ A designated area for organizing and displaying cards.
 - `fan` — Fanned arc display
 - `circle` — Circular arrangement
 
+**Zone Layout Behavior:**
+
+- Non-stack layouts allow picking any visible card
+- Cards in non-stack layouts can be reordered by dragging within the zone
+- Reordering a card within a zone does not remove it from the zone
+
 **Zone Card Settings:**
 
 | Setting          | Type     | Description                             |

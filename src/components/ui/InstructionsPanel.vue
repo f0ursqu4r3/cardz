@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { HelpCircle, X, Mouse, Hand, Keyboard, Smartphone } from 'lucide-vue-next'
+import { HelpCircle, X, Mouse, Keyboard, Smartphone } from 'lucide-vue-next'
 
 const props = defineProps<{
   isOpen: boolean
@@ -103,6 +103,7 @@ const closePanel = () => {
             <li>Drop card on zone — Add to zone</li>
             <li>Drag zone header — Move zone</li>
             <li>Drag corner handle — Resize zone</li>
+            <li>Drag card within zone — Reorder cards (non-stack layouts)</li>
           </ul>
 
           <h4>Viewport</h4>
@@ -133,6 +134,12 @@ const closePanel = () => {
           <ul class="instructions__list">
             <li>Drop card on hand zone — Add to hand</li>
             <li>Drag card out of hand — Play card</li>
+          </ul>
+
+          <h4>Zones</h4>
+          <ul class="instructions__list">
+            <li>Drop card on zone — Add to zone</li>
+            <li>Drag card within zone — Reorder cards (non-stack layouts)</li>
           </ul>
 
           <h4>Viewport</h4>

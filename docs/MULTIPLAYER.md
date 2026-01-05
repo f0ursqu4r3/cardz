@@ -522,6 +522,29 @@ interface StackFlipped {
 }
 ```
 
+### Reorder Stack
+
+Reorder cards within a stack (used for zone card reordering in non-stack layouts).
+
+```typescript
+// Client → Server
+interface StackReorder {
+  type: 'stack:reorder'
+  stackId: number
+  fromIndex: number
+  toIndex: number
+}
+
+// Server → All Clients
+interface StackReordered {
+  type: 'stack:reordered'
+  stackId: number
+  newOrder: number[] // New card ID order
+  cardUpdates: { cardId: number; x: number; y: number }[]
+  playerId: string
+}
+```
+
 ---
 
 ## Zone Actions

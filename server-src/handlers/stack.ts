@@ -8,6 +8,7 @@ import type {
   StackMerge,
   StackShuffle,
   StackFlip,
+  StackReorder,
 } from '../../shared/types'
 import type { Room } from '../room'
 import type { ClientData, GenericWebSocket } from '../utils/broadcast'
@@ -438,6 +439,46 @@ export function handleStackFlip(
   broadcastToRoom(clients, room.code, {
     type: 'stack:flipped',
     stackId: msg.stackId,
+    cardUpdates: result.cardUpdates,
+    playerId: clientData.id,
+  })
+}
+
+export function handleStackReorder(
+  ws: GenericWebSocket,
+  msg: StackReorder,
+  room: Room,
+  clients: Map<string, GenericWebSocket>,
+): void {
+  const clientData = getClientData(ws)
+  const { locks, gameState } = room
+
+  const lockedBy = locks.isStackLocked(msg.stackId)
+  if (lockedBy && lockedBy !== clientData.id) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'stack:reorder',
+      code: 'STACK_LOCKED',
+      message: 'Stack is locked by another player',
+    })
+    return
+  }
+
+  const result = gameState.reorderStack(msg.stackId, msg.fromIndex, msg.toIndex)
+  if (!result) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'stack:reorder',
+      code: 'INVALID_ACTION',
+      message: 'Invalid reorder operation',
+    })
+    return
+  }
+
+  broadcastToRoom(clients, room.code, {
+    type: 'stack:reordered',
+    stackId: msg.stackId,
+    newOrder: result.newOrder,
     cardUpdates: result.cardUpdates,
     playerId: clientData.id,
   })
