@@ -440,6 +440,7 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     // Ctrl+click to toggle selection (only for free cards, not stacked)
     if ((isCtrlClick || isMultiTouch) && !isInStack && card) {
       // Toggle selection
+      event.stopPropagation() // Prevent canvas from clearing selection
       cardStore.toggleSelect(card.id)
       return
     }
@@ -562,10 +563,26 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       const { x, y } = drag.getPending()
       if (shake.update(x, y)) {
         // Shake detected! Stack the selection and continue holding the new stack
+        // Use selectionStartPositions since selectedIds may have been cleared
+        const draggedIds = [...selectionStartPositions.value.keys()]
+        if (draggedIds.length < 2) return
+
         const anchorCard = cardStore.cards[drag.activeIndex.value!]
         if (anchorCard) {
-          const newStack = cardStore.stackSelection(anchorCard.x, anchorCard.y)
-          if (newStack) {
+          // Create stack manually from the dragged IDs
+          const newStack = cardStore.createStackAt(anchorCard.x, anchorCard.y, 'free')
+          draggedIds.forEach((id) => {
+            const card = cardStore.cards.find((c) => c.id === id)
+            if (card) {
+              newStack.cardIds.push(id)
+              card.stackId = newStack.id
+              card.isInDeck = true
+            }
+          })
+          cardStore.updateStackPositions(newStack)
+          cardStore.clearSelection()
+
+          if (newStack.cardIds.length > 0) {
             // Send stack:create to server
             send({
               type: 'stack:create',
