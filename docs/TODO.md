@@ -30,15 +30,9 @@
 - [x] Chat system with history
 - [x] Remote player cursors with state indicators (default, grab, grabbing)
 - [x] Player names and colors
-
----
-
-## In Progress / Known Issues 🔧
-
-### Multiplayer
-
-- [ ] Player cursors may not show immediately after page refresh
-- [ ] Session reconnection could be more robust
+- [x] Player cursors show correctly after page refresh
+- [x] Auto-rejoin room after connection drop
+- [x] Spaces work in chat messages
 
 ---
 

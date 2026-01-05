@@ -159,6 +159,10 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     state.value = 'connecting'
     error.value = null
 
+    // Store room info for potential rejoin after reconnect
+    const pendingRoomCode = roomCode.value
+    const pendingPlayerName = players.value.find((p) => p.id === playerId.value)?.name || ''
+
     try {
       ws.value = new WebSocket(url)
 
@@ -166,6 +170,18 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
         console.log('[ws] connected')
         state.value = 'connected'
         reconnectAttempts.value = 0
+
+        // Auto-rejoin room after reconnect
+        if (pendingRoomCode && pendingPlayerName) {
+          console.log('[ws] auto-rejoining room:', pendingRoomCode)
+          const sessionId = getSessionId()
+          send({
+            type: 'room:join',
+            roomCode: pendingRoomCode,
+            playerName: pendingPlayerName,
+            sessionId,
+          })
+        }
       }
 
       ws.value.onclose = (event) => {

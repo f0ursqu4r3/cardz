@@ -727,6 +727,12 @@ const leaveTable = () => {
 
 // Keyboard handlers for panning
 const onKeyDown = (event: KeyboardEvent) => {
+  // Don't intercept keyboard events when typing in an input field
+  const target = event.target as HTMLElement
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    return
+  }
+
   if (event.code === 'Space' && !event.repeat) {
     spaceHeld.value = true
     event.preventDefault()

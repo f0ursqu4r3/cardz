@@ -159,18 +159,17 @@ export function handleRoomJoin(
     })
   }
 
-  // Only notify others if this is a new player, not a reconnect
-  if (!isReconnect) {
-    broadcastToRoom(
-      roomManager.getClients(),
-      room.code,
-      {
-        type: 'room:player_joined',
-        player,
-      },
-      clientData.id,
-    )
-  }
+  // Always notify others when a player joins (even on reconnect)
+  // because when they disconnected, others received player_left
+  broadcastToRoom(
+    roomManager.getClients(),
+    room.code,
+    {
+      type: 'room:player_joined',
+      player,
+    },
+    clientData.id,
+  )
 }
 
 export function handleRoomLeave(ws: GenericWebSocket, roomManager: RoomManager): void {
