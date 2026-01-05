@@ -488,6 +488,12 @@ export interface ZoneAddCard {
   cardId: number
 }
 
+export interface ZoneAddCards {
+  type: 'zone:add_cards'
+  zoneId: number
+  cardIds: number[]
+}
+
 // ============================================================================
 // Zone Messages (Server → Client)
 // ============================================================================
@@ -521,6 +527,15 @@ export interface ZoneCardAdded {
   stackId: number
   stackCreated: boolean
   cardState: { cardId: number; x: number; y: number; z: number; faceUp: boolean }
+  playerId: string
+}
+
+export interface ZoneCardsAdded {
+  type: 'zone:cards_added'
+  zoneId: number
+  stackId: number
+  stackCreated: boolean
+  cardStates: { cardId: number; x: number; y: number; z: number; faceUp: boolean }[]
   playerId: string
 }
 
@@ -738,6 +753,7 @@ export type ClientMessage =
   | ZoneUpdate
   | ZoneDelete
   | ZoneAddCard
+  | ZoneAddCards
   | HandAdd
   | HandRemove
   | HandReorder
@@ -777,6 +793,7 @@ export type ServerMessage =
   | ZoneUpdated
   | ZoneDeleted
   | ZoneCardAdded
+  | ZoneCardsAdded
   | HandCardAdded
   | HandCardAddedOther
   | HandCardRemoved

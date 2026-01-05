@@ -531,6 +531,72 @@ export class GameStateManager {
     }
   }
 
+  // Bulk add cards to zone - more efficient than adding one at a time
+  addCardsToZone(
+    zoneId: number,
+    cardIds: number[],
+  ): {
+    stackId: number
+    stackCreated: boolean
+    cardStates: { cardId: number; x: number; y: number; z: number; faceUp: boolean }[]
+  } | null {
+    const zone = this.getZone(zoneId)
+    if (!zone) return null
+
+    const centerX = zone.x + zone.width / 2
+    const centerY = zone.y + zone.height / 2
+
+    let stackCreated = false
+    const cardStates: { cardId: number; x: number; y: number; z: number; faceUp: boolean }[] = []
+
+    // Create zone stack if needed
+    if (zone.stackId === null) {
+      // Create stack with all cards at once
+      const { stack, cardUpdates } = this.createStack(cardIds, centerX, centerY, 'zone', zoneId)
+      zone.stackId = stack.id
+      stackCreated = true
+
+      // Apply zone's faceUp setting and collect card states
+      for (const cardId of cardIds) {
+        const card = this.getCard(cardId)
+        if (card) {
+          card.faceUp = zone.faceUp
+          cardStates.push({ cardId: card.id, x: card.x, y: card.y, z: card.z, faceUp: card.faceUp })
+        }
+      }
+    } else {
+      // Add to existing stack
+      const stack = this.getStack(zone.stackId)
+      if (!stack) return null
+
+      for (const cardId of cardIds) {
+        const card = this.getCard(cardId)
+        if (!card) continue
+
+        // Remove from old stack if any
+        if (card.stackId !== null) {
+          this.removeCardFromStack(cardId)
+        }
+
+        // Add to zone stack
+        stack.cardIds.push(cardId)
+        card.stackId = stack.id
+        card.x = stack.anchorX
+        card.y = stack.anchorY + (stack.cardIds.length - 1) * STACK_OFFSET_Y
+        card.z = ++this.state.zCounter
+        card.faceUp = zone.faceUp
+
+        cardStates.push({ cardId: card.id, x: card.x, y: card.y, z: card.z, faceUp: card.faceUp })
+      }
+    }
+
+    return {
+      stackId: zone.stackId!,
+      stackCreated,
+      cardStates,
+    }
+  }
+
   // ============================================================================
   // Hand Operations
   // ============================================================================

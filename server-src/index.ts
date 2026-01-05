@@ -33,6 +33,7 @@ import {
   handleZoneUpdate,
   handleZoneDelete,
   handleZoneAddCard,
+  handleZoneAddCards,
 } from './handlers/zone'
 import {
   handleHandAdd,
@@ -315,6 +316,10 @@ const server = Bun.serve<ClientData>({
             break
           case 'zone:add_card':
             handleZoneAddCard(ws as any, msg, room, clients as any)
+            roomManager.markDirty(room.code)
+            break
+          case 'zone:add_cards':
+            handleZoneAddCards(ws as any, msg, room, clients as any)
             roomManager.markDirty(room.code)
             break
 

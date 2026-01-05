@@ -438,6 +438,59 @@ export const useCardStore = defineStore('cards', () => {
     updateStackPositions(stack)
   }
 
+  // Bulk add cards to a stack - more efficient than calling addCardToStack repeatedly
+  const addCardsToStack = (cardIds: number[], stack: Stack) => {
+    // Build a map for faster card lookups
+    const cardMap = new Map(cards.value.map((c) => [c.id, c]))
+
+    // Get zone faceUp setting if applicable
+    let zoneFaceUp: boolean | undefined
+    if (stack.zoneId !== undefined) {
+      const zone = zones.value.find((z) => z.id === stack.zoneId)
+      if (zone) {
+        zoneFaceUp = zone.faceUp
+      }
+    }
+
+    // Remove all cards from their current stacks first
+    for (const cardId of cardIds) {
+      const card = cardMap.get(cardId)
+      if (card && card.stackId !== null) {
+        const oldStack = stacks.value.find((s) => s.id === card.stackId)
+        if (oldStack) {
+          oldStack.cardIds = oldStack.cardIds.filter((id) => id !== cardId)
+          card.stackId = null
+          card.isInDeck = false
+          // Clean up empty stacks
+          if (oldStack.cardIds.length === 0) {
+            if (oldStack.zoneId !== undefined) {
+              const oldZone = zones.value.find((z) => z.id === oldStack.zoneId)
+              if (oldZone) oldZone.stackId = null
+            }
+            stacks.value = stacks.value.filter((s) => s.id !== oldStack.id)
+          }
+        }
+      }
+    }
+
+    // Add all cards to the target stack
+    for (const cardId of cardIds) {
+      const card = cardMap.get(cardId)
+      if (!card) continue
+
+      if (zoneFaceUp !== undefined) {
+        card.faceUp = zoneFaceUp
+      }
+
+      if (!stack.cardIds.includes(cardId)) {
+        stack.cardIds.push(cardId)
+      }
+    }
+
+    // Update positions once at the end
+    updateStackPositions(stack)
+  }
+
   const createStackAt = (
     anchorX: number,
     anchorY: number,
@@ -559,6 +612,14 @@ export const useCardStore = defineStore('cards', () => {
     const stack = ensureZoneStack(zoneId)
     if (!stack) return false
     addCardToStack(cardId, stack)
+    return true
+  }
+
+  // Bulk add multiple cards to a zone - much more efficient for large stacks
+  const addManyToZone = (cardIds: number[], zoneId: number): boolean => {
+    const stack = ensureZoneStack(zoneId)
+    if (!stack) return false
+    addCardsToStack(cardIds, stack)
     return true
   }
 
@@ -1015,6 +1076,7 @@ export const useCardStore = defineStore('cards', () => {
     updateAllStacks,
     removeFromStack,
     addCardToStack,
+    addCardsToStack,
     createStackAt,
     stackCardOnTarget,
     // Zone operations
@@ -1026,6 +1088,7 @@ export const useCardStore = defineStore('cards', () => {
     updateZone,
     ensureZoneStack,
     addToZone,
+    addManyToZone,
     // Card operations
     cardZ,
     bumpCardZ,

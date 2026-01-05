@@ -730,10 +730,9 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
         const zone = findZoneAtPoint(dropX, dropY)
         if (zone) {
           const ids = [...stack.cardIds]
-          ids.forEach((id) => {
-            cardStore.addToZone(id, zone.id)
-            send({ type: 'zone:add_card', zoneId: zone.id, cardId: id })
-          })
+          // Use bulk operation for better performance
+          cardStore.addManyToZone(ids, zone.id)
+          send({ type: 'zone:add_cards', zoneId: zone.id, cardIds: ids })
           handled = true
         }
       }
@@ -769,10 +768,10 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       // Check if dropped on a zone
       const zone = findZoneAtPoint(dropX, dropY)
       if (zone) {
-        cardStore.getSelectedIds().forEach((id) => {
-          cardStore.addToZone(id, zone.id)
-          send({ type: 'zone:add_card', zoneId: zone.id, cardId: id })
-        })
+        const ids = [...cardStore.getSelectedIds()]
+        // Use bulk operation for better performance
+        cardStore.addManyToZone(ids, zone.id)
+        send({ type: 'zone:add_cards', zoneId: zone.id, cardIds: ids })
         cardStore.clearSelection()
       } else {
         // Bump z-index of all selected cards and send moves

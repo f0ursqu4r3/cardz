@@ -536,6 +536,58 @@ ws.onMessage((message: ServerMessage) => {
       break
     }
 
+    case 'zone:cards_added': {
+      // Bulk add cards to zone - handle stack creation or update
+      if (message.stackCreated) {
+        // Create a new stack for this zone with all cards
+        const zone = cardStore.zones.find((z) => z.id === message.zoneId)
+        if (zone && message.cardStates.length > 0) {
+          const firstCard = message.cardStates[0]!
+          const newStack: import('@/types').Stack = {
+            id: message.stackId,
+            cardIds: message.cardStates.map((cs) => cs.cardId),
+            anchorX: firstCard.x,
+            anchorY: firstCard.y,
+            kind: 'zone',
+            zoneId: message.zoneId,
+            lockedBy: null,
+          }
+          cardStore.stacks.push(newStack)
+          zone.stackId = message.stackId
+
+          // Update all card states
+          for (const cardState of message.cardStates) {
+            cardStore.updateCardFromServer(cardState.cardId, {
+              z: cardState.z,
+              faceUp: cardState.faceUp,
+              stackId: message.stackId,
+            })
+          }
+
+          // Update positions once (applies zone layout)
+          cardStore.updateStackPositions(newStack)
+        }
+      } else {
+        // Add to existing stack
+        const existingStack = cardStore.stacks.find((s) => s.id === message.stackId)
+        if (existingStack) {
+          for (const cardState of message.cardStates) {
+            if (!existingStack.cardIds.includes(cardState.cardId)) {
+              existingStack.cardIds.push(cardState.cardId)
+            }
+            cardStore.updateCardFromServer(cardState.cardId, {
+              z: cardState.z,
+              faceUp: cardState.faceUp,
+              stackId: message.stackId,
+            })
+          }
+          // Update positions once at the end (applies zone layout)
+          cardStore.updateStackPositions(existingStack)
+        }
+      }
+      break
+    }
+
     case 'state:sync':
       // Full state sync from server (e.g., periodic sync or after reconnection)
       cardStore.syncFromServer(message.state, message.yourHand)

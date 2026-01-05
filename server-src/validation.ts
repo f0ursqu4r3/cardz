@@ -232,6 +232,12 @@ export const ZoneAddCardSchema = z.object({
   cardId: z.number().int().min(0).max(51),
 })
 
+export const ZoneAddCardsSchema = z.object({
+  type: z.literal('zone:add_cards'),
+  zoneId: z.number().int(),
+  cardIds: z.array(z.number().int().min(0).max(51)),
+})
+
 // ============================================================================
 // Hand Message Schemas (Client → Server)
 // ============================================================================
@@ -364,6 +370,7 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   ZoneUpdateSchema,
   ZoneDeleteSchema,
   ZoneAddCardSchema,
+  ZoneAddCardsSchema,
   HandAddSchema,
   HandRemoveSchema,
   HandReorderSchema,

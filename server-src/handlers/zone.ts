@@ -1,4 +1,10 @@
-import type { ZoneCreate, ZoneUpdate, ZoneDelete, ZoneAddCard } from '../../shared/types'
+import type {
+  ZoneCreate,
+  ZoneUpdate,
+  ZoneDelete,
+  ZoneAddCard,
+  ZoneAddCards,
+} from '../../shared/types'
 import type { Room } from '../room'
 import type { ClientData, GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom } from '../utils/broadcast'
@@ -186,6 +192,74 @@ export function handleZoneAddCard(
     stackId: result.stackId,
     stackCreated: result.stackCreated,
     cardState: result.cardState,
+    playerId: clientData.id,
+  })
+}
+
+export function handleZoneAddCards(
+  ws: GenericWebSocket,
+  msg: ZoneAddCards,
+  room: Room,
+  clients: Map<string, GenericWebSocket>,
+): void {
+  const clientData = getClientData(ws)
+  const { locks, gameState } = room
+
+  const zone = gameState.getZone(msg.zoneId)
+  if (!zone) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'zone:add_cards',
+      code: 'NOT_FOUND',
+      message: 'Zone not found',
+    })
+    return
+  }
+
+  // Validate all cards exist and are available
+  for (const cardId of msg.cardIds) {
+    const card = gameState.getCard(cardId)
+    if (!card) {
+      send(ws, {
+        type: 'error',
+        originalAction: 'zone:add_cards',
+        code: 'NOT_FOUND',
+        message: `Card ${cardId} not found`,
+      })
+      return
+    }
+
+    const lockedBy = locks.isCardLocked(cardId)
+    if (lockedBy && lockedBy !== clientData.id) {
+      send(ws, {
+        type: 'error',
+        originalAction: 'zone:add_cards',
+        code: 'CARD_LOCKED',
+        message: `Card ${cardId} is locked by another player`,
+      })
+      return
+    }
+
+    if (card.ownerId !== null) {
+      send(ws, {
+        type: 'error',
+        originalAction: 'zone:add_cards',
+        code: 'NOT_IN_HAND',
+        message: `Card ${cardId} is in a hand`,
+      })
+      return
+    }
+  }
+
+  const result = gameState.addCardsToZone(msg.zoneId, msg.cardIds)
+  if (!result) return
+
+  broadcastToRoom(clients, room.code, {
+    type: 'zone:cards_added',
+    zoneId: msg.zoneId,
+    stackId: result.stackId,
+    stackCreated: result.stackCreated,
+    cardStates: result.cardStates,
     playerId: clientData.id,
   })
 }
