@@ -2,6 +2,7 @@ import type {
   TableReset,
   TableUpdateSettings,
   TableUpdateVisibility,
+  TableUpdateName,
   GameState,
   TableSettings,
 } from '../../shared/types'
@@ -137,4 +138,44 @@ export function handleTableUpdateVisibility(
   console.log(
     `[table:visibility] Table ${clientData.roomCode} now ${msg.isPublic ? 'public' : 'private'}`,
   )
+}
+
+/**
+ * Handle table name update
+ */
+export function handleTableUpdateName(
+  ws: GenericWebSocket,
+  msg: TableUpdateName,
+  roomManager: RoomManager,
+): void {
+  const clientData = getClientData(ws)
+  if (!clientData.roomCode) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:update_name',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+    })
+    return
+  }
+
+  const success = roomManager.updateName(clientData.roomCode, msg.name)
+  if (!success) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:update_name',
+      code: 'NOT_FOUND',
+      message: 'Room not found',
+    })
+    return
+  }
+
+  // Broadcast name update to all players
+  broadcastToRoom(roomManager.getClients(), clientData.roomCode, {
+    type: 'table:name_updated',
+    name: msg.name,
+    playerId: clientData.id,
+  })
+
+  console.log(`[table:name] Table ${clientData.roomCode} renamed to "${msg.name}"`)
 }

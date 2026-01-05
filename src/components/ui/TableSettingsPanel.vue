@@ -1,6 +1,16 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { Settings, RotateCcw, Globe, Lock, Palette, ChevronDown, X } from 'lucide-vue-next'
+import { ref, computed, watch } from 'vue'
+import {
+  Settings,
+  RotateCcw,
+  Globe,
+  Lock,
+  Palette,
+  ChevronDown,
+  X,
+  Pencil,
+  Check,
+} from 'lucide-vue-next'
 import type { TableSettings, TableBackground } from '../../../shared/types'
 
 const props = defineProps<{
@@ -12,11 +22,51 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:settings': [settings: Partial<TableSettings>]
   'update:visibility': [isPublic: boolean]
+  'update:name': [name: string]
   reset: []
   close: []
 }>()
 
 const showBackgroundPicker = ref(false)
+const isEditingName = ref(false)
+const editedName = ref('')
+
+// Sync editedName when props change or when starting to edit
+watch(
+  () => props.tableName,
+  (newName) => {
+    if (!isEditingName.value) {
+      editedName.value = newName
+    }
+  },
+  { immediate: true },
+)
+
+const startEditingName = () => {
+  editedName.value = props.tableName || ''
+  isEditingName.value = true
+}
+
+const saveName = () => {
+  const trimmedName = editedName.value.trim()
+  if (trimmedName && trimmedName !== props.tableName) {
+    emit('update:name', trimmedName)
+  }
+  isEditingName.value = false
+}
+
+const cancelEditingName = () => {
+  editedName.value = props.tableName
+  isEditingName.value = false
+}
+
+const handleNameKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Enter') {
+    saveName()
+  } else if (event.key === 'Escape') {
+    cancelEditingName()
+  }
+}
 
 const backgrounds: { id: TableBackground; name: string; preview: string }[] = [
   {
@@ -82,10 +132,30 @@ const confirmReset = () => {
     </div>
 
     <div class="settings-content">
-      <!-- Table Name (readonly) -->
-      <div class="settings-row">
+      <!-- Table Name (editable) -->
+      <div class="settings-row settings-row--name">
         <span class="settings-label">Table Name</span>
-        <span class="settings-value">{{ tableName || 'Unnamed Table' }}</span>
+        <div v-if="isEditingName" class="settings-name-edit">
+          <input
+            v-model="editedName"
+            type="text"
+            class="settings-name-input"
+            maxlength="50"
+            @keydown="handleNameKeydown"
+            @blur="saveName"
+            ref="nameInputRef"
+            autofocus
+          />
+          <button class="settings-name-save" @click="saveName" title="Save">
+            <Check :size="14" />
+          </button>
+        </div>
+        <div v-else class="settings-name-display" @click="startEditingName">
+          <span class="settings-value">{{ tableName || 'Unnamed Table' }}</span>
+          <button class="settings-name-edit-btn" title="Edit name">
+            <Pencil :size="12" />
+          </button>
+        </div>
       </div>
 
       <!-- Visibility Toggle -->
@@ -378,5 +448,90 @@ const confirmReset = () => {
   color: #666;
   text-align: center;
   margin: 0;
+}
+
+/* Name editing styles */
+.settings-row--name {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.settings-name-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.settings-name-display:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.settings-name-display .settings-value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-name-edit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.settings-name-edit-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.settings-name-edit {
+  display: flex;
+  gap: 6px;
+}
+
+.settings-name-input {
+  flex: 1;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.settings-name-input:focus {
+  border-color: #e94560;
+}
+
+.settings-name-save {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  background: #e94560;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.settings-name-save:hover {
+  background: #d13a54;
 }
 </style>

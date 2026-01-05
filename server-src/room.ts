@@ -611,6 +611,18 @@ export class RoomManager {
   }
 
   /**
+   * Update room name
+   */
+  updateName(roomCode: string, name: string): boolean {
+    const room = this.rooms.get(roomCode)
+    if (!room) return false
+
+    room.name = name
+    this.markDirty(roomCode)
+    return true
+  }
+
+  /**
    * Clean up empty or old rooms
    */
   private cleanupEmptyRooms(): void {

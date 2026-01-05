@@ -231,7 +231,29 @@ export function handleStackAddCard(
     return
   }
 
-  const result = gameState.addCardToStack(msg.stackId, msg.cardId)
+  // Determine the stack's orientation from existing cards
+  const stack = gameState.getStack(msg.stackId)
+  if (!stack) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'stack:add_card',
+      code: 'NOT_FOUND',
+      message: 'Stack not found',
+    })
+    return
+  }
+
+  // Get the orientation of the top card in the stack
+  let stackFaceUp: boolean | undefined
+  if (stack.cardIds.length > 0) {
+    const topCardId = stack.cardIds[stack.cardIds.length - 1]
+    const topCard = gameState.getCard(topCardId)
+    if (topCard) {
+      stackFaceUp = topCard.faceUp
+    }
+  }
+
+  const result = gameState.addCardToStack(msg.stackId, msg.cardId, stackFaceUp)
   if (!result) {
     send(ws, {
       type: 'error',

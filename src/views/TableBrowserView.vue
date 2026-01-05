@@ -1,17 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  ArrowLeft,
-  Users,
-  RefreshCw,
-  Globe,
-  Search,
-  SortAsc,
-  SortDesc,
-  Clock,
-  Filter,
-} from 'lucide-vue-next'
+import { ArrowLeft, Users, RefreshCw, Globe, Search, Clock } from 'lucide-vue-next'
 import type { ServerMessage, PublicRoomInfo } from '../../shared/types'
 
 const router = useRouter()
@@ -21,11 +11,11 @@ const error = ref<string | null>(null)
 const playerName = ref('')
 const searchQuery = ref('')
 const sortBy = ref<'players' | 'newest' | 'oldest'>('players')
-const showFilters = ref(false)
 
 // WebSocket connection for fetching public rooms
 let ws: WebSocket | null = null
-const wsUrl = `ws://${window.location.hostname}:9001`
+
+const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:9001`
 
 // Filtered and sorted tables
 const filteredTables = computed(() => {

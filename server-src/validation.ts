@@ -316,6 +316,11 @@ export const TableUpdateVisibilitySchema = z.object({
   isPublic: z.boolean(),
 })
 
+export const TableUpdateNameSchema = z.object({
+  type: z.literal('table:update_name'),
+  name: z.string().min(1).max(50).trim(),
+})
+
 // ============================================================================
 // Chat Message Schemas (Client → Server)
 // ============================================================================
@@ -361,6 +366,7 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   TableResetSchema,
   TableUpdateSettingsSchema,
   TableUpdateVisibilitySchema,
+  TableUpdateNameSchema,
   ChatSendSchema,
 ])
 

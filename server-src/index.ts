@@ -43,6 +43,7 @@ import {
   handleTableReset,
   handleTableUpdateSettings,
   handleTableUpdateVisibility,
+  handleTableUpdateName,
 } from './handlers/table'
 
 const PORT = parseInt(process.env.PORT ?? '9001', 10)
@@ -361,6 +362,9 @@ const server = Bun.serve<ClientData>({
             break
           case 'table:update_visibility':
             handleTableUpdateVisibility(ws as any, msg, roomManager)
+            break
+          case 'table:update_name':
+            handleTableUpdateName(ws as any, msg, roomManager)
             break
         }
       } catch (err) {

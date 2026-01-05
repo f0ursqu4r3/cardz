@@ -56,6 +56,7 @@ export interface UseWebSocketReturn {
   resetTable: () => void
   updateTableSettings: (settings: Partial<TableSettings>) => void
   updateTableVisibility: (isPublic: boolean) => void
+  updateTableName: (name: string) => void
 
   // Chat
   sendChat: (message: string) => void
@@ -262,6 +263,10 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
 
   const updateTableVisibility = (isPublic: boolean) => {
     send({ type: 'table:update_visibility', isPublic })
+  }
+
+  const updateTableName = (name: string) => {
+    send({ type: 'table:update_name', name })
   }
 
   // Chat
@@ -699,6 +704,11 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
         console.log('[ws] table visibility updated:', message.isPublic ? 'public' : 'private')
         break
 
+      case 'table:name_updated':
+        tableName.value = message.name
+        console.log('[ws] table name updated:', message.name)
+        break
+
       case 'table:info':
         tableName.value = message.name
         tableIsPublic.value = message.isPublic
@@ -764,6 +774,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     resetTable,
     updateTableSettings,
     updateTableVisibility,
+    updateTableName,
     sendChat,
     onMessage,
     offMessage,

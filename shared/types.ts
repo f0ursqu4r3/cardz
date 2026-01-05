@@ -189,6 +189,11 @@ export interface TableUpdateVisibility {
   isPublic: boolean
 }
 
+export interface TableUpdateName {
+  type: 'table:update_name'
+  name: string
+}
+
 // ============================================================================
 // Table Management Messages (Server → Client)
 // ============================================================================
@@ -207,6 +212,12 @@ export interface TableSettingsUpdated {
 export interface TableVisibilityUpdated {
   type: 'table:visibility_updated'
   isPublic: boolean
+  playerId: string
+}
+
+export interface TableNameUpdated {
+  type: 'table:name_updated'
+  name: string
   playerId: string
 }
 
@@ -721,6 +732,7 @@ export type ClientMessage =
   | TableReset
   | TableUpdateSettings
   | TableUpdateVisibility
+  | TableUpdateName
   | ChatSend
 
 export type ServerMessage =
@@ -762,6 +774,7 @@ export type ServerMessage =
   | TableResetComplete
   | TableSettingsUpdated
   | TableVisibilityUpdated
+  | TableNameUpdated
   | TableInfo
   | ChatMessage
   | ChatHistory

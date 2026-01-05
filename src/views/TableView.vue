@@ -695,6 +695,10 @@ const handleVisibilityUpdate = (isPublic: boolean) => {
   ws.updateTableVisibility(isPublic)
 }
 
+const handleNameUpdate = (name: string) => {
+  ws.updateTableName(name)
+}
+
 const handleTableReset = () => {
   ws.resetTable()
   showSettings.value = false
@@ -916,6 +920,7 @@ onBeforeUnmount(() => {
           :table-name="ws.tableName.value || tableName"
           @update:settings="handleSettingsUpdate"
           @update:visibility="handleVisibilityUpdate"
+          @update:name="handleNameUpdate"
           @reset="handleTableReset"
           @close="showSettings = false"
         />

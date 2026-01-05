@@ -70,15 +70,25 @@ const toMinimap = (worldX: number, worldY: number) => ({
   y: (worldY - worldBounds.value.y) * scale.value,
 })
 
-// Visible viewport rectangle on minimap
+// Visible viewport rectangle on minimap (clamped to minimap bounds)
 const viewportRect = computed(() => {
   const bounds = props.viewport.getVisibleBounds()
   const topLeft = toMinimap(bounds.x, bounds.y)
+  const width = bounds.width * scale.value
+  const height = bounds.height * scale.value
+
+  // Clamp the rectangle to stay within minimap bounds
+  const clampedX = Math.max(0, Math.min(topLeft.x, MINIMAP_WIDTH - 2))
+  const clampedY = Math.max(0, Math.min(topLeft.y, MINIMAP_HEIGHT - 2))
+  const clampedWidth = Math.min(width, MINIMAP_WIDTH - clampedX)
+  const clampedHeight = Math.min(height, MINIMAP_HEIGHT - clampedY)
+
+  // Ensure minimum visible size
   return {
-    x: topLeft.x,
-    y: topLeft.y,
-    width: bounds.width * scale.value,
-    height: bounds.height * scale.value,
+    x: clampedX,
+    y: clampedY,
+    width: Math.max(4, clampedWidth),
+    height: Math.max(4, clampedHeight),
   }
 })
 
