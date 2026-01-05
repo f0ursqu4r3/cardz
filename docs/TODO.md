@@ -26,8 +26,8 @@
 
 ## Social Features
 
-[ ] some way for players to know how many cards are in other player's hands
-[ ] chat system
+[x] some way for players to know how many cards are in other player's hands
+[x] chat system
 
 ## Game Entities
 

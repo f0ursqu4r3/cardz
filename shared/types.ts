@@ -636,6 +636,34 @@ export type StateChange =
   | { op: 'zone:delete'; zoneId: number }
 
 // ============================================================================
+// Chat Messages (Client → Server)
+// ============================================================================
+
+export interface ChatSend {
+  type: 'chat:send'
+  message: string
+}
+
+// ============================================================================
+// Chat Messages (Server → Client)
+// ============================================================================
+
+export interface ChatMessage {
+  type: 'chat:message'
+  id: string
+  playerId: string
+  playerName: string
+  playerColor: string
+  message: string
+  timestamp: number
+}
+
+export interface ChatHistory {
+  type: 'chat:history'
+  messages: Omit<ChatMessage, 'type'>[]
+}
+
+// ============================================================================
 // Error Messages
 // ============================================================================
 
@@ -693,6 +721,7 @@ export type ClientMessage =
   | TableReset
   | TableUpdateSettings
   | TableUpdateVisibility
+  | ChatSend
 
 export type ServerMessage =
   | RoomCreated
@@ -734,6 +763,8 @@ export type ServerMessage =
   | TableSettingsUpdated
   | TableVisibilityUpdated
   | TableInfo
+  | ChatMessage
+  | ChatHistory
 
 // ============================================================================
 // Constants

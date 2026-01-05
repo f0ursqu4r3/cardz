@@ -5,7 +5,7 @@ import { ClientMessageSchema } from './validation'
 import type { ClientData } from './utils/broadcast'
 import { send, broadcastToRoom } from './utils/broadcast'
 import { CURSOR_THROTTLE_MS } from '../shared/types'
-import { closeDatabase } from './persistence'
+import { closeDatabase, saveChatMessage } from './persistence'
 
 // Handlers
 import {
@@ -322,6 +322,32 @@ const server = Bun.serve<ClientData>({
               state,
               yourHand: playerHand?.cardIds ?? [],
               handCounts,
+            })
+            break
+          }
+
+          // Chat messages
+          case 'chat:send': {
+            const player = room.players.get(clientData.id)
+            if (!player) break
+
+            const chatMessage = {
+              id: nanoid(),
+              roomCode: room.code,
+              playerId: clientData.id,
+              playerName: player.name,
+              playerColor: player.color,
+              message: msg.message,
+              timestamp: Date.now(),
+            }
+
+            // Save to database
+            saveChatMessage(chatMessage)
+
+            // Broadcast to all players in the room
+            broadcastToRoom(clients as any, room.code, {
+              type: 'chat:message',
+              ...chatMessage,
             })
             break
           }

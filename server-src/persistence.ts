@@ -61,11 +61,11 @@ function getDb(): Database {
   db = new Database(DB_PATH)
 
   // Enable WAL mode for better concurrent access
-  db.exec('PRAGMA journal_mode = WAL')
-  db.exec('PRAGMA synchronous = NORMAL')
+  db.run('PRAGMA journal_mode = WAL')
+  db.run('PRAGMA synchronous = NORMAL')
 
   // Create tables table if it doesn't exist
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS tables (
       code TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -80,8 +80,27 @@ function getDb(): Database {
   `)
 
   // Create index for public tables listing
-  db.exec(`
+  db.run(`
     CREATE INDEX IF NOT EXISTS idx_tables_public ON tables (is_public, updated_at DESC)
+  `)
+
+  // Create chat_messages table for persisting chat history
+  db.run(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      room_code TEXT NOT NULL,
+      player_id TEXT NOT NULL,
+      player_name TEXT NOT NULL,
+      player_color TEXT NOT NULL,
+      message TEXT NOT NULL,
+      timestamp INTEGER NOT NULL,
+      FOREIGN KEY (room_code) REFERENCES tables(code) ON DELETE CASCADE
+    )
+  `)
+
+  // Create index for loading chat messages by room
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_chat_room_timestamp ON chat_messages (room_code, timestamp DESC)
   `)
 
   console.log(`[persistence] SQLite database initialized at ${DB_PATH}`)
@@ -482,4 +501,88 @@ export function searchTables(query: string, publicOnly: boolean = true): TableMe
       settings,
     }
   })
+}
+// ============================================================================
+// Chat Message Persistence
+// ============================================================================
+
+export interface PersistedChatMessage {
+  id: string
+  roomCode: string
+  playerId: string
+  playerName: string
+  playerColor: string
+  message: string
+  timestamp: number
+}
+
+/**
+ * Save a chat message to the database
+ */
+export function saveChatMessage(msg: PersistedChatMessage): void {
+  const database = getDb()
+
+  const stmt = database.prepare(`
+    INSERT INTO chat_messages (id, room_code, player_id, player_name, player_color, message, timestamp)
+    VALUES ($id, $room_code, $player_id, $player_name, $player_color, $message, $timestamp)
+  `)
+
+  stmt.run({
+    $id: msg.id,
+    $room_code: msg.roomCode,
+    $player_id: msg.playerId,
+    $player_name: msg.playerName,
+    $player_color: msg.playerColor,
+    $message: msg.message,
+    $timestamp: msg.timestamp,
+  })
+}
+
+/**
+ * Load recent chat messages for a room
+ * @param roomCode The room code
+ * @param limit Maximum number of messages to load (default 100)
+ */
+export function loadChatMessages(roomCode: string, limit: number = 100): PersistedChatMessage[] {
+  const database = getDb()
+
+  const stmt = database.prepare(`
+    SELECT id, room_code, player_id, player_name, player_color, message, timestamp
+    FROM chat_messages
+    WHERE room_code = $room_code
+    ORDER BY timestamp DESC
+    LIMIT $limit
+  `)
+
+  const rows = stmt.all({ $room_code: roomCode, $limit: limit }) as {
+    id: string
+    room_code: string
+    player_id: string
+    player_name: string
+    player_color: string
+    message: string
+    timestamp: number
+  }[]
+
+  // Return in chronological order (oldest first)
+  return rows
+    .map((row) => ({
+      id: row.id,
+      roomCode: row.room_code,
+      playerId: row.player_id,
+      playerName: row.player_name,
+      playerColor: row.player_color,
+      message: row.message,
+      timestamp: row.timestamp,
+    }))
+    .reverse()
+}
+
+/**
+ * Delete all chat messages for a room
+ */
+export function deleteChatMessages(roomCode: string): void {
+  const database = getDb()
+  const stmt = database.prepare('DELETE FROM chat_messages WHERE room_code = ?')
+  stmt.run(roomCode)
 }

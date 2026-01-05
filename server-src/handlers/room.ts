@@ -2,6 +2,7 @@ import type { RoomCreate, RoomJoin, RoomListRequest } from '../../shared/types'
 import type { RoomManager } from '../room'
 import type { ClientData, GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom } from '../utils/broadcast'
+import { loadChatMessages } from '../persistence'
 
 function getClientData(ws: GenericWebSocket): ClientData {
   return ws.data ?? ws.getUserData?.() ?? { id: '', roomCode: null, name: '' }
@@ -54,6 +55,22 @@ export function handleRoomCreate(
     isPublic: room.isPublic,
     settings: room.settings,
   })
+
+  // Send chat history (room might have persisted messages from previous session)
+  const chatHistory = loadChatMessages(room.code)
+  if (chatHistory.length > 0) {
+    send(ws, {
+      type: 'chat:history',
+      messages: chatHistory.map((msg) => ({
+        id: msg.id,
+        playerId: msg.playerId,
+        playerName: msg.playerName,
+        playerColor: msg.playerColor,
+        message: msg.message,
+        timestamp: msg.timestamp,
+      })),
+    })
+  }
 }
 
 export function handleRoomJoin(
@@ -125,6 +142,22 @@ export function handleRoomJoin(
     isPublic: room.isPublic,
     settings: room.settings,
   })
+
+  // Send chat history
+  const chatHistory = loadChatMessages(room.code)
+  if (chatHistory.length > 0) {
+    send(ws, {
+      type: 'chat:history',
+      messages: chatHistory.map((msg) => ({
+        id: msg.id,
+        playerId: msg.playerId,
+        playerName: msg.playerName,
+        playerColor: msg.playerColor,
+        message: msg.message,
+        timestamp: msg.timestamp,
+      })),
+    })
+  }
 
   // Only notify others if this is a new player, not a reconnect
   if (!isReconnect) {

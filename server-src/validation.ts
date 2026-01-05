@@ -317,6 +317,15 @@ export const TableUpdateVisibilitySchema = z.object({
 })
 
 // ============================================================================
+// Chat Message Schemas (Client → Server)
+// ============================================================================
+
+export const ChatSendSchema = z.object({
+  type: z.literal('chat:send'),
+  message: z.string().min(1).max(500).trim(),
+})
+
+// ============================================================================
 // Combined Client Message Schema
 // ============================================================================
 
@@ -352,6 +361,7 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   TableResetSchema,
   TableUpdateSettingsSchema,
   TableUpdateVisibilitySchema,
+  ChatSendSchema,
 ])
 
 // ============================================================================

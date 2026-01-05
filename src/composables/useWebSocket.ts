@@ -9,6 +9,7 @@ import type {
   ZoneState,
   TableSettings,
   TableBackground,
+  ChatMessage,
 } from '../../shared/types'
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
@@ -36,6 +37,7 @@ export interface UseWebSocketReturn {
   handCardIds: Ref<number[]>
   handCounts: Ref<Map<string, number>>
   cursors: Ref<Map<string, { x: number; y: number; state: 'default' | 'grab' | 'grabbing' }>>
+  chatMessages: Ref<ChatMessage[]>
 
   // Table settings
   tableSettings: Ref<TableSettings>
@@ -54,6 +56,9 @@ export interface UseWebSocketReturn {
   resetTable: () => void
   updateTableSettings: (settings: Partial<TableSettings>) => void
   updateTableVisibility: (isPublic: boolean) => void
+
+  // Chat
+  sendChat: (message: string) => void
 
   // Event handlers
   onMessage: (handler: (message: ServerMessage) => void) => void
@@ -118,6 +123,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
   const cursors = ref<
     Map<string, { x: number; y: number; state: 'default' | 'grab' | 'grabbing' }>
   >(new Map())
+  const chatMessages = ref<ChatMessage[]>([])
 
   // Table settings
   const tableSettings = ref<TableSettings>({ background: 'green-felt' })
@@ -197,6 +203,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     handCardIds.value = []
     handCounts.value.clear()
     cursors.value.clear()
+    chatMessages.value = []
     tableSettings.value = { background: 'green-felt' }
     tableName.value = ''
     tableIsPublic.value = false
@@ -238,6 +245,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     handCardIds.value = []
     handCounts.value.clear()
     cursors.value.clear()
+    chatMessages.value = []
     tableSettings.value = { background: 'green-felt' }
     tableName.value = ''
     tableIsPublic.value = false
@@ -254,6 +262,13 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
 
   const updateTableVisibility = (isPublic: boolean) => {
     send({ type: 'table:update_visibility', isPublic })
+  }
+
+  // Chat
+  const sendChat = (message: string) => {
+    if (message.trim()) {
+      send({ type: 'chat:send', message: message.trim() })
+    }
   }
 
   // Message handling
@@ -690,6 +705,20 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
         tableSettings.value = message.settings
         break
 
+      // Chat
+      case 'chat:message':
+        chatMessages.value = [...chatMessages.value, message]
+        break
+
+      case 'chat:history':
+        // Load chat history (prepend to any existing messages, avoiding duplicates)
+        const existingIds = new Set(chatMessages.value.map((m) => m.id))
+        const newMessages = message.messages
+          .filter((m) => !existingIds.has(m.id))
+          .map((m) => ({ ...m, type: 'chat:message' as const }))
+        chatMessages.value = [...newMessages, ...chatMessages.value]
+        break
+
       // Errors
       case 'error':
         console.error('[ws] error:', message.code, message.message)
@@ -722,6 +751,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     handCardIds,
     handCounts,
     cursors,
+    chatMessages,
     tableSettings,
     tableName,
     tableIsPublic,
@@ -734,6 +764,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     resetTable,
     updateTableSettings,
     updateTableVisibility,
+    sendChat,
     onMessage,
     offMessage,
   }

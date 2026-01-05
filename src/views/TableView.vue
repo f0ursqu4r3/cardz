@@ -9,6 +9,8 @@ import RemoteCursors from '@/components/RemoteCursors.vue'
 import TablePanel from '@/components/ui/TablePanel.vue'
 import TableButton from '@/components/ui/TableButton.vue'
 import TableSettingsPanel from '@/components/ui/TableSettingsPanel.vue'
+import PlayersPanel from '@/components/ui/PlayersPanel.vue'
+import ChatPanel from '@/components/ui/ChatPanel.vue'
 import { useCardStore } from '@/stores/cards'
 import { useCardInteraction } from '@/composables/useCardInteraction'
 import { useViewport } from '@/composables/useViewport'
@@ -45,6 +47,8 @@ const isNewTable = computed(() => route.name === 'table-new')
 const ws = useWebSocket()
 const codeCopied = ref(false)
 const showSettings = ref(false)
+const showPlayers = ref(false)
+const showChat = ref(false)
 
 // Get current player's color for cursor
 const playerColor = computed(() => {
@@ -738,6 +742,10 @@ const onKeyUp = (event: KeyboardEvent) => {
 
 // Canvas pointer handlers for panning
 const onCanvasPointerDown = (event: PointerEvent) => {
+  // Close any open panels when clicking on canvas
+  showSettings.value = false
+  showPlayers.value = false
+
   // Middle mouse button or space+left click for panning
   if (event.button === 1 || (event.button === 0 && spaceHeld.value)) {
     event.preventDefault()
@@ -864,12 +872,24 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="table-header__right">
-        <div
-          class="table-header__players"
-          :title="`${ws.players.value.length} player(s) connected`"
-        >
-          <Users :size="16" />
-          <span>{{ ws.players.value.length }}</span>
+        <div class="table-header__players-wrapper">
+          <button
+            class="table-header__players"
+            :class="{ 'table-header__players--active': showPlayers }"
+            :title="`${ws.players.value.length} player(s) connected`"
+            @click="showPlayers = !showPlayers"
+          >
+            <Users :size="16" />
+            <span>{{ ws.players.value.length }}</span>
+          </button>
+          <PlayersPanel
+            v-if="showPlayers"
+            :players="ws.players.value"
+            :hand-counts="ws.handCounts.value"
+            :current-player-id="ws.playerId.value"
+            :own-hand-count="cardStore.handCount"
+            @close="showPlayers = false"
+          />
         </div>
         <button
           class="table-header__settings"
@@ -1021,6 +1041,14 @@ onBeforeUnmount(() => {
         {{ cardStore.selectionCount }} selected
       </div>
     </div>
+
+    <!-- Chat Panel -->
+    <ChatPanel
+      v-if="ws.isConnected.value"
+      :messages="ws.chatMessages.value"
+      v-model:is-open="showChat"
+      @send="ws.sendChat"
+    />
   </div>
 </template>
 
@@ -1137,12 +1165,32 @@ onBeforeUnmount(() => {
   gap: 1rem;
 }
 
+.table-header__players-wrapper {
+  position: relative;
+}
+
 .table-header__players {
   display: flex;
   align-items: center;
   gap: 0.375rem;
   color: #a0a0b0;
   font-size: 0.875rem;
+  background: transparent;
+  border: none;
+  padding: 0.375rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.table-header__players:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.table-header__players--active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
 }
 
 .table-header__status {
