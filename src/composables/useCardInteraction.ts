@@ -480,7 +480,20 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     if (!card) return
 
     if (card.stackId !== null) {
-      // Double-click on stacked card = flip entire stack
+      const stack = cardStore.stacks.find((s) => s.id === card.stackId)
+
+      // Check if this is a zone with non-stack layout
+      if (stack?.zoneId !== undefined) {
+        const zone = cardStore.zones.find((z) => z.id === stack.zoneId)
+        if (zone && zone.layout !== 'stack') {
+          // Non-stack zone layout: flip the specific clicked card
+          cardStore.flipCard(card.id)
+          send({ type: 'card:flip', cardId: card.id })
+          return
+        }
+      }
+
+      // Stack layout or free stack: flip top card
       cardStore.flipStack(card.stackId)
       send({ type: 'stack:flip', stackId: card.stackId })
     } else {
