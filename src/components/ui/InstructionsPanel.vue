@@ -78,7 +78,7 @@ const closePanel = () => {
           <h4>Cards</h4>
           <ul class="instructions__list">
             <li><kbd>Left-click</kbd> + drag — Move card</li>
-            <li><kbd>Right-click</kbd> + drag — Move entire stack</li>
+            <li><kbd>Shift</kbd> + drag — Move entire stack</li>
             <li><kbd>Double-click</kbd> — Flip card/stack</li>
             <li><kbd>Ctrl</kbd> + click — Select multiple cards</li>
             <li>Hover over card <span class="instructions__time">250ms</span> — Stack cards</li>

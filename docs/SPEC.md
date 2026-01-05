@@ -130,7 +130,7 @@ The play area where cards exist and can be manipulated.
 | Action              | Mouse                   | Touch                   | Result                        |
 | ------------------- | ----------------------- | ----------------------- | ----------------------------- |
 | **Move Card**       | Left-click + drag       | Tap + drag              | Drag single card              |
-| **Move Stack**      | Right-click + drag      | Long press + drag       | Drag entire stack             |
+| **Move Stack**      | Shift + left-drag       | Long press + drag       | Drag entire stack             |
 | **Create Stack**    | Hover 250ms + release   | Hover 250ms + release   | Form stack at target          |
 | **Add to Stack**    | Drop on stack           | Drop on stack           | Instant add to top            |
 | **Merge Stacks**    | Drop stack on stack     | Drop stack on stack     | Combine stacks                |
@@ -179,7 +179,7 @@ The play area where cards exist and can be manipulated.
 
 | Action         | Trigger                                                       | Result                                |
 | -------------- | ------------------------------------------------------------- | ------------------------------------- |
-| **Drag Stack** | Right-click + drag (mouse) OR long press 500ms + drag (touch) | Entire stack follows pointer          |
+| **Drag Stack** | Shift + left-drag (mouse) OR long press 500ms + drag (touch) | Entire stack follows pointer          |
 | **Drop Stack** | Release on canvas                                             | Stack anchor updated to drop position |
 
 ### Stack → Deck Zone
@@ -267,11 +267,11 @@ Cards are rendered with the following z-index priority (highest on top):
 ```mermaid
 flowchart TD
     subgraph DOWN["POINTER DOWN"]
-        D1[Pointer down on card] --> D2{Button type?}
-        D2 -->|Right-click| D3{Card in stack?}
+        D1[Pointer down on card] --> D2{Shift held?}
+        D2 -->|Yes| D3{Card in stack?}
         D3 -->|Yes| D4[Start STACK DRAG]
-        D3 -->|No| D5[Ignore]
-        D2 -->|Left-click| D6{Card in stack?}
+        D3 -->|No| D5[Start CARD DRAG]
+        D2 -->|No| D6{Card in stack?}
         D6 -->|Yes| D7[Start long-press timer]
         D6 -->|No| D8[Start CARD DRAG]
         D7 --> D9{Timer fires?}

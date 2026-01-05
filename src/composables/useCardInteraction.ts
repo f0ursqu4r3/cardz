@@ -411,8 +411,8 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
 
   // Pointer event handlers
   const onCardPointerDown = (event: PointerEvent, index: number) => {
-    // Left-click (0) or right-click (2) only
-    if (event.button !== 0 && event.button !== 2) return
+    // Left-click (0) only (Shift modifier used for stack drag)
+    if (event.button !== 0) return
 
     event.preventDefault()
     const targetEl = event.currentTarget as HTMLElement | null
@@ -456,8 +456,8 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       cardStore.clearSelection()
     }
 
-    // Right-click on stacked card = immediate stack drag
-    if (event.button === 2 && isInStack) {
+    // Shift+left-click on stacked card = immediate stack drag
+    if (event.shiftKey && event.button === 0 && isInStack) {
       startStackDrag(index)
       return
     }
