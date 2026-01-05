@@ -11,6 +11,7 @@ import TableButton from '@/components/ui/TableButton.vue'
 import TableSettingsPanel from '@/components/ui/TableSettingsPanel.vue'
 import PlayersPanel from '@/components/ui/PlayersPanel.vue'
 import ChatPanel from '@/components/ui/ChatPanel.vue'
+import InstructionsPanel from '@/components/ui/InstructionsPanel.vue'
 import { useCardStore } from '@/stores/cards'
 import { useCardInteraction } from '@/composables/useCardInteraction'
 import { useViewport } from '@/composables/useViewport'
@@ -49,6 +50,7 @@ const codeCopied = ref(false)
 const showSettings = ref(false)
 const showPlayers = ref(false)
 const showChat = ref(false)
+const showInstructions = ref(false)
 
 // Get current player's color for cursor
 const playerColor = computed(() => {
@@ -756,6 +758,11 @@ const onCanvasPointerDown = (event: PointerEvent) => {
   showSettings.value = false
   showPlayers.value = false
 
+  // Clear card selection when clicking on empty canvas (left-click only)
+  if (event.button === 0 && !spaceHeld.value) {
+    cardStore.clearSelection()
+  }
+
   // Middle mouse button or space+left click for panning
   if (event.button === 1 || (event.button === 0 && spaceHeld.value)) {
     event.preventDefault()
@@ -1060,6 +1067,9 @@ onBeforeUnmount(() => {
       v-model:is-open="showChat"
       @send="ws.sendChat"
     />
+
+    <!-- Instructions Panel -->
+    <InstructionsPanel v-model:is-open="showInstructions" />
   </div>
 </template>
 
