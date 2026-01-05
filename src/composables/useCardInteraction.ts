@@ -131,8 +131,51 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       const clampedRow = Math.max(0, Math.min(rows - 1, row))
       const idx = clampedRow * cols + clampedCol
       return Math.max(0, Math.min(cardCount - 1, idx))
+    } else if (layout === 'fan') {
+      // Fan layout - calculate based on angle from arc center
+      const zoneCenterX = zone.width / 2
+      const zoneCenterY = zone.height / 2
+      const radius = Math.max(150, zone.height * 1.5)
+      const baseArcSpan = Math.PI * 0.3 * spacingMultiplier
+      const arcSpan = Math.min(baseArcSpan, cardCount * 0.12)
+      const startAngle = Math.PI / 2 + arcSpan / 2
+      const angleStep = cardCount > 1 ? arcSpan / (cardCount - 1) : 0
+
+      // Arc center is below the zone center
+      const arcCenterX = zoneCenterX
+      const arcCenterY = zoneCenterY + radius - CARD_H / 2
+
+      // Calculate angle from arc center to drop position
+      const dx = relX - arcCenterX
+      const dy = arcCenterY - relY // Inverted because arc goes upward
+      const dropAngle = Math.atan2(dy, dx)
+
+      // Convert angle to index (startAngle is leftmost, decreases as index increases)
+      if (angleStep === 0) return 0
+      const idx = Math.round((startAngle - dropAngle) / angleStep)
+      return Math.max(0, Math.min(cardCount - 1, idx))
+    } else if (layout === 'circle') {
+      // Circle layout - calculate based on angle from center
+      const centerX = zone.width / 2
+      const centerY = zone.height / 2
+      const angleStep = cardCount > 0 ? (Math.PI * 2) / cardCount : 0
+      const startAngle = -Math.PI / 2
+
+      // Calculate angle from center to drop position
+      const dx = relX - centerX
+      const dy = relY - centerY
+      let dropAngle = Math.atan2(dy, dx)
+
+      // Normalize angle relative to start angle
+      let relativeAngle = dropAngle - startAngle
+      if (relativeAngle < 0) relativeAngle += Math.PI * 2
+
+      // Convert angle to index
+      if (angleStep === 0) return 0
+      const idx = Math.round(relativeAngle / angleStep)
+      return Math.max(0, Math.min(cardCount - 1, idx % cardCount))
     } else {
-      // For fan, circle, and stack layouts, just use distance-based calculation
+      // For stack layout, use distance-based calculation
       // Find closest card position
       let closestIdx = 0
       let closestDist = Infinity
