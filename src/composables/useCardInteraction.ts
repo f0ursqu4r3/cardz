@@ -437,14 +437,15 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     const isMultiTouch = !event.isPrimary
     const isCtrlClick = event.ctrlKey || event.metaKey
 
-    if ((isCtrlClick || isMultiTouch) && !isInStack && event.button === 0 && card) {
+    // Ctrl+click to toggle selection (only for free cards, not stacked)
+    if ((isCtrlClick || isMultiTouch) && !isInStack && card) {
       // Toggle selection
       cardStore.toggleSelect(card.id)
       return
     }
 
     // If clicking on a selected card, drag the entire selection
-    if (card && cardStore.isSelected(card.id) && event.button === 0) {
+    if (card && cardStore.isSelected(card.id)) {
       const { x, y } = drag.getPending()
       selectionDragStart.value = { x, y }
       startSelectionDrag(index)
@@ -456,8 +457,8 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       cardStore.clearSelection()
     }
 
-    // Shift+left-click on stacked card = immediate stack drag
-    if (event.shiftKey && event.button === 0 && isInStack) {
+    // Shift+left-click on stacked card = immediate stack drag (not when Ctrl is held)
+    if (event.shiftKey && !isCtrlClick && isInStack) {
       startStackDrag(index)
       return
     }

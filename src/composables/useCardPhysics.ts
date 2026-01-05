@@ -74,8 +74,8 @@ export function useCardPhysics() {
       const newVelX = (x - lastX.value) / dt
       const newVelY = (y - lastY.value) / dt
       // Smooth velocity with previous value
-      velocityX.value = velocityX.value * 0.6 + newVelX * 0.4
-      velocityY.value = velocityY.value * 0.6 + newVelY * 0.4
+      velocityX.value = velocityX.value * 0.4 + newVelX * 0.4
+      velocityY.value = velocityY.value * 0.4 + newVelY * 0.4
     }
 
     lastX.value = x

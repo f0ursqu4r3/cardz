@@ -177,10 +177,10 @@ The play area where cards exist and can be manipulated.
 
 ### Stack → Canvas
 
-| Action         | Trigger                                                       | Result                                |
-| -------------- | ------------------------------------------------------------- | ------------------------------------- |
+| Action         | Trigger                                                      | Result                                |
+| -------------- | ------------------------------------------------------------ | ------------------------------------- |
 | **Drag Stack** | Shift + left-drag (mouse) OR long press 500ms + drag (touch) | Entire stack follows pointer          |
-| **Drop Stack** | Release on canvas                                             | Stack anchor updated to drop position |
+| **Drop Stack** | Release on canvas                                            | Stack anchor updated to drop position |
 
 ### Stack → Deck Zone
 
