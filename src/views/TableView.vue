@@ -553,6 +553,15 @@ interaction.setHandCardDropHandler((event) => {
 
     // Clear selection after drop
     handCompRef.value?.clearHandSelection()
+  } else if (result.removedCard) {
+    // Single card removed from hand
+    ws.send({
+      type: 'hand:remove',
+      cardId: result.removedCard.cardId,
+      x: result.removedCard.x,
+      y: result.removedCard.y,
+      faceUp: result.removedCard.faceUp,
+    })
   }
 
   return result.handled

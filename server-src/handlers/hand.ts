@@ -29,6 +29,27 @@ export function handleHandAdd(
 
   // Check if already owned
   if (card.ownerId !== null) {
+    // If it's already in our hand, just acknowledge (handles race condition)
+    if (card.ownerId === clientData.id) {
+      const handCount = gameState.getHandCount(clientData.id)
+      broadcastSplit(
+        clients,
+        room.code,
+        clientData.id,
+        {
+          type: 'hand:card_added',
+          cardId: msg.cardId,
+          cardState: card,
+        },
+        {
+          type: 'hand:card_added_other',
+          playerId: clientData.id,
+          cardId: msg.cardId,
+          handCount,
+        },
+      )
+      return
+    }
     send(ws, {
       type: 'error',
       originalAction: 'hand:add',

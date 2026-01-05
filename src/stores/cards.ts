@@ -681,6 +681,7 @@ export const useCardStore = defineStore('cards', () => {
     const card = cards.value.find((c) => c.id === cardId)
     if (card) {
       card.inHand = false
+      card.ownerId = null
     }
     return true
   }

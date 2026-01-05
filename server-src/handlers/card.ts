@@ -90,6 +90,15 @@ export function handleCardLock(
   }
 
   if (card.ownerId !== null) {
+    // If the card is in our own hand, just acknowledge (handles race condition)
+    if (card.ownerId === clientData.id) {
+      send(ws, {
+        type: 'card:locked',
+        cardId: msg.cardId,
+        playerId: clientData.id,
+      })
+      return
+    }
     send(ws, {
       type: 'error',
       originalAction: 'card:lock',
