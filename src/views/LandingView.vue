@@ -48,7 +48,7 @@ const browseTables = () => {
     <div class="landing__hero">
       <div class="landing__logo">
         <span class="landing__logo-icon">🃏</span>
-        <h1 class="landing__title">Dekkard</h1>
+        <h1 class="landing__title">cardz</h1>
       </div>
       <p class="landing__subtitle">A multiplayer virtual tabletop for card games</p>
     </div>

@@ -1516,7 +1516,7 @@ onBeforeUnmount(() => {
           <LogOut :size="18" />
         </button>
         <div class="table-header__info">
-          <h1 class="table-header__title">🃏 Dekkard</h1>
+          <h1 class="table-header__title">🃏 cardz</h1>
           <div v-if="ws.roomCode.value" class="table-header__room">
             <span class="table-header__code">{{ ws.roomCode.value }}</span>
             <button
