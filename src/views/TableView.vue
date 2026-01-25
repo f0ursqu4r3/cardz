@@ -318,13 +318,11 @@ ws.onMessage((message: ServerMessage) => {
       break
 
     case 'card:moved':
-      // Skip if this is our own card move
       if (message.playerId === ws.playerId.value) {
-        cardStore.updateCardFromServer(message.cardId, {
-          x: message.x,
-          y: message.y,
-          z: message.z,
-        })
+        // Our own move - only update z-index, not x/y position.
+        // We already have the correct local position from dragging;
+        // updating from server would cause jumping due to network latency.
+        cardStore.updateCardFromServer(message.cardId, { z: message.z })
       } else if (message.vx !== undefined && message.vy !== undefined) {
         // Remote player threw the card - animate with physics prediction
         cardStore.updateCardFromServer(message.cardId, { z: message.z })
@@ -367,11 +365,7 @@ ws.onMessage((message: ServerMessage) => {
       break
 
     case 'stack:moved':
-      cardStore.updateStackFromServer(message.stackId, {
-        anchorX: message.anchorX,
-        anchorY: message.anchorY,
-      })
-      // Handle zone detachment
+      // Handle zone detachment for all moves (metadata change)
       if (message.zoneDetached) {
         const zone = cardStore.zones.find((z) => z.id === message.zoneDetached!.zoneId)
         if (zone) {
@@ -383,12 +377,20 @@ ws.onMessage((message: ServerMessage) => {
           stack.kind = 'free'
         }
       }
-      message.cardUpdates.forEach((update) => {
-        cardStore.updateCardFromServer(update.cardId, {
-          x: update.x,
-          y: update.y,
+      // For our own moves, don't update positions - we already have correct local state
+      // Only update positions for remote player moves
+      if (message.playerId !== ws.playerId.value) {
+        cardStore.updateStackFromServer(message.stackId, {
+          anchorX: message.anchorX,
+          anchorY: message.anchorY,
         })
-      })
+        message.cardUpdates.forEach((update) => {
+          cardStore.updateCardFromServer(update.cardId, {
+            x: update.x,
+            y: update.y,
+          })
+        })
+      }
       break
 
     case 'stack:locked':
@@ -487,16 +489,20 @@ ws.onMessage((message: ServerMessage) => {
       break
 
     case 'zone:updated':
-      cardStore.updateZoneFromServer(message.zoneId, message.zone)
-      if (message.stackUpdate) {
-        cardStore.updateStackFromServer(message.stackUpdate.stackId, {
-          anchorX: message.stackUpdate.anchorX,
-          anchorY: message.stackUpdate.anchorY,
-        })
+      // For our own zone updates, we already have correct local state
+      // Only update for remote player changes
+      if (message.playerId !== ws.playerId.value) {
+        cardStore.updateZoneFromServer(message.zoneId, message.zone)
+        if (message.stackUpdate) {
+          cardStore.updateStackFromServer(message.stackUpdate.stackId, {
+            anchorX: message.stackUpdate.anchorX,
+            anchorY: message.stackUpdate.anchorY,
+          })
+        }
+        // Recalculate card positions based on zone's layout
+        // (server sends basic stack positions, but client needs to apply zone layout)
+        cardStore.updateAllStacks()
       }
-      // Recalculate card positions based on zone's layout
-      // (server sends basic stack positions, but client needs to apply zone layout)
-      cardStore.updateAllStacks()
       break
 
     case 'zone:deleted': {
@@ -1969,6 +1975,10 @@ onBeforeUnmount(() => {
   outline-offset: 1px;
   box-shadow: 0 0 12px var(--lock-color, #888);
   animation: grabbed-pulse 1s ease-in-out infinite;
+  /* Smooth position interpolation to match remote cursor transition */
+  transition:
+    left 0.05s linear,
+    top 0.05s linear;
 }
 
 @keyframes grabbed-pulse {

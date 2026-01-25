@@ -29,15 +29,10 @@ export function handleCardMessage(
 
   switch (message.type) {
     case 'card:moved':
-      // NOTE: Position updates (x, y) are handled by TableView.vue's onMessage handler
-      // which properly supports physics animation for remote throws.
-      // We only update z here to avoid race conditions with the animation system.
-      if (gameState.value) {
-        const card = gameState.value.cards.find((c) => c.id === message.cardId)
-        if (card) {
-          card.z = message.z
-        }
-      }
+      // Card position updates are handled entirely by TableView.vue's onMessage handler,
+      // which properly handles local vs remote moves and physics animation.
+      // We don't update gameState here to avoid race conditions.
+      // The periodic state:sync will keep gameState in sync.
       return true
 
     case 'card:locked':
@@ -92,31 +87,10 @@ export function handleStackMessage(
       return true
 
     case 'stack:moved':
-      if (gameState.value) {
-        const stack = gameState.value.stacks.find((s) => s.id === message.stackId)
-        if (stack) {
-          stack.anchorX = message.anchorX
-          stack.anchorY = message.anchorY
-        }
-        // Handle zone detachment
-        if (message.zoneDetached) {
-          const zone = gameState.value.zones.find((z) => z.id === message.zoneDetached!.zoneId)
-          if (zone) {
-            zone.stackId = null
-          }
-          if (stack) {
-            stack.zoneId = undefined
-            stack.kind = 'free'
-          }
-        }
-        message.cardUpdates.forEach((update) => {
-          const card = gameState.value!.cards.find((c) => c.id === update.cardId)
-          if (card) {
-            card.x = update.x
-            card.y = update.y
-          }
-        })
-      }
+      // Stack position updates are handled entirely by TableView.vue's onMessage handler,
+      // which properly handles local vs remote moves.
+      // We don't update gameState here to avoid race conditions.
+      // The periodic state:sync will keep gameState in sync.
       return true
 
     case 'stack:locked':
@@ -266,28 +240,10 @@ export function handleZoneMessage(
       return true
 
     case 'zone:updated':
-      if (gameState.value) {
-        const zoneIdx = gameState.value.zones.findIndex((z) => z.id === message.zoneId)
-        if (zoneIdx !== -1) {
-          gameState.value.zones[zoneIdx] = message.zone
-        }
-        if (message.stackUpdate) {
-          const stack = gameState.value.stacks.find((s) => s.id === message.stackUpdate!.stackId)
-          if (stack) {
-            stack.anchorX = message.stackUpdate.anchorX
-            stack.anchorY = message.stackUpdate.anchorY
-          }
-        }
-        if (message.cardUpdates) {
-          message.cardUpdates.forEach((update) => {
-            const card = gameState.value!.cards.find((c) => c.id === update.cardId)
-            if (card) {
-              card.x = update.x
-              card.y = update.y
-            }
-          })
-        }
-      }
+      // Zone updates are handled entirely by TableView.vue's onMessage handler,
+      // which properly handles local vs remote moves.
+      // We don't update gameState here to avoid race conditions.
+      // The periodic state:sync will keep gameState in sync.
       return true
 
     case 'zone:deleted':
