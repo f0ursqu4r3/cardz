@@ -5,12 +5,15 @@
 // Core Types
 // ============================================================================
 
+export type PlayerRole = 'creator' | 'member'
+
 export interface Player {
   id: string
   name: string
   connected: boolean
   color: string // For cursor/highlight color
   sessionId?: string // For reconnection after refresh
+  role: PlayerRole // 'creator' can manage table settings, 'member' is regular player
 }
 
 export interface CardState {
@@ -114,6 +117,7 @@ export interface RoomCreated {
   roomCode: string
   playerId: string
   state: GameState
+  sessionToken: string // HMAC-signed token for reconnection
 }
 
 export interface RoomJoined {
@@ -123,6 +127,7 @@ export interface RoomJoined {
   players: Player[]
   state: GameState
   cursors: { playerId: string; x: number; y: number; state: 'default' | 'grab' | 'grabbing' }[]
+  sessionToken: string // HMAC-signed token for reconnection
 }
 
 export interface PlayerJoined {
@@ -730,6 +735,20 @@ export interface ChatTypingStatus {
 }
 
 // ============================================================================
+// Heartbeat Messages (for connection health monitoring)
+// ============================================================================
+
+export interface Ping {
+  type: 'ping'
+  timestamp: number
+}
+
+export interface Pong {
+  type: 'pong'
+  timestamp: number
+}
+
+// ============================================================================
 // Error Messages
 // ============================================================================
 
@@ -750,6 +769,7 @@ export type ErrorCode =
   | 'ZONE_LOCKED'
   | 'RATE_LIMITED'
   | 'INTERNAL_ERROR'
+  | 'PERMISSION_DENIED'
 
 // ============================================================================
 // Union Types for Message Handling
@@ -793,6 +813,7 @@ export type ClientMessage =
   | TableUpdateName
   | ChatSend
   | ChatTyping
+  | Pong
 
 export type ServerMessage =
   | RoomCreated
@@ -841,6 +862,7 @@ export type ServerMessage =
   | ChatMessage
   | ChatHistory
   | ChatTypingStatus
+  | Ping
 
 // ============================================================================
 // Constants

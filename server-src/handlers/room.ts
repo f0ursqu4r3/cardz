@@ -4,6 +4,7 @@ import type { ClientData, GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
 import { loadChatMessages } from '../persistence'
 import { sanitizePlayerName, sanitizeTableName } from '../utils/sanitize'
+import { createSessionToken, verifySessionToken } from '../utils/session'
 
 export function handleRoomCreate(
   ws: GenericWebSocket,
@@ -42,11 +43,15 @@ export function handleRoomCreate(
     `[room:create] ${room.code} (${room.isPublic ? 'public' : 'private'}) - cards: ${state.cards.length}, stacks: ${state.stacks.length}`,
   )
 
+  // Generate HMAC-signed session token for secure reconnection
+  const sessionToken = createSessionToken(clientData.id, room.code)
+
   send(ws, {
     type: 'room:created',
     roomCode: room.code,
     playerId: clientData.id,
     state,
+    sessionToken,
   })
 
   // Send table info (name, visibility, settings)
@@ -95,12 +100,26 @@ export function handleRoomJoin(
     }
   }
 
+  // Verify session token if provided (for reconnection)
+  // The sessionId field now contains an HMAC-signed token
+  let verifiedPlayerId: string | undefined
+  if (msg.sessionId) {
+    const tokenPayload = verifySessionToken(msg.sessionId, msg.roomCode)
+    if (tokenPayload) {
+      verifiedPlayerId = tokenPayload.playerId
+      console.log(`[room:join] Valid session token for player ${verifiedPlayerId}`)
+    } else {
+      console.log(`[room:join] Invalid session token for room ${msg.roomCode}`)
+    }
+  }
+
   // Use loadOrCreateRoom to support loading persisted rooms after server restart
+  // Pass the verified player ID if token was valid, otherwise use new session
   const result = roomManager.loadOrCreateRoom(
     msg.roomCode,
     clientData.id,
     playerName,
-    msg.sessionId,
+    verifiedPlayerId ? msg.sessionId : undefined, // Only use session if token was valid
   )
 
   if ('error' in result) {
@@ -129,6 +148,9 @@ export function handleRoomJoin(
     }
   }
 
+  // Generate HMAC-signed session token for secure reconnection
+  const sessionToken = createSessionToken(clientData.id, room.code)
+
   // Send full state to joining player
   send(ws, {
     type: 'room:joined',
@@ -137,6 +159,7 @@ export function handleRoomJoin(
     players: [...room.players.values()],
     state: room.gameState.getState(),
     cursors,
+    sessionToken,
   })
 
   // Send table info (name, visibility, settings)

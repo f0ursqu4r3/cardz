@@ -97,6 +97,23 @@ export class RoomManager {
   }
 
   /**
+   * Get a specific client by ID
+   */
+  getClient(id: string): GenericWebSocket | undefined {
+    return this.clients.get(id)
+  }
+
+  /**
+   * Check if a player is the creator of a room
+   */
+  isCreator(roomCode: string, playerId: string): boolean {
+    const room = this.rooms.get(roomCode)
+    if (!room) return false
+    const player = room.players.get(playerId)
+    return player?.role === 'creator'
+  }
+
+  /**
    * Mark a room as dirty and schedule a save.
    * Call this after any change to the room's game state.
    */
@@ -172,6 +189,7 @@ export class RoomManager {
       connected: true,
       color: PLAYER_COLORS[0],
       sessionId,
+      role: 'creator',
     }
 
     const settings: TableSettings = { background: 'green-felt' }
@@ -262,12 +280,14 @@ export class RoomManager {
     }
 
     // Recreate the room from persisted data
+    // First person to rejoin a persisted table becomes the creator for this session
     const player: Player = {
       id: playerId,
       name: playerName,
       connected: true,
       color: PLAYER_COLORS[0],
       sessionId,
+      role: 'creator',
     }
 
     const room: Room = {
@@ -373,6 +393,7 @@ export class RoomManager {
       connected: true,
       color: availableColor,
       sessionId,
+      role: 'member',
     }
 
     room.players.set(playerId, player)

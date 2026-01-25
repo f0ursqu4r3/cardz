@@ -253,7 +253,7 @@ export function useHand(
 
         // Remove all selected cards and position them as a stack
         selectedIds.forEach((cardId, idx) => {
-          const c = cardStore.cards.find((card) => card.id === cardId)
+          const c = cardStore.getCardById(cardId)
           if (c) {
             cardStore.removeFromHand(cardId)
             c.x = x

@@ -42,9 +42,9 @@
 ### 🔴 Critical Security (Fix Immediately)
 
 - [x] Use `crypto.getRandomValues()` for room code generation (server-src/room.ts:24-31)
-- [ ] Add role-based authorization (creator vs player permissions)
+- [x] Add role-based authorization (creator vs player permissions)
 - [x] Validate WebSocket origin header to prevent CSRF (server-src/index.ts:115-131)
-- [ ] Fix session hijacking - add HMAC-signed session tokens (server-src/room.ts:336-357)
+- [x] Fix session hijacking - add HMAC-signed session tokens (server-src/room.ts:336-357)
 - [x] Add rate limiting on WebSocket messages (server-src/index.ts:168-196)
 - [x] Add security headers (CSP, X-Frame-Options, X-Content-Type-Options, HSTS)
 
@@ -63,7 +63,7 @@
 - [x] Add proper error handling for silent catch blocks (server-src/index.ts:95-97)
 - [x] Add database operation error handling (server-src/persistence.ts:114-141)
 - [x] Add Vue error boundary component for graceful failure recovery
-- [ ] Optimize O(n²) card lookups in useCardInteraction.ts:177-193
+- [x] Optimize O(n²) card lookups in useCardInteraction.ts:177-193
 - [ ] Split useWebSocket.ts (862 lines) into focused composables
 - [ ] Add request IDs to message protocol for better error correlation
 - [x] Sanitize zone labels and chat messages for XSS prevention
@@ -78,7 +78,7 @@
 
 - [ ] Add state versioning for client/server consistency
 - [ ] Implement viewport-based selective broadcasting
-- [ ] Add heartbeat/keep-alive mechanism for connection health
+- [x] Add heartbeat/keep-alive mechanism for connection health
 - [ ] Configuration schema with validation (make timeouts/limits configurable)
 
 ---

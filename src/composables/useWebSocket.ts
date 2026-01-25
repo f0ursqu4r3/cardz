@@ -10,6 +10,7 @@ import type {
   TableSettings,
   TableBackground,
   ChatMessage,
+  Pong,
 } from '../../shared/types'
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
@@ -104,15 +105,25 @@ function generateUUID(): string {
 }
 
 /**
- * Get or create a persistent session ID for reconnection
+ * Get stored session token for reconnection (HMAC-signed by server)
+ * Returns undefined if no token is stored
  */
-function getSessionId(): string {
-  let sessionId = localStorage.getItem(SESSION_ID_KEY)
-  if (!sessionId) {
-    sessionId = generateUUID()
-    localStorage.setItem(SESSION_ID_KEY, sessionId)
-  }
-  return sessionId
+function getSessionToken(): string | undefined {
+  return localStorage.getItem(SESSION_ID_KEY) || undefined
+}
+
+/**
+ * Store a session token from the server (HMAC-signed)
+ */
+function storeSessionToken(token: string): void {
+  localStorage.setItem(SESSION_ID_KEY, token)
+}
+
+/**
+ * Clear stored session token (on leave or error)
+ */
+function clearSessionToken(): void {
+  localStorage.removeItem(SESSION_ID_KEY)
 }
 
 export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn {
@@ -177,7 +188,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
         // Auto-rejoin room after reconnect
         if (pendingRoomCode && pendingPlayerName) {
           console.log('[ws] auto-rejoining room:', pendingRoomCode)
-          const sessionId = getSessionId()
+          const sessionId = getSessionToken() // Use stored HMAC token for reconnection
           send({
             type: 'room:join',
             roomCode: pendingRoomCode,
@@ -258,25 +269,25 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
 
   // Room actions
   const createRoom = (playerName: string, options?: { tableName?: string; isPublic?: boolean }) => {
-    const sessionId = getSessionId()
+    // Don't send session token when creating a new room - server will generate one
     console.log('[ws] creating room for:', playerName, options?.isPublic ? '(public)' : '(private)')
     send({
       type: 'room:create',
       playerName,
-      sessionId,
       tableName: options?.tableName,
       isPublic: options?.isPublic,
     })
   }
 
   const joinRoom = (code: string, playerName: string) => {
-    const sessionId = getSessionId()
-    console.log('[ws] joining room:', code)
+    const sessionId = getSessionToken() // Use stored HMAC token if available
+    console.log('[ws] joining room:', code, sessionId ? '(with session)' : '(new session)')
     send({ type: 'room:join', roomCode: code.toUpperCase(), playerName, sessionId })
   }
 
   const leaveRoom = () => {
     send({ type: 'room:leave' })
+    clearSessionToken() // Clear stored session token when leaving
     roomCode.value = null
     playerId.value = null
     players.value = []
@@ -325,12 +336,21 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     messageHandlers.forEach((handler) => handler(message))
 
     switch (message.type) {
+      // Heartbeat response
+      case 'ping': {
+        const pong: Pong = { type: 'pong', timestamp: message.timestamp }
+        send(pong)
+        return
+      }
+
       // Room events
       case 'room:created':
         roomCode.value = message.roomCode
         playerId.value = message.playerId
         gameState.value = message.state
-        players.value = [{ id: message.playerId, name: '', connected: true, color: '#ef4444' }]
+        players.value = [{ id: message.playerId, name: '', connected: true, color: '#ef4444', role: 'creator' }]
+        // Store HMAC-signed session token for secure reconnection
+        storeSessionToken(message.sessionToken)
         console.log('[ws] room created:', message.roomCode)
         break
 
@@ -355,6 +375,8 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
           }
           cursors.value = newCursors
         }
+        // Store HMAC-signed session token for secure reconnection
+        storeSessionToken(message.sessionToken)
         console.log('[ws] joined room:', message.roomCode)
         break
 

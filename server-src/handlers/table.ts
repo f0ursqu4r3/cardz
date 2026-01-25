@@ -11,6 +11,7 @@ import { sanitizeTableName } from '../utils/sanitize'
 
 /**
  * Handle table reset request
+ * Only the room creator can reset the table
  */
 export function handleTableReset(
   ws: GenericWebSocket,
@@ -24,6 +25,17 @@ export function handleTableReset(
       originalAction: 'table:reset',
       code: 'INVALID_ACTION',
       message: 'Not in a room',
+    })
+    return
+  }
+
+  // Permission check - only creator can reset table
+  if (!roomManager.isCreator(clientData.roomCode, clientData.id)) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:reset',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the table creator can reset the table',
     })
     return
   }
@@ -53,6 +65,7 @@ export function handleTableReset(
 
 /**
  * Handle table settings update
+ * Only the room creator can change settings
  */
 export function handleTableUpdateSettings(
   ws: GenericWebSocket,
@@ -66,6 +79,17 @@ export function handleTableUpdateSettings(
       originalAction: 'table:update_settings',
       code: 'INVALID_ACTION',
       message: 'Not in a room',
+    })
+    return
+  }
+
+  // Permission check - only creator can change settings
+  if (!roomManager.isCreator(clientData.roomCode, clientData.id)) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:update_settings',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the table creator can change settings',
     })
     return
   }
@@ -95,6 +119,7 @@ export function handleTableUpdateSettings(
 
 /**
  * Handle table visibility update
+ * Only the room creator can change visibility
  */
 export function handleTableUpdateVisibility(
   ws: GenericWebSocket,
@@ -108,6 +133,17 @@ export function handleTableUpdateVisibility(
       originalAction: 'table:update_visibility',
       code: 'INVALID_ACTION',
       message: 'Not in a room',
+    })
+    return
+  }
+
+  // Permission check - only creator can change visibility
+  if (!roomManager.isCreator(clientData.roomCode, clientData.id)) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:update_visibility',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the table creator can change visibility',
     })
     return
   }
@@ -137,6 +173,7 @@ export function handleTableUpdateVisibility(
 
 /**
  * Handle table name update
+ * Only the room creator can change the table name
  */
 export function handleTableUpdateName(
   ws: GenericWebSocket,
@@ -150,6 +187,17 @@ export function handleTableUpdateName(
       originalAction: 'table:update_name',
       code: 'INVALID_ACTION',
       message: 'Not in a room',
+    })
+    return
+  }
+
+  // Permission check - only creator can change table name
+  if (!roomManager.isCreator(clientData.roomCode, clientData.id)) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:update_name',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the table creator can change the table name',
     })
     return
   }

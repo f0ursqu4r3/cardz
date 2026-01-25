@@ -8,6 +8,7 @@ import { CURSOR_THROTTLE_MS } from '../shared/types'
 import { closeDatabase, saveChatMessage } from './persistence'
 import { RateLimiter } from './utils/rate-limit'
 import { sanitizeChatMessage } from './utils/sanitize'
+import { heartbeatManager } from './utils/heartbeat'
 
 // Handlers
 import {
@@ -253,7 +254,9 @@ const server = Bun.serve<ClientData>({
 
     open(ws) {
       const clientData = ws.data
-      roomManager.addClient(clientData.id, ws as GenericWebSocket)
+      const socket = ws as GenericWebSocket
+      roomManager.addClient(clientData.id, socket)
+      heartbeatManager.startHeartbeat(clientData.id, socket)
       console.log(`[connect] ${clientData.id}`)
     },
 
@@ -302,6 +305,12 @@ const server = Bun.serve<ClientData>({
       const msg = result.data
 
       try {
+        // Handle heartbeat pong (doesn't require being in a room)
+        if (msg.type === 'pong') {
+          heartbeatManager.receivePong(clientData.id, msg.timestamp)
+          return
+        }
+
         // Handle room messages (don't require being in a room)
         if (msg.type === 'room:create') {
           handleRoomCreate(socket, msg, roomManager)
@@ -593,9 +602,24 @@ const server = Bun.serve<ClientData>({
 
       lastCursorUpdate.delete(clientData.id)
       rateLimiter.removeClient(clientData.id)
+      heartbeatManager.stopHeartbeat(clientData.id)
       handleDisconnect(clientData, roomManager)
     },
   },
+})
+
+// Set up heartbeat timeout callback to close dead connections
+heartbeatManager.setTimeoutCallback((clientId) => {
+  const ws = roomManager.getClient(clientId)
+  if (ws) {
+    console.log(`[heartbeat] Closing timed-out connection for ${clientId}`)
+    // Close with code 4000 to indicate heartbeat timeout
+    try {
+      (ws as ServerWebSocket<ClientData>).close(4000, 'Heartbeat timeout')
+    } catch {
+      // Connection may already be closed
+    }
+  }
 })
 
 console.log(`🃏 Cardz server running on port ${server.port}`)
@@ -607,6 +631,7 @@ console.log(
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log('\nShutting down...')
+  heartbeatManager.cleanup()
   roomManager.dispose()
   rateLimiter.dispose()
   closeDatabase()
@@ -616,6 +641,7 @@ process.on('SIGINT', () => {
 
 process.on('SIGTERM', () => {
   console.log('\nShutting down...')
+  heartbeatManager.cleanup()
   roomManager.dispose()
   rateLimiter.dispose()
   closeDatabase()

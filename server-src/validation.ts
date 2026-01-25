@@ -4,11 +4,14 @@ import { z } from 'zod'
 // Base Schemas
 // ============================================================================
 
+export const PlayerRoleSchema = z.enum(['creator', 'member'])
+
 export const PlayerSchema = z.object({
   id: z.string(),
   name: z.string().min(1).max(32),
   connected: z.boolean(),
   color: z.string(),
+  role: PlayerRoleSchema,
 })
 
 export const CardStateSchema = z.object({
@@ -355,6 +358,15 @@ export const ChatTypingSchema = z.object({
 })
 
 // ============================================================================
+// Heartbeat Message Schema (Client → Server)
+// ============================================================================
+
+export const PongSchema = z.object({
+  type: z.literal('pong'),
+  timestamp: z.number(),
+})
+
+// ============================================================================
 // Combined Client Message Schema
 // ============================================================================
 
@@ -396,6 +408,7 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   TableUpdateNameSchema,
   ChatSendSchema,
   ChatTypingSchema,
+  PongSchema,
 ])
 
 // ============================================================================

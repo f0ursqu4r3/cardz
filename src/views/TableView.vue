@@ -20,8 +20,8 @@ import { useViewport } from '@/composables/useViewport'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useCursor } from '@/composables/useCursor'
 import { useRemoteThrow } from '@/composables/useRemoteThrow'
-import { useRadialMenu, type RadialMenuTarget } from '@/composables/useRadialMenu'
-import { SquarePlus, Copy, Check, LogOut, Users, Wifi, WifiOff, Settings } from 'lucide-vue-next'
+import { useRadialMenu } from '@/composables/useRadialMenu'
+import { SquarePlus, Copy, Check, DoorOpen, Users, Wifi, WifiOff, Settings } from 'lucide-vue-next'
 import {
   CARD_BACK_COL,
   CARD_BACK_ROW,
@@ -251,7 +251,7 @@ const interaction = useCardInteraction({
 })
 
 // Remote throw physics for other players' card throws
-const remoteThrow = useRemoteThrow((id) => cardStore.cards.find((c) => c.id === id))
+const remoteThrow = useRemoteThrow((id) => cardStore.getCardById(id))
 
 // Radial context menu
 const radialMenu = useRadialMenu()
@@ -678,7 +678,7 @@ const zoneGhostCard = computed(() => {
   if (!stack) return null
   const cardId = stack.cardIds[source.cardIndex]
   if (cardId === undefined) return null
-  const card = cardStore.cards.find((c) => c.id === cardId)
+  const card = cardStore.getCardById(cardId)
   if (!card) return null
 
   // Get the target position
@@ -937,7 +937,7 @@ const onHandCardRightClick = (event: MouseEvent, cardId: number) => {
   event.preventDefault()
   event.stopPropagation()
 
-  const card = cardStore.cards.find((c) => c.id === cardId)
+  const card = cardStore.getCardById(cardId)
   if (!card) return
 
   // If card is part of a hand selection with multiple cards, use hand-selection menu
@@ -993,7 +993,7 @@ const onRadialMenuSelect = (item: RadialMenuItem) => {
 }
 
 const handleCardAction = (action: string, cardId: number) => {
-  const card = cardStore.cards.find((c) => c.id === cardId)
+  const card = cardStore.getCardById(cardId)
   if (!card) return
 
   switch (action) {
@@ -1031,7 +1031,7 @@ const handleStackAction = (action: string, stackId: number) => {
       const spacing = CARD_W + 10
       const startX = stack.anchorX - ((stack.cardIds.length - 1) * spacing) / 2
       stack.cardIds.forEach((cardId, i) => {
-        const card = cardStore.cards.find((c) => c.id === cardId)
+        const card = cardStore.getCardById(cardId)
         if (card) {
           cardStore.removeFromStack(cardId)
           card.x = startX + i * spacing
@@ -1044,7 +1044,7 @@ const handleStackAction = (action: string, stackId: number) => {
     case 'all-face-up':
       // Set all cards in stack to face up
       stack.cardIds.forEach((cardId) => {
-        const card = cardStore.cards.find((c) => c.id === cardId)
+        const card = cardStore.getCardById(cardId)
         if (card) card.faceUp = true
       })
       ws.send({ type: 'stack:set_faces', stackId, faceUp: true })
@@ -1052,7 +1052,7 @@ const handleStackAction = (action: string, stackId: number) => {
     case 'all-face-down':
       // Set all cards in stack to face down
       stack.cardIds.forEach((cardId) => {
-        const card = cardStore.cards.find((c) => c.id === cardId)
+        const card = cardStore.getCardById(cardId)
         if (card) card.faceUp = false
       })
       ws.send({ type: 'stack:set_faces', stackId, faceUp: false })
@@ -1115,7 +1115,7 @@ const handleSelectionAction = (action: string, cardIds: number[]) => {
         sumY = 0,
         count = 0
       cardIds.forEach((id) => {
-        const card = cardStore.cards.find((c) => c.id === id)
+        const card = cardStore.getCardById(id)
         if (card) {
           sumX += card.x
           sumY += card.y
@@ -1182,7 +1182,7 @@ const handleCanvasAction = (action: string, worldX: number, worldY: number) => {
 }
 
 const handleHandCardAction = (action: string, cardId: number) => {
-  const card = cardStore.cards.find((c) => c.id === cardId)
+  const card = cardStore.getCardById(cardId)
   if (!card) return
 
   switch (action) {
@@ -1222,7 +1222,7 @@ const handleHandSelectionAction = (action: string, cardIds: number[]) => {
       const centerY = bounds.y + bounds.height / 2 - CARD_H / 2
 
       cardIds.forEach((cardId, i) => {
-        const card = cardStore.cards.find((c) => c.id === cardId)
+        const card = cardStore.getCardById(cardId)
         if (card) {
           const x = startX + i * (CARD_W + 10)
           const y = centerY
@@ -1243,7 +1243,7 @@ const handleHandSelectionAction = (action: string, cardIds: number[]) => {
 
       // Remove all from hand first
       cardIds.forEach((cardId) => {
-        const card = cardStore.cards.find((c) => c.id === cardId)
+        const card = cardStore.getCardById(cardId)
         if (card) {
           cardStore.removeFromHand(cardId)
           ws.send({ type: 'hand:remove', cardId, x: centerX, y: centerY, faceUp: card.faceUp })
@@ -1253,7 +1253,7 @@ const handleHandSelectionAction = (action: string, cardIds: number[]) => {
       // Create stack
       const newStack = cardStore.createStackAt(centerX, centerY, 'free')
       cardIds.forEach((cardId) => {
-        const card = cardStore.cards.find((c) => c.id === cardId)
+        const card = cardStore.getCardById(cardId)
         if (card) {
           newStack.cardIds.push(cardId)
           card.stackId = newStack.id
@@ -1514,7 +1514,7 @@ onBeforeUnmount(() => {
     <header class="table-header">
       <div class="table-header__left">
         <button class="table-header__back" @click="leaveTable" title="Leave Table">
-          <LogOut :size="18" />
+          <DoorOpen :size="18" />
         </button>
         <div class="table-header__info">
           <h1 class="table-header__title">🃏 cardz</h1>
