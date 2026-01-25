@@ -839,7 +839,8 @@ type ClientMessageBase =
 // All client messages can optionally include a requestId for error correlation
 export type ClientMessage = ClientMessageBase & { requestId?: string }
 
-export type ServerMessage =
+// Base server message union (internal)
+type ServerMessageBase =
   | RoomCreated
   | RoomJoined
   | PlayerJoined
@@ -887,6 +888,9 @@ export type ServerMessage =
   | ChatHistory
   | ChatTypingStatus
   | Ping
+
+// All server messages can optionally include a requestId echoed from the client for correlation
+export type ServerMessage = ServerMessageBase & { requestId?: string }
 
 // ============================================================================
 // Constants

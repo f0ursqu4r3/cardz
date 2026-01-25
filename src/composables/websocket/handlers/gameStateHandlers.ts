@@ -29,11 +29,12 @@ export function handleCardMessage(
 
   switch (message.type) {
     case 'card:moved':
+      // NOTE: Position updates (x, y) are handled by TableView.vue's onMessage handler
+      // which properly supports physics animation for remote throws.
+      // We only update z here to avoid race conditions with the animation system.
       if (gameState.value) {
         const card = gameState.value.cards.find((c) => c.id === message.cardId)
         if (card) {
-          card.x = message.x
-          card.y = message.y
           card.z = message.z
         }
       }
