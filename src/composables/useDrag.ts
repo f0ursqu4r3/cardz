@@ -1,4 +1,4 @@
-import { ref, computed, type Ref } from 'vue'
+import { ref, computed, type Ref, onUnmounted } from 'vue'
 import type { DragTarget } from '@/types'
 import { LONG_PRESS_MS } from '@/types'
 
@@ -146,6 +146,12 @@ export function useDrag(screenToWorld?: ScreenToWorldFn) {
     clearLongPressTimer()
     cancelRaf()
   }
+
+  // Clean up RAF and timers on unmount to prevent memory leaks
+  onUnmounted(() => {
+    cancelRaf()
+    clearLongPressTimer()
+  })
 
   const getDelta = () => {
     const x = state.pendingX - state.offsetX

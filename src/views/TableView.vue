@@ -1352,7 +1352,8 @@ const handleTableReset = () => {
 const copyRoomCode = async () => {
   if (!ws.roomCode.value) return
   try {
-    await navigator.clipboard.writeText(ws.roomCode.value)
+    const fullAddress = `${window.location.origin}/table/${ws.roomCode.value}`
+    await navigator.clipboard.writeText(fullAddress)
     codeCopied.value = true
     setTimeout(() => {
       codeCopied.value = false

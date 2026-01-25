@@ -244,6 +244,8 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     tableSettings.value = { background: 'green-felt' }
     tableName.value = ''
     tableIsPublic.value = false
+    // Clear message handlers to prevent memory leaks from stale closures
+    messageHandlers.clear()
   }
 
   const send = (message: ClientMessage) => {

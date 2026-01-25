@@ -1,12 +1,9 @@
 import type { RoomCreate, RoomJoin, RoomListRequest } from '../../shared/types'
 import type { RoomManager } from '../room'
 import type { ClientData, GenericWebSocket } from '../utils/broadcast'
-import { send, broadcastToRoom } from '../utils/broadcast'
+import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
 import { loadChatMessages } from '../persistence'
-
-function getClientData(ws: GenericWebSocket): ClientData {
-  return ws.data ?? ws.getUserData?.() ?? { id: '', roomCode: null, name: '' }
-}
+import { sanitizePlayerName, sanitizeTableName } from '../utils/sanitize'
 
 export function handleRoomCreate(
   ws: GenericWebSocket,
@@ -14,6 +11,10 @@ export function handleRoomCreate(
   roomManager: RoomManager,
 ): void {
   const clientData = getClientData(ws)
+
+  // Sanitize user-provided names to prevent XSS
+  const playerName = sanitizePlayerName(msg.playerName) || 'Player'
+  const tableName = msg.tableName ? sanitizeTableName(msg.tableName) : undefined
 
   // Leave current room if in one
   if (clientData.roomCode) {
@@ -28,13 +29,13 @@ export function handleRoomCreate(
 
   const room = roomManager.createRoom(
     clientData.id,
-    msg.playerName,
+    playerName,
     msg.sessionId,
-    msg.tableName,
+    tableName,
     msg.isPublic,
   )
   clientData.roomCode = room.code
-  clientData.name = msg.playerName
+  clientData.name = playerName
 
   const state = room.gameState.getState()
   console.log(
@@ -80,6 +81,9 @@ export function handleRoomJoin(
 ): void {
   const clientData = getClientData(ws)
 
+  // Sanitize user-provided name to prevent XSS
+  const playerName = sanitizePlayerName(msg.playerName) || 'Player'
+
   // Leave current room if in one
   if (clientData.roomCode) {
     const oldRoom = roomManager.leaveRoom(clientData.id, clientData.roomCode)
@@ -95,7 +99,7 @@ export function handleRoomJoin(
   const result = roomManager.loadOrCreateRoom(
     msg.roomCode,
     clientData.id,
-    msg.playerName,
+    playerName,
     msg.sessionId,
   )
 
@@ -110,7 +114,7 @@ export function handleRoomJoin(
 
   const { room, player, isReconnect } = result
   clientData.roomCode = room.code
-  clientData.name = msg.playerName
+  clientData.name = playerName
 
   // Build cursors array for joining player (exclude their own cursor)
   const cursors: {

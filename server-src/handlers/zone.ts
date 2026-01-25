@@ -6,12 +6,9 @@ import type {
   ZoneAddCards,
 } from '../../shared/types'
 import type { Room } from '../room'
-import type { ClientData, GenericWebSocket } from '../utils/broadcast'
-import { send, broadcastToRoom } from '../utils/broadcast'
-
-function getClientData(ws: GenericWebSocket): ClientData {
-  return ws.data ?? ws.getUserData?.() ?? { id: '', roomCode: null, name: '' }
-}
+import type { GenericWebSocket } from '../utils/broadcast'
+import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
+import { sanitizeZoneLabel } from '../utils/sanitize'
 
 export function handleZoneCreate(
   ws: GenericWebSocket,
@@ -22,12 +19,15 @@ export function handleZoneCreate(
   const clientData = getClientData(ws)
   const { gameState } = room
 
+  // Sanitize user-provided label to prevent XSS
+  const sanitizedLabel = sanitizeZoneLabel(msg.label)
+
   const zone = gameState.createZone(
     msg.x,
     msg.y,
     msg.width,
     msg.height,
-    msg.label,
+    sanitizedLabel,
     msg.faceUp,
     msg.visibility ?? 'public',
     msg.ownerId ?? null,
@@ -75,7 +75,13 @@ export function handleZoneUpdate(
     return
   }
 
-  const result = gameState.updateZone(msg.zoneId, msg.updates)
+  // Sanitize label if present in updates to prevent XSS
+  const sanitizedUpdates = { ...msg.updates }
+  if (sanitizedUpdates.label !== undefined) {
+    sanitizedUpdates.label = sanitizeZoneLabel(sanitizedUpdates.label)
+  }
+
+  const result = gameState.updateZone(msg.zoneId, sanitizedUpdates)
   if (!result) return
 
   broadcastToRoom(clients, room.code, {

@@ -1,11 +1,7 @@
 import type { HandAdd, HandRemove, HandReorder, HandAddStack } from '../../shared/types'
 import type { Room } from '../room'
-import type { ClientData, GenericWebSocket } from '../utils/broadcast'
-import { send, broadcastToRoom, broadcastSplit } from '../utils/broadcast'
-
-function getClientData(ws: GenericWebSocket): ClientData {
-  return ws.data ?? ws.getUserData?.() ?? { id: '', roomCode: null, name: '' }
-}
+import type { GenericWebSocket } from '../utils/broadcast'
+import { send, broadcastToRoom, broadcastSplit, getClientData } from '../utils/broadcast'
 
 export function handleHandAdd(
   ws: GenericWebSocket,

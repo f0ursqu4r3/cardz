@@ -7,6 +7,7 @@ import { useCardPhysics } from '@/composables/useCardPhysics'
 import type { DragTarget, Zone } from '@/types'
 import { CARD_BACK_COL, CARD_BACK_ROW, CARD_W, CARD_H } from '@/types'
 import type { ClientMessage } from '../../shared/types'
+import { getDropIndexInZone } from '@/utils/zoneLayouts'
 
 interface CardInteractionOptions {
   onHandCardDrop?: (event: PointerEvent) => boolean
@@ -89,108 +90,27 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
   ): number => {
     const layout = zone.layout || 'stack'
     const cardCount = stack.cardIds.length
-    const settings = zone.cardSettings || { cardScale: 1.0, cardSpacing: 0.5 }
-    const spacing = settings.cardSpacing
-    const spacingMultiplier = spacing < 0.5 ? 0.3 + spacing * 1.4 : 1.0 + (spacing - 0.5) * 1.4
 
-    // Relative position within zone
-    const relX = dropX - zone.x
-    const relY = dropY - zone.y
+    // For non-stack layouts, use the shared utility
+    if (layout !== 'stack') {
+      return getDropIndexInZone(zone, cardCount, dropX, dropY)
+    }
 
-    if (layout === 'row') {
-      const step = CARD_W * spacingMultiplier
-      const totalWidth = CARD_W + Math.max(0, cardCount - 1) * step
-      const startX = (zone.width - totalWidth) / 2
-      const posInRow = relX - startX
-      const idx = Math.round(posInRow / step)
-      return Math.max(0, Math.min(cardCount - 1, idx))
-    } else if (layout === 'column') {
-      const step = CARD_H * spacingMultiplier
-      const totalHeight = CARD_H + Math.max(0, cardCount - 1) * step
-      const startY = (zone.height - totalHeight) / 2
-      const posInCol = relY - startY
-      const idx = Math.round(posInCol / step)
-      return Math.max(0, Math.min(cardCount - 1, idx))
-    } else if (layout === 'grid') {
-      // Match the grid calculation from getZoneCardPosition in cards.ts
-      const gapX = CARD_W * spacingMultiplier
-      const gapY = CARD_H * spacingMultiplier
-      const sqrtCount = Math.sqrt(cardCount)
-      let cols = Math.ceil(sqrtCount)
-      const maxCols = Math.max(1, Math.floor((zone.width + gapX - CARD_W) / gapX))
-      if (cols > maxCols) cols = maxCols
-      cols = Math.max(1, cols)
-      const rows = Math.ceil(cardCount / cols)
-      const totalWidth = CARD_W + Math.max(0, cols - 1) * gapX
-      const totalHeight = CARD_H + Math.max(0, rows - 1) * gapY
-      const startX = (zone.width - totalWidth) / 2
-      const startY = (zone.height - totalHeight) / 2
-
-      const col = Math.round((relX - startX) / gapX)
-      const row = Math.round((relY - startY) / gapY)
-      const clampedCol = Math.max(0, Math.min(cols - 1, col))
-      const clampedRow = Math.max(0, Math.min(rows - 1, row))
-      const idx = clampedRow * cols + clampedCol
-      return Math.max(0, Math.min(cardCount - 1, idx))
-    } else if (layout === 'fan') {
-      // Fan layout - calculate based on angle from arc center
-      const zoneCenterX = zone.width / 2
-      const zoneCenterY = zone.height / 2
-      const radius = Math.max(150, zone.height * 1.5)
-      const baseArcSpan = Math.PI * 0.3 * spacingMultiplier
-      const arcSpan = Math.min(baseArcSpan, cardCount * 0.12)
-      const startAngle = Math.PI / 2 + arcSpan / 2
-      const angleStep = cardCount > 1 ? arcSpan / (cardCount - 1) : 0
-
-      // Arc center is below the zone center
-      const arcCenterX = zoneCenterX
-      const arcCenterY = zoneCenterY + radius - CARD_H / 2
-
-      // Calculate angle from arc center to drop position
-      const dx = relX - arcCenterX
-      const dy = arcCenterY - relY // Inverted because arc goes upward
-      const dropAngle = Math.atan2(dy, dx)
-
-      // Convert angle to index (startAngle is leftmost, decreases as index increases)
-      if (angleStep === 0) return 0
-      const idx = Math.round((startAngle - dropAngle) / angleStep)
-      return Math.max(0, Math.min(cardCount - 1, idx))
-    } else if (layout === 'circle') {
-      // Circle layout - calculate based on angle from center
-      // Uses ~330 degrees (11/12 of circle) with a gap at the bottom
-      const centerX = zone.width / 2
-      const centerY = zone.height / 2
-      const arcSpan = Math.PI * 2 * (11 / 12)
-      const angleStep = cardCount > 1 ? arcSpan / (cardCount - 1) : 0
-      const startAngle = -Math.PI / 2 - arcSpan / 2 // Center the arc at top
-
-      // Calculate angle from center to drop position
-      const dx = relX - centerX
-      const dy = relY - centerY
-      const dropAngle = Math.atan2(dy, dx)
-
-      // Convert angle to index relative to start angle
-      if (angleStep === 0) return 0
-      const idx = Math.round((dropAngle - startAngle) / angleStep)
-      return Math.max(0, Math.min(cardCount - 1, idx))
-    } else {
-      // For stack layout, use distance-based calculation
-      // Find closest card position
-      let closestIdx = 0
-      let closestDist = Infinity
-      for (let i = 0; i < cardCount; i++) {
-        const cardId = stack.cardIds[i]
-        const card = cardStore.cards.find((c) => c.id === cardId)
-        if (card) {
-          const dist = Math.hypot(dropX - card.x, dropY - card.y)
-          if (dist < closestDist) {
-            closestDist = dist
-            closestIdx = i
-          }
+    // For stack layout, use distance-based calculation to find closest card position
+    let closestIdx = 0
+    let closestDist = Infinity
+    for (let i = 0; i < cardCount; i++) {
+      const cardId = stack.cardIds[i]
+      const card = cardStore.cards.find((c) => c.id === cardId)
+      if (card) {
+        const dist = Math.hypot(dropX - card.x, dropY - card.y)
+        if (dist < closestDist) {
+          closestDist = dist
+          closestIdx = i
         }
       }
-      return closestIdx
     }
+    return closestIdx
   }
 
   // Apply pending position during drag

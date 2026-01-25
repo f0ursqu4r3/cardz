@@ -7,13 +7,14 @@ export interface ClientData {
 }
 
 // Generic WebSocket interface that works with both Bun and uWebSockets.js
+// The send signature is compatible with Bun's ServerWebSocket (returns number) and others (void)
 export interface GenericWebSocket {
-  send(message: string): void
-  data?: ClientData
+  send(message: string, compress?: boolean): number | void
+  readonly data?: ClientData
   getUserData?(): ClientData
 }
 
-function getClientData(ws: GenericWebSocket): ClientData {
+export function getClientData(ws: GenericWebSocket): ClientData {
   // Bun uses ws.data, uWebSockets.js uses ws.getUserData()
   return ws.data ?? ws.getUserData?.() ?? { id: '', roomCode: null, name: '' }
 }

@@ -12,12 +12,8 @@ import type {
   StackReorder,
 } from '../../shared/types'
 import type { Room } from '../room'
-import type { ClientData, GenericWebSocket } from '../utils/broadcast'
-import { send, broadcastToRoom } from '../utils/broadcast'
-
-function getClientData(ws: GenericWebSocket): ClientData {
-  return ws.data ?? ws.getUserData?.() ?? { id: '', roomCode: null, name: '' }
-}
+import type { GenericWebSocket } from '../utils/broadcast'
+import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
 
 export function handleStackCreate(
   ws: GenericWebSocket,
@@ -28,7 +24,7 @@ export function handleStackCreate(
   const clientData = getClientData(ws)
   const { locks, gameState } = room
 
-  // Check all cards are free (not locked by others, not in hands)
+  // First pass: validate all cards exist and are not in hands
   for (const cardId of msg.cardIds) {
     const card = gameState.getCard(cardId)
     if (!card) {
@@ -50,21 +46,34 @@ export function handleStackCreate(
       })
       return
     }
+  }
 
-    const lockedBy = locks.isCardLocked(cardId)
-    if (lockedBy && lockedBy !== clientData.id) {
+  // Second pass: atomically acquire locks on all cards
+  const acquiredLocks: number[] = []
+  for (const cardId of msg.cardIds) {
+    if (!locks.lockCard(cardId, clientData.id)) {
+      // Failed to acquire lock - release any locks we acquired
+      for (const lockedCardId of acquiredLocks) {
+        locks.unlockCard(lockedCardId, clientData.id)
+      }
       send(ws, {
         type: 'error',
         originalAction: 'stack:create',
         code: 'CARD_LOCKED',
-        message: 'One or more cards are locked',
+        message: 'One or more cards are locked by another player',
       })
       return
     }
+    acquiredLocks.push(cardId)
   }
 
-  // Create the stack
+  // Create the stack (we now hold all the locks)
   const result = gameState.createStack(msg.cardIds, msg.anchorX, msg.anchorY)
+
+  // Release the card locks (stack creation transfers cards to stack)
+  for (const cardId of acquiredLocks) {
+    locks.unlockCard(cardId, clientData.id)
+  }
 
   // Broadcast creation
   broadcastToRoom(clients, room.code, {
@@ -84,9 +93,20 @@ export function handleStackMove(
   const clientData = getClientData(ws)
   const { locks, gameState } = room
 
-  // Check lock
-  const lockedBy = locks.isStackLocked(msg.stackId)
-  if (lockedBy && lockedBy !== clientData.id) {
+  // Check if stack exists first
+  const stack = gameState.getStack(msg.stackId)
+  if (!stack) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'stack:move',
+      code: 'NOT_FOUND',
+      message: 'Stack not found',
+    })
+    return
+  }
+
+  // Atomically try to acquire lock (or refresh if we already hold it)
+  if (!locks.lockStack(msg.stackId, clientData.id)) {
     send(ws, {
       type: 'error',
       originalAction: 'stack:move',
@@ -96,14 +116,9 @@ export function handleStackMove(
     return
   }
 
+  // Move the stack (we now hold the lock)
   const result = gameState.moveStack(msg.stackId, msg.anchorX, msg.anchorY, msg.detachFromZone)
   if (!result) {
-    send(ws, {
-      type: 'error',
-      originalAction: 'stack:move',
-      code: 'NOT_FOUND',
-      message: 'Stack not found',
-    })
     return
   }
 

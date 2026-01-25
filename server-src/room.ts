@@ -19,13 +19,15 @@ import {
 } from './persistence'
 
 /**
- * Generate a random 6-character room code
+ * Generate a random 6-character room code using cryptographically secure random
  */
 function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // Avoid ambiguous chars
+  const randomBytes = new Uint8Array(6)
+  crypto.getRandomValues(randomBytes)
   let code = ''
   for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)]
+    code += chars[randomBytes[i] % chars.length]
   }
   return code
 }

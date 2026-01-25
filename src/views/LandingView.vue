@@ -401,7 +401,7 @@ const browseTables = () => {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 1rem;
+  gap: 3rem;
 }
 
 .landing__footer p {

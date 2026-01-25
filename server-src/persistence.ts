@@ -111,35 +111,41 @@ function getDb(): Database {
 /**
  * Save a table to the database
  */
-export function saveTable(code: string, metadata: TableMetadata, gameState: GameState): void {
-  const database = getDb()
-  const now = Date.now()
+export function saveTable(code: string, metadata: TableMetadata, gameState: GameState): boolean {
+  try {
+    const database = getDb()
+    const now = Date.now()
 
-  const stmt = database.prepare(`
-    INSERT INTO tables (code, name, is_public, max_players, created_at, updated_at, created_by, settings, game_state)
-    VALUES ($code, $name, $is_public, $max_players, $created_at, $updated_at, $created_by, $settings, $game_state)
-    ON CONFLICT(code) DO UPDATE SET
-      name = $name,
-      is_public = $is_public,
-      max_players = $max_players,
-      updated_at = $updated_at,
-      settings = $settings,
-      game_state = $game_state
-  `)
+    const stmt = database.prepare(`
+      INSERT INTO tables (code, name, is_public, max_players, created_at, updated_at, created_by, settings, game_state)
+      VALUES ($code, $name, $is_public, $max_players, $created_at, $updated_at, $created_by, $settings, $game_state)
+      ON CONFLICT(code) DO UPDATE SET
+        name = $name,
+        is_public = $is_public,
+        max_players = $max_players,
+        updated_at = $updated_at,
+        settings = $settings,
+        game_state = $game_state
+    `)
 
-  stmt.run({
-    $code: code,
-    $name: metadata.name,
-    $is_public: metadata.isPublic ? 1 : 0,
-    $max_players: metadata.maxPlayers,
-    $created_at: metadata.createdAt,
-    $updated_at: now,
-    $created_by: metadata.createdBy,
-    $settings: JSON.stringify(metadata.settings),
-    $game_state: JSON.stringify(gameState),
-  })
+    stmt.run({
+      $code: code,
+      $name: metadata.name,
+      $is_public: metadata.isPublic ? 1 : 0,
+      $max_players: metadata.maxPlayers,
+      $created_at: metadata.createdAt,
+      $updated_at: now,
+      $created_by: metadata.createdBy,
+      $settings: JSON.stringify(metadata.settings),
+      $game_state: JSON.stringify(gameState),
+    })
 
-  console.log(`[persistence] Saved table ${code}`)
+    console.log(`[persistence] Saved table ${code}`)
+    return true
+  } catch (err) {
+    console.error(`[persistence] Failed to save table ${code}:`, err)
+    return false
+  }
 }
 
 /**
@@ -173,15 +179,16 @@ export function loadTable(code: string): PersistedTable | null {
   let settings: TableSettings
   try {
     settings = JSON.parse(row.settings)
-  } catch {
+  } catch (err) {
+    console.warn(`[persistence] Failed to parse settings for table ${code}, using defaults:`, err)
     settings = getDefaultSettings()
   }
 
   let gameState: GameState
   try {
     gameState = JSON.parse(row.game_state)
-  } catch {
-    console.error(`[persistence] Failed to parse game state for table ${code}`)
+  } catch (err) {
+    console.error(`[persistence] Failed to parse game state for table ${code}:`, err)
     return null
   }
 
@@ -204,17 +211,22 @@ export function loadTable(code: string): PersistedTable | null {
  * Delete a table from the database
  */
 export function deleteTable(code: string): boolean {
-  const database = getDb()
+  try {
+    const database = getDb()
 
-  const stmt = database.prepare('DELETE FROM tables WHERE code = ?')
-  const result = stmt.run(code)
+    const stmt = database.prepare('DELETE FROM tables WHERE code = ?')
+    const result = stmt.run(code)
 
-  if (result.changes > 0) {
-    console.log(`[persistence] Deleted table ${code}`)
-    return true
+    if (result.changes > 0) {
+      console.log(`[persistence] Deleted table ${code}`)
+      return true
+    }
+
+    return false
+  } catch (err) {
+    console.error(`[persistence] Failed to delete table ${code}:`, err)
+    return false
   }
-
-  return false
 }
 
 /**
@@ -244,7 +256,8 @@ export function listTables(): TableMetadata[] {
     let settings: TableSettings
     try {
       settings = JSON.parse(row.settings)
-    } catch {
+    } catch (err) {
+      console.warn(`[persistence] Failed to parse settings for table ${row.code}, using defaults:`, err)
       settings = getDefaultSettings()
     }
 
@@ -433,17 +446,22 @@ export function flushPendingSaves(): void {
  * Clean up old tables (older than maxAge)
  */
 export function cleanupOldTables(maxAgeMs: number = 7 * 24 * 60 * 60 * 1000): number {
-  const database = getDb()
-  const cutoff = Date.now() - maxAgeMs
+  try {
+    const database = getDb()
+    const cutoff = Date.now() - maxAgeMs
 
-  const stmt = database.prepare('DELETE FROM tables WHERE updated_at < ?')
-  const result = stmt.run(cutoff)
+    const stmt = database.prepare('DELETE FROM tables WHERE updated_at < ?')
+    const result = stmt.run(cutoff)
 
-  if (result.changes > 0) {
-    console.log(`[persistence] Cleaned up ${result.changes} old tables`)
+    if (result.changes > 0) {
+      console.log(`[persistence] Cleaned up ${result.changes} old tables`)
+    }
+
+    return result.changes
+  } catch (err) {
+    console.error(`[persistence] Failed to cleanup old tables:`, err)
+    return 0
   }
-
-  return result.changes
 }
 
 /**
@@ -486,7 +504,8 @@ export function searchTables(query: string, publicOnly: boolean = true): TableMe
     let settings: TableSettings
     try {
       settings = JSON.parse(row.settings)
-    } catch {
+    } catch (err) {
+      console.warn(`[persistence] Failed to parse settings for table ${row.code}, using defaults:`, err)
       settings = getDefaultSettings()
     }
 
@@ -519,23 +538,29 @@ export interface PersistedChatMessage {
 /**
  * Save a chat message to the database
  */
-export function saveChatMessage(msg: PersistedChatMessage): void {
-  const database = getDb()
+export function saveChatMessage(msg: PersistedChatMessage): boolean {
+  try {
+    const database = getDb()
 
-  const stmt = database.prepare(`
-    INSERT INTO chat_messages (id, room_code, player_id, player_name, player_color, message, timestamp)
-    VALUES ($id, $room_code, $player_id, $player_name, $player_color, $message, $timestamp)
-  `)
+    const stmt = database.prepare(`
+      INSERT INTO chat_messages (id, room_code, player_id, player_name, player_color, message, timestamp)
+      VALUES ($id, $room_code, $player_id, $player_name, $player_color, $message, $timestamp)
+    `)
 
-  stmt.run({
-    $id: msg.id,
-    $room_code: msg.roomCode,
-    $player_id: msg.playerId,
-    $player_name: msg.playerName,
-    $player_color: msg.playerColor,
-    $message: msg.message,
-    $timestamp: msg.timestamp,
-  })
+    stmt.run({
+      $id: msg.id,
+      $room_code: msg.roomCode,
+      $player_id: msg.playerId,
+      $player_name: msg.playerName,
+      $player_color: msg.playerColor,
+      $message: msg.message,
+      $timestamp: msg.timestamp,
+    })
+    return true
+  } catch (err) {
+    console.error(`[persistence] Failed to save chat message in room ${msg.roomCode}:`, err)
+    return false
+  }
 }
 
 /**

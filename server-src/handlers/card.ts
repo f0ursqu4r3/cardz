@@ -1,11 +1,7 @@
 import type { CardMoveIntent, CardLock, CardUnlock, CardFlip } from '../../shared/types'
 import type { Room } from '../room'
-import type { ClientData, GenericWebSocket } from '../utils/broadcast'
-import { send, broadcastToRoom } from '../utils/broadcast'
-
-function getClientData(ws: GenericWebSocket): ClientData {
-  return ws.data ?? ws.getUserData?.() ?? { id: '', roomCode: null, name: '' }
-}
+import type { GenericWebSocket } from '../utils/broadcast'
+import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
 
 export function handleCardMove(
   ws: GenericWebSocket,
@@ -16,20 +12,7 @@ export function handleCardMove(
   const clientData = getClientData(ws)
   const { locks, gameState } = room
 
-  // Check if card is locked by another player
-  const lockedBy = locks.isCardLocked(msg.cardId)
-  if (lockedBy && lockedBy !== clientData.id) {
-    const card = gameState.getCard(msg.cardId)
-    send(ws, {
-      type: 'card:move_rejected',
-      cardId: msg.cardId,
-      reason: 'LOCKED',
-      currentState: { x: card?.x ?? 0, y: card?.y ?? 0 },
-    })
-    return
-  }
-
-  // Check if card is in someone's hand
+  // Check if card exists first
   const card = gameState.getCard(msg.cardId)
   if (!card) {
     send(ws, {
@@ -41,6 +24,7 @@ export function handleCardMove(
     return
   }
 
+  // Check if card is in someone's hand
   if (card.ownerId !== null) {
     send(ws, {
       type: 'card:move_rejected',
@@ -51,7 +35,19 @@ export function handleCardMove(
     return
   }
 
-  // Move the card
+  // Atomically try to acquire lock (or refresh if we already hold it)
+  // This prevents race conditions where two players check and then move simultaneously
+  if (!locks.lockCard(msg.cardId, clientData.id)) {
+    send(ws, {
+      type: 'card:move_rejected',
+      cardId: msg.cardId,
+      reason: 'LOCKED',
+      currentState: { x: card.x, y: card.y },
+    })
+    return
+  }
+
+  // Move the card (we now hold the lock)
   const result = gameState.moveCard(msg.cardId, msg.x, msg.y)
   if (!result) return
 
@@ -163,19 +159,7 @@ export function handleCardFlip(
   const clientData = getClientData(ws)
   const { locks, gameState } = room
 
-  // Check lock
-  const lockedBy = locks.isCardLocked(msg.cardId)
-  if (lockedBy && lockedBy !== clientData.id) {
-    send(ws, {
-      type: 'error',
-      originalAction: 'card:flip',
-      code: 'CARD_LOCKED',
-      message: 'Card is locked by another player',
-    })
-    return
-  }
-
-  // Check if card is in hand
+  // Check if card exists
   const card = gameState.getCard(msg.cardId)
   if (!card) {
     send(ws, {
@@ -187,6 +171,7 @@ export function handleCardFlip(
     return
   }
 
+  // Check if card is in another player's hand
   if (card.ownerId !== null && card.ownerId !== clientData.id) {
     send(ws, {
       type: 'error',
@@ -197,7 +182,18 @@ export function handleCardFlip(
     return
   }
 
-  // Flip the card
+  // Atomically try to acquire lock for the flip operation
+  if (!locks.lockCard(msg.cardId, clientData.id)) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'card:flip',
+      code: 'CARD_LOCKED',
+      message: 'Card is locked by another player',
+    })
+    return
+  }
+
+  // Flip the card (we now hold the lock)
   const flipped = gameState.flipCard(msg.cardId)
   if (!flipped) return
 

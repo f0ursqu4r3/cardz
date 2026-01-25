@@ -2,10 +2,12 @@ import type { ServerWebSocket } from 'bun'
 import { nanoid } from 'nanoid'
 import { RoomManager } from './room'
 import { ClientMessageSchema } from './validation'
-import type { ClientData } from './utils/broadcast'
+import type { ClientData, GenericWebSocket } from './utils/broadcast'
 import { send, broadcastToRoom } from './utils/broadcast'
 import { CURSOR_THROTTLE_MS } from '../shared/types'
 import { closeDatabase, saveChatMessage } from './persistence'
+import { RateLimiter } from './utils/rate-limit'
+import { sanitizeChatMessage } from './utils/sanitize'
 
 // Handlers
 import {
@@ -55,6 +57,65 @@ const roomManager = new RoomManager()
 // Track cursor update timestamps for throttling
 const lastCursorUpdate = new Map<string, number>()
 
+// Rate limiter for WebSocket messages
+const rateLimiter = new RateLimiter({
+  maxTokens: 100, // Allow burst of 100 messages
+  refillRate: 50, // Refill 50 tokens per second (allows sustained 50 msg/s)
+  messageCost: 1,
+})
+
+// Allowed origins for WebSocket connections (configurable via env)
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  : null // null means allow all origins (development mode)
+
+/**
+ * Validate WebSocket origin to prevent CSRF attacks
+ */
+function isValidOrigin(origin: string | null): boolean {
+  // In development, allow all origins if ALLOWED_ORIGINS is not set
+  if (!ALLOWED_ORIGINS) {
+    return true
+  }
+
+  // Require origin header in production
+  if (!origin) {
+    return false
+  }
+
+  // Check if origin matches any allowed pattern
+  return ALLOWED_ORIGINS.some((allowed) => {
+    if (allowed === '*') return true
+    if (allowed === origin) return true
+    // Support wildcard subdomains (e.g., *.example.com)
+    if (allowed.startsWith('*.')) {
+      const domain = allowed.slice(2)
+      return origin.endsWith(domain) || origin.endsWith('.' + domain)
+    }
+    return false
+  })
+}
+
+/**
+ * Security headers for HTTP responses
+ */
+function getSecurityHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'X-XSS-Protection': '1; mode=block',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+  }
+
+  if (isProduction) {
+    headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    headers['Content-Security-Policy'] =
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss: ws:; font-src 'self'"
+  }
+
+  return headers
+}
+
 // Type alias for Bun's WebSocket
 export type BunWebSocket = ServerWebSocket<ClientData>
 
@@ -89,11 +150,17 @@ async function serveStaticFile(pathname: string): Promise<Response | null> {
     const file = Bun.file(filePath)
     if (await file.exists()) {
       return new Response(file, {
-        headers: { 'Content-Type': mimeType },
+        headers: {
+          'Content-Type': mimeType,
+          ...getSecurityHeaders(),
+        },
       })
     }
-  } catch {
-    // File not found
+  } catch (err) {
+    // Log unexpected errors (not file not found, which is normal for SPA routing)
+    if (err instanceof Error && !err.message.includes('ENOENT')) {
+      console.warn(`[static] Error serving ${pathname}:`, err.message)
+    }
   }
   return null
 }
@@ -108,13 +175,26 @@ const server = Bun.serve<ClientData>({
     // Health check endpoint
     if (url.pathname === '/health') {
       return new Response(JSON.stringify({ status: 'ok' }), {
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...getSecurityHeaders(),
+        },
       })
     }
 
     // Check if this is a WebSocket upgrade request
     const upgradeHeader = req.headers.get('upgrade')
     if (upgradeHeader?.toLowerCase() === 'websocket') {
+      // Validate origin to prevent CSRF attacks
+      const origin = req.headers.get('origin')
+      if (!isValidOrigin(origin)) {
+        console.warn(`[ws] Rejected connection from invalid origin: ${origin}`)
+        return new Response('Forbidden: Invalid origin', {
+          status: 403,
+          headers: getSecurityHeaders(),
+        })
+      }
+
       const success = server.upgrade(req, {
         data: {
           id: nanoid(),
@@ -127,7 +207,10 @@ const server = Bun.serve<ClientData>({
         return undefined
       }
 
-      return new Response('WebSocket upgrade failed', { status: 400 })
+      return new Response('WebSocket upgrade failed', {
+        status: 400,
+        headers: getSecurityHeaders(),
+      })
     }
 
     // In production, serve static files
@@ -143,16 +226,25 @@ const server = Bun.serve<ClientData>({
         const indexFile = Bun.file(`${STATIC_DIR}/index.html`)
         if (await indexFile.exists()) {
           return new Response(indexFile, {
-            headers: { 'Content-Type': 'text/html' },
+            headers: {
+              'Content-Type': 'text/html',
+              ...getSecurityHeaders(),
+            },
           })
         }
       }
 
-      return new Response('Not Found', { status: 404 })
+      return new Response('Not Found', {
+        status: 404,
+        headers: getSecurityHeaders(),
+      })
     }
 
     // In development, just handle WebSocket or return 404
-    return new Response('Not Found', { status: 404 })
+    return new Response('Not Found', {
+      status: 404,
+      headers: getSecurityHeaders(),
+    })
   },
 
   websocket: {
@@ -161,12 +253,24 @@ const server = Bun.serve<ClientData>({
 
     open(ws) {
       const clientData = ws.data
-      roomManager.addClient(clientData.id, ws as any)
+      roomManager.addClient(clientData.id, ws as GenericWebSocket)
       console.log(`[connect] ${clientData.id}`)
     },
 
     message(ws, message) {
       const clientData = ws.data
+      const socket = ws as GenericWebSocket
+
+      // Rate limiting check
+      if (!rateLimiter.allowMessage(clientData.id)) {
+        send(socket, {
+          type: 'error',
+          originalAction: 'unknown',
+          code: 'RATE_LIMITED',
+          message: 'Too many requests. Please slow down.',
+        })
+        return
+      }
 
       // Parse message
       let raw: unknown
@@ -174,7 +278,7 @@ const server = Bun.serve<ClientData>({
         const text = typeof message === 'string' ? message : new TextDecoder().decode(message)
         raw = JSON.parse(text)
       } catch {
-        send(ws as any, {
+        send(socket, {
           type: 'error',
           originalAction: 'unknown',
           code: 'INVALID_ACTION',
@@ -186,9 +290,9 @@ const server = Bun.serve<ClientData>({
       // Validate message
       const result = ClientMessageSchema.safeParse(raw)
       if (!result.success) {
-        send(ws as any, {
+        send(socket, {
           type: 'error',
-          originalAction: (raw as any)?.type ?? 'unknown',
+          originalAction: (raw as Record<string, unknown>)?.type as string ?? 'unknown',
           code: 'INVALID_ACTION',
           message: result.error.issues[0]?.message ?? 'Invalid message',
         })
@@ -200,28 +304,28 @@ const server = Bun.serve<ClientData>({
       try {
         // Handle room messages (don't require being in a room)
         if (msg.type === 'room:create') {
-          handleRoomCreate(ws as any, msg, roomManager)
+          handleRoomCreate(socket, msg, roomManager)
           return
         }
 
         if (msg.type === 'room:join') {
-          handleRoomJoin(ws as any, msg, roomManager)
+          handleRoomJoin(socket, msg, roomManager)
           return
         }
 
         if (msg.type === 'room:leave') {
-          handleRoomLeave(ws as any, roomManager)
+          handleRoomLeave(socket, roomManager)
           return
         }
 
         if (msg.type === 'room:list') {
-          handleRoomList(ws as any, msg, roomManager)
+          handleRoomList(socket, msg, roomManager)
           return
         }
 
         // All other messages require being in a room
         if (!clientData.roomCode) {
-          send(ws as any, {
+          send(socket, {
             type: 'error',
             originalAction: msg.type,
             code: 'INVALID_ACTION',
@@ -233,7 +337,7 @@ const server = Bun.serve<ClientData>({
         const room = roomManager.getRoom(clientData.roomCode)
         if (!room) {
           clientData.roomCode = null
-          send(ws as any, {
+          send(socket, {
             type: 'error',
             originalAction: msg.type,
             code: 'NOT_FOUND',
@@ -248,108 +352,108 @@ const server = Bun.serve<ClientData>({
         switch (msg.type) {
           // Card actions
           case 'card:move':
-            handleCardMove(ws as any, msg, room, clients as any)
+            handleCardMove(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
           case 'card:lock':
-            handleCardLock(ws as any, msg, room, clients as any)
+            handleCardLock(socket, msg, room, clients)
             break
           case 'card:unlock':
-            handleCardUnlock(ws as any, msg, room, clients as any)
+            handleCardUnlock(socket, msg, room, clients)
             break
           case 'card:flip':
-            handleCardFlip(ws as any, msg, room, clients as any)
+            handleCardFlip(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
 
           // Stack actions
           case 'stack:create':
-            handleStackCreate(ws as any, msg, room, clients as any)
+            handleStackCreate(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
           case 'stack:move':
-            handleStackMove(ws as any, msg, room, clients as any)
+            handleStackMove(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
           case 'stack:lock':
-            handleStackLock(ws as any, msg, room, clients as any)
+            handleStackLock(socket, msg, room, clients)
             break
           case 'stack:unlock':
-            handleStackUnlock(ws as any, msg, room, clients as any)
+            handleStackUnlock(socket, msg, room, clients)
             break
           case 'stack:add_card':
-            handleStackAddCard(ws as any, msg, room, clients as any)
+            handleStackAddCard(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
           case 'stack:remove_card':
-            handleStackRemoveCard(ws as any, msg, room, clients as any)
+            handleStackRemoveCard(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
           case 'stack:merge':
-            handleStackMerge(ws as any, msg, room, clients as any)
+            handleStackMerge(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
           case 'stack:shuffle':
-            handleStackShuffle(ws as any, msg, room, clients as any)
+            handleStackShuffle(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
           case 'stack:flip':
-            handleStackFlip(ws as any, msg, room, clients as any)
+            handleStackFlip(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
           case 'stack:set_faces':
-            handleStackSetFaces(ws as any, msg, room, clients as any)
+            handleStackSetFaces(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
           case 'stack:reorder':
-            handleStackReorder(ws as any, msg, room, clients as any)
+            handleStackReorder(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
 
           // Zone actions
           case 'zone:create':
-            handleZoneCreate(ws as any, msg, room, clients as any)
+            handleZoneCreate(socket, msg, room, clients)
             roomManager.markDirtyImmediate(room.code)
             break
           case 'zone:update':
-            handleZoneUpdate(ws as any, msg, room, clients as any)
+            handleZoneUpdate(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
           case 'zone:delete':
-            handleZoneDelete(ws as any, msg, room, clients as any)
+            handleZoneDelete(socket, msg, room, clients)
             roomManager.markDirtyImmediate(room.code)
             break
           case 'zone:add_card':
-            handleZoneAddCard(ws as any, msg, room, clients as any)
+            handleZoneAddCard(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
           case 'zone:add_cards':
-            handleZoneAddCards(ws as any, msg, room, clients as any)
+            handleZoneAddCards(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
 
           // Hand actions
           case 'hand:add':
-            handleHandAdd(ws as any, msg, room, clients as any)
+            handleHandAdd(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
           case 'hand:remove':
-            handleHandRemove(ws as any, msg, room, clients as any)
+            handleHandRemove(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
           case 'hand:reorder':
-            handleHandReorder(ws as any, msg, room)
+            handleHandReorder(socket, msg, room)
             roomManager.markDirty(room.code)
             break
           case 'hand:add_stack':
-            handleHandAddStack(ws as any, msg, room, clients as any)
+            handleHandAddStack(socket, msg, room, clients)
             roomManager.markDirty(room.code)
             break
 
           // Selection actions
           case 'selection:stack':
             handleStackCreate(
-              ws as any,
+              socket,
               {
                 type: 'stack:create',
                 cardIds: msg.cardIds,
@@ -357,7 +461,7 @@ const server = Bun.serve<ClientData>({
                 anchorY: msg.anchorY,
               },
               room,
-              clients as any,
+              clients,
             )
             roomManager.markDirty(room.code)
             break
@@ -378,7 +482,7 @@ const server = Bun.serve<ClientData>({
             room.cursors.set(clientData.id, { x: msg.x, y: msg.y, state: msg.state })
 
             broadcastToRoom(
-              clients as any,
+              clients,
               room.code,
               {
                 type: 'cursor:updated',
@@ -400,7 +504,7 @@ const server = Bun.serve<ClientData>({
               playerId: h.playerId,
               count: h.cardIds.length,
             }))
-            send(ws as any, {
+            send(socket, {
               type: 'state:sync',
               state,
               yourHand: playerHand?.cardIds ?? [],
@@ -414,13 +518,17 @@ const server = Bun.serve<ClientData>({
             const player = room.players.get(clientData.id)
             if (!player) break
 
+            // Sanitize message to prevent XSS
+            const sanitizedMessage = sanitizeChatMessage(msg.message)
+            if (!sanitizedMessage) break // Ignore empty messages
+
             const chatMessage = {
               id: nanoid(),
               roomCode: room.code,
               playerId: clientData.id,
               playerName: player.name,
               playerColor: player.color,
-              message: msg.message,
+              message: sanitizedMessage,
               timestamp: Date.now(),
             }
 
@@ -428,7 +536,7 @@ const server = Bun.serve<ClientData>({
             saveChatMessage(chatMessage)
 
             // Broadcast to all players in the room
-            broadcastToRoom(clients as any, room.code, {
+            broadcastToRoom(clients, room.code, {
               type: 'chat:message',
               ...chatMessage,
             })
@@ -441,7 +549,7 @@ const server = Bun.serve<ClientData>({
 
             // Broadcast typing status to other players in the room
             broadcastToRoom(
-              clients as any,
+              clients,
               room.code,
               {
                 type: 'chat:typing_status',
@@ -456,21 +564,21 @@ const server = Bun.serve<ClientData>({
 
           // Table management
           case 'table:reset':
-            handleTableReset(ws as any, msg, roomManager)
+            handleTableReset(socket, msg, roomManager)
             break
           case 'table:update_settings':
-            handleTableUpdateSettings(ws as any, msg, roomManager)
+            handleTableUpdateSettings(socket, msg, roomManager)
             break
           case 'table:update_visibility':
-            handleTableUpdateVisibility(ws as any, msg, roomManager)
+            handleTableUpdateVisibility(socket, msg, roomManager)
             break
           case 'table:update_name':
-            handleTableUpdateName(ws as any, msg, roomManager)
+            handleTableUpdateName(socket, msg, roomManager)
             break
         }
       } catch (err) {
         console.error(`[error] Handler error for ${msg.type}:`, err)
-        send(ws as any, {
+        send(socket, {
           type: 'error',
           originalAction: msg.type,
           code: 'INTERNAL_ERROR',
@@ -484,6 +592,7 @@ const server = Bun.serve<ClientData>({
       console.log(`[disconnect] ${clientData.id} (code: ${code})`)
 
       lastCursorUpdate.delete(clientData.id)
+      rateLimiter.removeClient(clientData.id)
       handleDisconnect(clientData, roomManager)
     },
   },
@@ -499,6 +608,7 @@ console.log(
 process.on('SIGINT', () => {
   console.log('\nShutting down...')
   roomManager.dispose()
+  rateLimiter.dispose()
   closeDatabase()
   server.stop()
   process.exit(0)
@@ -507,6 +617,7 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
   console.log('\nShutting down...')
   roomManager.dispose()
+  rateLimiter.dispose()
   closeDatabase()
   server.stop()
   process.exit(0)

@@ -1,4 +1,4 @@
-import { computed, type Ref } from 'vue'
+import { computed, type Ref, onUnmounted } from 'vue'
 import { useCardStore } from '@/stores/cards'
 import type { useDrag } from '@/composables/useDrag'
 import type { DragTarget } from '@/types'
@@ -108,6 +108,11 @@ export function useHand(
       longPressTimer = null
     }
   }
+
+  // Clean up timer on unmount to prevent memory leaks
+  onUnmounted(() => {
+    clearLongPressTimer()
+  })
 
   const startHandCardDrag = (event: PointerEvent, cardId: number, faceDown: boolean) => {
     const index = cardStore.cards.findIndex((c) => c.id === cardId)

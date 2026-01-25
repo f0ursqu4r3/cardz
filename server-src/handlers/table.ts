@@ -3,16 +3,11 @@ import type {
   TableUpdateSettings,
   TableUpdateVisibility,
   TableUpdateName,
-  GameState,
-  TableSettings,
 } from '../../shared/types'
 import type { RoomManager } from '../room'
-import type { ClientData, GenericWebSocket } from '../utils/broadcast'
-import { send, broadcastToRoom } from '../utils/broadcast'
-
-function getClientData(ws: GenericWebSocket): ClientData {
-  return ws.data ?? ws.getUserData?.() ?? { id: '', roomCode: null, name: '' }
-}
+import type { GenericWebSocket } from '../utils/broadcast'
+import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
+import { sanitizeTableName } from '../utils/sanitize'
 
 /**
  * Handle table reset request
@@ -159,7 +154,10 @@ export function handleTableUpdateName(
     return
   }
 
-  const success = roomManager.updateName(clientData.roomCode, msg.name)
+  // Sanitize table name to prevent XSS
+  const sanitizedName = sanitizeTableName(msg.name) || 'Untitled Table'
+
+  const success = roomManager.updateName(clientData.roomCode, sanitizedName)
   if (!success) {
     send(ws, {
       type: 'error',
@@ -173,9 +171,9 @@ export function handleTableUpdateName(
   // Broadcast name update to all players
   broadcastToRoom(roomManager.getClients(), clientData.roomCode, {
     type: 'table:name_updated',
-    name: msg.name,
+    name: sanitizedName,
     playerId: clientData.id,
   })
 
-  console.log(`[table:name] Table ${clientData.roomCode} renamed to "${msg.name}"`)
+  console.log(`[table:name] Table ${clientData.roomCode} renamed to "${sanitizedName}"`)
 }
