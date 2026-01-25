@@ -70,8 +70,8 @@
 
 ### 🟢 Testing
 
-- [ ] Add server-side unit tests (GameStateManager, handlers, persistence)
-- [ ] Add client-server integration tests
+- [x] Add server-side unit tests (GameStateManager, validation, session, sanitize, rate-limit)
+- [x] Add client-server integration tests (WebSocket room/chat/connection tests)
 - [ ] Add E2E multiplayer scenario tests
 
 ### 📐 Architecture Improvements

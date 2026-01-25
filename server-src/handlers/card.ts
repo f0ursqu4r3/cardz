@@ -1,7 +1,7 @@
 import type { CardMoveIntent, CardLock, CardUnlock, CardFlip } from '../../shared/types'
 import type { Room } from '../room'
 import type { GenericWebSocket } from '../utils/broadcast'
-import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
+import { send, broadcastToRoom, broadcastToViewport, getClientData } from '../utils/broadcast'
 
 export function handleCardMove(
   ws: GenericWebSocket,
@@ -51,17 +51,22 @@ export function handleCardMove(
   const result = gameState.moveCard(msg.cardId, msg.x, msg.y)
   if (!result) return
 
-  // Broadcast to all players in room
-  broadcastToRoom(clients, room.code, {
-    type: 'card:moved',
-    cardId: msg.cardId,
-    x: msg.x,
-    y: msg.y,
-    z: result.z,
-    playerId: clientData.id,
-    vx: msg.vx,
-    vy: msg.vy,
-  })
+  // Broadcast to players whose viewport contains this position
+  broadcastToViewport(
+    clients,
+    room.code,
+    {
+      type: 'card:moved',
+      cardId: msg.cardId,
+      x: msg.x,
+      y: msg.y,
+      z: result.z,
+      playerId: clientData.id,
+      vx: msg.vx,
+      vy: msg.vy,
+    },
+    { x: msg.x, y: msg.y },
+  )
 }
 
 export function handleCardLock(
@@ -203,11 +208,16 @@ export function handleCardFlip(
   const flipped = gameState.flipCard(msg.cardId)
   if (!flipped) return
 
-  // Broadcast flip
-  broadcastToRoom(clients, room.code, {
-    type: 'card:flipped',
-    cardId: msg.cardId,
-    faceUp: flipped.faceUp,
-    playerId: clientData.id,
-  })
+  // Broadcast flip to players whose viewport contains this card
+  broadcastToViewport(
+    clients,
+    room.code,
+    {
+      type: 'card:flipped',
+      cardId: msg.cardId,
+      faceUp: flipped.faceUp,
+      playerId: clientData.id,
+    },
+    { x: card.x, y: card.y },
+  )
 }

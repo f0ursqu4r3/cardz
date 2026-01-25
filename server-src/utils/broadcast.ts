@@ -1,9 +1,10 @@
-import type { ServerMessage } from '../../shared/types'
+import type { ServerMessage, Viewport } from '../../shared/types'
 
 export interface ClientData {
   id: string
   roomCode: string | null
   name: string
+  viewport?: Viewport
 }
 
 // Generic WebSocket interface that works with both Bun and uWebSockets.js
@@ -89,4 +90,90 @@ export function broadcastSplit(
       ws.send(id === ownerId ? ownerData : otherData)
     }
   }
+}
+
+/**
+ * Check if a point is within a viewport (with optional padding)
+ */
+function isPointInViewport(x: number, y: number, viewport: Viewport, padding: number = 100): boolean {
+  return (
+    x >= viewport.x - padding &&
+    x <= viewport.x + viewport.width + padding &&
+    y >= viewport.y - padding &&
+    y <= viewport.y + viewport.height + padding
+  )
+}
+
+/**
+ * Check if a rectangle overlaps with a viewport
+ */
+function isRectInViewport(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  viewport: Viewport,
+  padding: number = 100,
+): boolean {
+  const expandedViewport = {
+    x: viewport.x - padding,
+    y: viewport.y - padding,
+    width: viewport.width + padding * 2,
+    height: viewport.height + padding * 2,
+  }
+
+  return !(
+    x + width < expandedViewport.x ||
+    x > expandedViewport.x + expandedViewport.width ||
+    y + height < expandedViewport.y ||
+    y > expandedViewport.y + expandedViewport.height
+  )
+}
+
+/**
+ * Broadcast a message only to clients whose viewport contains the given position
+ * Falls back to regular broadcast if client hasn't reported a viewport
+ *
+ * @param position - The x,y coordinates (and optional width/height for area updates)
+ */
+export function broadcastToViewport(
+  clients: Map<string, GenericWebSocket>,
+  roomCode: string,
+  message: ServerMessage,
+  position: { x: number; y: number; width?: number; height?: number },
+  excludeId?: string,
+): void {
+  const data = JSON.stringify(message)
+  const { x, y, width, height } = position
+
+  for (const [id, ws] of clients) {
+    const clientData = getClientData(ws)
+    if (clientData.roomCode !== roomCode || id === excludeId) {
+      continue
+    }
+
+    // If client hasn't reported viewport, always send (fallback behavior)
+    if (!clientData.viewport) {
+      ws.send(data)
+      continue
+    }
+
+    // Check if the update position is visible in client's viewport
+    const isVisible =
+      width !== undefined && height !== undefined
+        ? isRectInViewport(x, y, width, height, clientData.viewport)
+        : isPointInViewport(x, y, clientData.viewport)
+
+    if (isVisible) {
+      ws.send(data)
+    }
+  }
+}
+
+/**
+ * Update a client's viewport
+ */
+export function updateClientViewport(ws: GenericWebSocket, viewport: Viewport): void {
+  const clientData = getClientData(ws)
+  clientData.viewport = viewport
 }

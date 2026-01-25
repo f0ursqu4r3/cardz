@@ -5,7 +5,9 @@
     "scripts": {
         "dev": "bun run --watch index.ts",
         "start": "bun run index.ts",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "test": "bun test",
+        "test:watch": "bun test --watch"
     },
     "dependencies": {
         "nanoid": "^5.0.9",

@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid'
 import { RoomManager } from './room'
 import { ClientMessageSchema } from './validation'
 import type { ClientData, GenericWebSocket } from './utils/broadcast'
-import { send, broadcastToRoom } from './utils/broadcast'
+import { send, broadcastToRoom, broadcastToViewport, updateClientViewport } from './utils/broadcast'
 import { CURSOR_THROTTLE_MS } from '../shared/types'
 import { closeDatabase, saveChatMessage } from './persistence'
 import { RateLimiter } from './utils/rate-limit'
@@ -488,7 +488,8 @@ const server = Bun.serve<ClientData>({
             // Store cursor position in room for new players joining
             room.cursors.set(clientData.id, { x: msg.x, y: msg.y, state: msg.state })
 
-            broadcastToRoom(
+            // Broadcast cursor to players whose viewport contains this position
+            broadcastToViewport(
               clients,
               room.code,
               {
@@ -498,8 +499,15 @@ const server = Bun.serve<ClientData>({
                 y: msg.y,
                 state: msg.state,
               },
+              { x: msg.x, y: msg.y },
               clientData.id,
             )
+            break
+          }
+
+          // Viewport updates (for selective broadcasting optimization)
+          case 'viewport:update': {
+            updateClientViewport(socket, msg.viewport)
             break
           }
 

@@ -668,6 +668,22 @@ export interface CursorUpdated {
 }
 
 // ============================================================================
+// Viewport Messages (for selective broadcasting optimization)
+// ============================================================================
+
+export interface Viewport {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface ViewportUpdate {
+  type: 'viewport:update'
+  viewport: Viewport
+}
+
+// ============================================================================
 // State Sync Messages
 // ============================================================================
 
@@ -810,6 +826,7 @@ type ClientMessageBase =
   | HandAddStack
   | SelectionStack
   | CursorUpdate
+  | ViewportUpdate
   | StateRequest
   | TableReset
   | TableUpdateSettings

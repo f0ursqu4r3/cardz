@@ -13,7 +13,7 @@ import type {
 } from '../../shared/types'
 import type { Room } from '../room'
 import type { GenericWebSocket } from '../utils/broadcast'
-import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
+import { send, broadcastToRoom, broadcastToViewport, getClientData } from '../utils/broadcast'
 
 export function handleStackCreate(
   ws: GenericWebSocket,
@@ -78,13 +78,18 @@ export function handleStackCreate(
     locks.unlockCard(cardId, clientData.id)
   }
 
-  // Broadcast creation
-  broadcastToRoom(clients, room.code, {
-    type: 'stack:created',
-    stack: result.stack,
-    cardUpdates: result.cardUpdates,
-    playerId: clientData.id,
-  })
+  // Broadcast creation to players whose viewport contains this position
+  broadcastToViewport(
+    clients,
+    room.code,
+    {
+      type: 'stack:created',
+      stack: result.stack,
+      cardUpdates: result.cardUpdates,
+      playerId: clientData.id,
+    },
+    { x: msg.anchorX, y: msg.anchorY },
+  )
 }
 
 export function handleStackMove(
@@ -127,16 +132,21 @@ export function handleStackMove(
     return
   }
 
-  // Broadcast move
-  broadcastToRoom(clients, room.code, {
-    type: 'stack:moved',
-    stackId: msg.stackId,
-    anchorX: msg.anchorX,
-    anchorY: msg.anchorY,
-    cardUpdates: result.cardUpdates,
-    zoneDetached: result.zoneDetached,
-    playerId: clientData.id,
-  })
+  // Broadcast move to players whose viewport contains this position
+  broadcastToViewport(
+    clients,
+    room.code,
+    {
+      type: 'stack:moved',
+      stackId: msg.stackId,
+      anchorX: msg.anchorX,
+      anchorY: msg.anchorY,
+      cardUpdates: result.cardUpdates,
+      zoneDetached: result.zoneDetached,
+      playerId: clientData.id,
+    },
+    { x: msg.anchorX, y: msg.anchorY },
+  )
 }
 
 export function handleStackLock(
@@ -286,13 +296,19 @@ export function handleStackAddCard(
     return
   }
 
-  broadcastToRoom(clients, room.code, {
-    type: 'stack:card_added',
-    stackId: msg.stackId,
-    cardId: msg.cardId,
-    cardState: result,
-    playerId: clientData.id,
-  })
+  // Broadcast to players whose viewport contains this stack
+  broadcastToViewport(
+    clients,
+    room.code,
+    {
+      type: 'stack:card_added',
+      stackId: msg.stackId,
+      cardId: msg.cardId,
+      cardState: result,
+      playerId: clientData.id,
+    },
+    { x: stack.anchorX, y: stack.anchorY },
+  )
 }
 
 export function handleStackRemoveCard(
@@ -329,16 +345,26 @@ export function handleStackRemoveCard(
     return
   }
 
+  // Get stack position before removal for viewport broadcasting
+  const stack = gameState.getStack(card.stackId)
+  const stackPos = stack ? { x: stack.anchorX, y: stack.anchorY } : { x: card.x, y: card.y }
+
   const result = gameState.removeCardFromStack(msg.cardId)
   if (!result) return
 
-  broadcastToRoom(clients, room.code, {
-    type: 'stack:card_removed',
-    stackId: result.stackId,
-    cardId: msg.cardId,
-    stackDeleted: result.stackDeleted,
-    playerId: clientData.id,
-  })
+  // Broadcast to players whose viewport contains this stack
+  broadcastToViewport(
+    clients,
+    room.code,
+    {
+      type: 'stack:card_removed',
+      stackId: result.stackId,
+      cardId: msg.cardId,
+      stackDeleted: result.stackDeleted,
+      playerId: clientData.id,
+    },
+    stackPos,
+  )
 }
 
 export function handleStackMerge(
@@ -365,6 +391,20 @@ export function handleStackMerge(
     }
   }
 
+  // Get target stack position for viewport broadcasting
+  const targetStack = gameState.getStack(msg.targetStackId)
+  if (!targetStack) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'stack:merge',
+      code: 'NOT_FOUND',
+      message: 'Stack not found',
+      requestId: msg.requestId,
+    })
+    return
+  }
+  const targetPos = { x: targetStack.anchorX, y: targetStack.anchorY }
+
   const result = gameState.mergeStacks(msg.sourceStackId, msg.targetStackId)
   if (!result) {
     send(ws, {
@@ -380,14 +420,20 @@ export function handleStackMerge(
   // Release source stack lock if any
   locks.unlockStack(msg.sourceStackId, clientData.id)
 
-  broadcastToRoom(clients, room.code, {
-    type: 'stack:merged',
-    sourceStackId: msg.sourceStackId,
-    targetStackId: msg.targetStackId,
-    targetStack: result.targetStack,
-    cardUpdates: result.cardUpdates,
-    playerId: clientData.id,
-  })
+  // Broadcast to players whose viewport contains the target stack
+  broadcastToViewport(
+    clients,
+    room.code,
+    {
+      type: 'stack:merged',
+      sourceStackId: msg.sourceStackId,
+      targetStackId: msg.targetStackId,
+      targetStack: result.targetStack,
+      cardUpdates: result.cardUpdates,
+      playerId: clientData.id,
+    },
+    targetPos,
+  )
 }
 
 export function handleStackShuffle(
@@ -411,8 +457,9 @@ export function handleStackShuffle(
     return
   }
 
-  const result = gameState.shuffleStack(msg.stackId)
-  if (!result) {
+  // Get stack position for viewport broadcasting
+  const stack = gameState.getStack(msg.stackId)
+  if (!stack) {
     send(ws, {
       type: 'error',
       originalAction: 'stack:shuffle',
@@ -423,13 +470,24 @@ export function handleStackShuffle(
     return
   }
 
-  broadcastToRoom(clients, room.code, {
-    type: 'stack:shuffled',
-    stackId: msg.stackId,
-    newOrder: result.newOrder,
-    cardUpdates: result.cardUpdates,
-    playerId: clientData.id,
-  })
+  const result = gameState.shuffleStack(msg.stackId)
+  if (!result) {
+    return
+  }
+
+  // Broadcast to players whose viewport contains this stack
+  broadcastToViewport(
+    clients,
+    room.code,
+    {
+      type: 'stack:shuffled',
+      stackId: msg.stackId,
+      newOrder: result.newOrder,
+      cardUpdates: result.cardUpdates,
+      playerId: clientData.id,
+    },
+    { x: stack.anchorX, y: stack.anchorY },
+  )
 }
 
 export function handleStackFlip(
@@ -453,8 +511,9 @@ export function handleStackFlip(
     return
   }
 
-  const result = gameState.flipStack(msg.stackId)
-  if (!result) {
+  // Get stack position for viewport broadcasting
+  const stack = gameState.getStack(msg.stackId)
+  if (!stack) {
     send(ws, {
       type: 'error',
       originalAction: 'stack:flip',
@@ -465,12 +524,23 @@ export function handleStackFlip(
     return
   }
 
-  broadcastToRoom(clients, room.code, {
-    type: 'stack:flipped',
-    stackId: msg.stackId,
-    cardUpdates: result.cardUpdates,
-    playerId: clientData.id,
-  })
+  const result = gameState.flipStack(msg.stackId)
+  if (!result) {
+    return
+  }
+
+  // Broadcast to players whose viewport contains this stack
+  broadcastToViewport(
+    clients,
+    room.code,
+    {
+      type: 'stack:flipped',
+      stackId: msg.stackId,
+      cardUpdates: result.cardUpdates,
+      playerId: clientData.id,
+    },
+    { x: stack.anchorX, y: stack.anchorY },
+  )
 }
 
 export function handleStackSetFaces(
@@ -494,8 +564,9 @@ export function handleStackSetFaces(
     return
   }
 
-  const result = gameState.setStackFaces(msg.stackId, msg.faceUp)
-  if (!result) {
+  // Get stack position for viewport broadcasting
+  const stack = gameState.getStack(msg.stackId)
+  if (!stack) {
     send(ws, {
       type: 'error',
       originalAction: 'stack:set_faces',
@@ -506,13 +577,24 @@ export function handleStackSetFaces(
     return
   }
 
-  broadcastToRoom(clients, room.code, {
-    type: 'stack:faces_set',
-    stackId: msg.stackId,
-    faceUp: msg.faceUp,
-    cardIds: result.cardIds,
-    playerId: clientData.id,
-  })
+  const result = gameState.setStackFaces(msg.stackId, msg.faceUp)
+  if (!result) {
+    return
+  }
+
+  // Broadcast to players whose viewport contains this stack
+  broadcastToViewport(
+    clients,
+    room.code,
+    {
+      type: 'stack:faces_set',
+      stackId: msg.stackId,
+      faceUp: msg.faceUp,
+      cardIds: result.cardIds,
+      playerId: clientData.id,
+    },
+    { x: stack.anchorX, y: stack.anchorY },
+  )
 }
 
 export function handleStackReorder(
@@ -536,6 +618,19 @@ export function handleStackReorder(
     return
   }
 
+  // Get stack position for viewport broadcasting
+  const stack = gameState.getStack(msg.stackId)
+  if (!stack) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'stack:reorder',
+      code: 'INVALID_ACTION',
+      message: 'Invalid reorder operation',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
   const result = gameState.reorderStack(msg.stackId, msg.fromIndex, msg.toIndex)
   if (!result) {
     send(ws, {
@@ -548,11 +643,17 @@ export function handleStackReorder(
     return
   }
 
-  broadcastToRoom(clients, room.code, {
-    type: 'stack:reordered',
-    stackId: msg.stackId,
-    newOrder: result.newOrder,
-    cardUpdates: result.cardUpdates,
-    playerId: clientData.id,
-  })
+  // Broadcast to players whose viewport contains this stack
+  broadcastToViewport(
+    clients,
+    room.code,
+    {
+      type: 'stack:reordered',
+      stackId: msg.stackId,
+      newOrder: result.newOrder,
+      cardUpdates: result.cardUpdates,
+      playerId: clientData.id,
+    },
+    { x: stack.anchorX, y: stack.anchorY },
+  )
 }

@@ -7,7 +7,7 @@ import type {
 } from '../../shared/types'
 import type { Room } from '../room'
 import type { GenericWebSocket } from '../utils/broadcast'
-import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
+import { send, broadcastToViewport, getClientData } from '../utils/broadcast'
 import { sanitizeZoneLabel } from '../utils/sanitize'
 
 export function handleZoneCreate(
@@ -35,11 +35,17 @@ export function handleZoneCreate(
     msg.cardSettings ?? { cardScale: 1.0, cardSpacing: 0.5 },
   )
 
-  broadcastToRoom(clients, room.code, {
-    type: 'zone:created',
-    zone,
-    playerId: clientData.id,
-  })
+  // Broadcast to players whose viewport overlaps this zone
+  broadcastToViewport(
+    clients,
+    room.code,
+    {
+      type: 'zone:created',
+      zone,
+      playerId: clientData.id,
+    },
+    { x: msg.x, y: msg.y, width: msg.width, height: msg.height },
+  )
 }
 
 export function handleZoneUpdate(
@@ -86,14 +92,20 @@ export function handleZoneUpdate(
   const result = gameState.updateZone(msg.zoneId, sanitizedUpdates)
   if (!result) return
 
-  broadcastToRoom(clients, room.code, {
-    type: 'zone:updated',
-    zoneId: msg.zoneId,
-    zone: result.zone,
-    stackUpdate: result.stackUpdate,
-    cardUpdates: result.cardUpdates,
-    playerId: clientData.id,
-  })
+  // Broadcast to players whose viewport overlaps this zone
+  broadcastToViewport(
+    clients,
+    room.code,
+    {
+      type: 'zone:updated',
+      zoneId: msg.zoneId,
+      zone: result.zone,
+      stackUpdate: result.stackUpdate,
+      cardUpdates: result.cardUpdates,
+      playerId: clientData.id,
+    },
+    { x: result.zone.x, y: result.zone.y, width: result.zone.width, height: result.zone.height },
+  )
 }
 
 export function handleZoneDelete(
@@ -128,15 +140,24 @@ export function handleZoneDelete(
     return
   }
 
+  // Store zone position before deletion for viewport broadcasting
+  const zonePos = { x: zone.x, y: zone.y, width: zone.width, height: zone.height }
+
   const result = gameState.deleteZone(msg.zoneId)
   if (!result) return
 
-  broadcastToRoom(clients, room.code, {
-    type: 'zone:deleted',
-    zoneId: msg.zoneId,
-    convertedStack: result.convertedStack,
-    playerId: clientData.id,
-  })
+  // Broadcast to players whose viewport overlaps this zone
+  broadcastToViewport(
+    clients,
+    room.code,
+    {
+      type: 'zone:deleted',
+      zoneId: msg.zoneId,
+      convertedStack: result.convertedStack,
+      playerId: clientData.id,
+    },
+    zonePos,
+  )
 }
 
 export function handleZoneAddCard(
@@ -199,14 +220,20 @@ export function handleZoneAddCard(
   const result = gameState.addCardToZone(msg.zoneId, msg.cardId)
   if (!result) return
 
-  broadcastToRoom(clients, room.code, {
-    type: 'zone:card_added',
-    zoneId: msg.zoneId,
-    stackId: result.stackId,
-    stackCreated: result.stackCreated,
-    cardState: result.cardState,
-    playerId: clientData.id,
-  })
+  // Broadcast to players whose viewport overlaps this zone
+  broadcastToViewport(
+    clients,
+    room.code,
+    {
+      type: 'zone:card_added',
+      zoneId: msg.zoneId,
+      stackId: result.stackId,
+      stackCreated: result.stackCreated,
+      cardState: result.cardState,
+      playerId: clientData.id,
+    },
+    { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
+  )
 }
 
 export function handleZoneAddCards(
@@ -271,12 +298,18 @@ export function handleZoneAddCards(
   const result = gameState.addCardsToZone(msg.zoneId, msg.cardIds)
   if (!result) return
 
-  broadcastToRoom(clients, room.code, {
-    type: 'zone:cards_added',
-    zoneId: msg.zoneId,
-    stackId: result.stackId,
-    stackCreated: result.stackCreated,
-    cardStates: result.cardStates,
-    playerId: clientData.id,
-  })
+  // Broadcast to players whose viewport overlaps this zone
+  broadcastToViewport(
+    clients,
+    room.code,
+    {
+      type: 'zone:cards_added',
+      zoneId: msg.zoneId,
+      stackId: result.stackId,
+      stackCreated: result.stackCreated,
+      cardStates: result.cardStates,
+      playerId: clientData.id,
+    },
+    { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
+  )
 }

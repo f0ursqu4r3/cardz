@@ -298,6 +298,22 @@ export const CursorUpdateSchema = z.object({
 })
 
 // ============================================================================
+// Viewport Message Schemas (Client → Server)
+// ============================================================================
+
+export const ViewportSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number().positive(),
+  height: z.number().positive(),
+})
+
+export const ViewportUpdateSchema = z.object({
+  type: z.literal('viewport:update'),
+  viewport: ViewportSchema,
+})
+
+// ============================================================================
 // State Sync Message Schemas (Client → Server)
 // ============================================================================
 
@@ -401,6 +417,7 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   HandAddStackSchema,
   SelectionStackSchema,
   CursorUpdateSchema,
+  ViewportUpdateSchema,
   StateRequestSchema,
   TableResetSchema,
   TableUpdateSettingsSchema,

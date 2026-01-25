@@ -218,7 +218,7 @@ export function useRadialMenu() {
       {
         id: 'create-zone',
         label: 'Create zone',
-        icon: 'square',
+        icon: 'square-plus',
       },
       {
         id: 'deal-card',
