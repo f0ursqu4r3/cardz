@@ -106,7 +106,7 @@ function getSecurityHeaders(): Record<string, string> {
   if (config.nodeEnv === 'production') {
     headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     headers['Content-Security-Policy'] =
-      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss: ws:; font-src 'self'"
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://img.buymeacoffee.com; connect-src 'self' wss: ws:; font-src 'self'"
   }
 
   return headers
