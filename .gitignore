@@ -36,4 +36,4 @@ coverage
 __screenshots__/
 
 # data directory
-/server-src/data/*
+data/*
