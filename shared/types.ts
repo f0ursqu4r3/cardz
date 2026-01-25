@@ -79,6 +79,7 @@ export interface GameState {
   nextStackId: number
   nextZoneId: number
   zCounter: number
+  stateVersion: number // Incremented on each mutation for client/server consistency
 }
 
 // ============================================================================
@@ -679,6 +680,7 @@ export interface StateSync {
   state: GameState
   yourHand: number[]
   handCounts: { playerId: string; count: number }[]
+  stateVersion: number
 }
 
 export interface StateDelta {

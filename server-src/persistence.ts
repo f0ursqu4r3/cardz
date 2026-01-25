@@ -2,10 +2,10 @@ import { Database } from 'bun:sqlite'
 import { existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import type { GameState } from '../shared/types'
+import { config } from './config'
 
-// Database directory and file
-const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), 'data')
-const DB_PATH = join(DATA_DIR, 'cardz.db')
+// Database file path
+const DB_PATH = join(config.dataDir, 'cardz.db')
 
 // Table metadata stored alongside game state
 export interface TableMetadata {
@@ -54,8 +54,8 @@ function getDb(): Database {
   if (db) return db
 
   // Ensure data directory exists
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true })
+  if (!existsSync(config.dataDir)) {
+    mkdirSync(config.dataDir, { recursive: true })
   }
 
   db = new Database(DB_PATH)

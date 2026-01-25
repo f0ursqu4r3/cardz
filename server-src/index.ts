@@ -9,6 +9,7 @@ import { closeDatabase, saveChatMessage } from './persistence'
 import { RateLimiter } from './utils/rate-limit'
 import { sanitizeChatMessage } from './utils/sanitize'
 import { heartbeatManager } from './utils/heartbeat'
+import { config, logConfigSummary } from './config'
 
 // Handlers
 import {
@@ -52,7 +53,6 @@ import {
   handleTableUpdateName,
 } from './handlers/table'
 
-const PORT = parseInt(process.env.PORT ?? '9001', 10)
 const roomManager = new RoomManager()
 
 // Track cursor update timestamps for throttling
@@ -65,17 +65,12 @@ const rateLimiter = new RateLimiter({
   messageCost: 1,
 })
 
-// Allowed origins for WebSocket connections (configurable via env)
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
-  : null // null means allow all origins (development mode)
-
 /**
  * Validate WebSocket origin to prevent CSRF attacks
  */
 function isValidOrigin(origin: string | null): boolean {
-  // In development, allow all origins if ALLOWED_ORIGINS is not set
-  if (!ALLOWED_ORIGINS) {
+  // In development, allow all origins if allowedOrigins is not set
+  if (!config.allowedOrigins) {
     return true
   }
 
@@ -85,7 +80,7 @@ function isValidOrigin(origin: string | null): boolean {
   }
 
   // Check if origin matches any allowed pattern
-  return ALLOWED_ORIGINS.some((allowed) => {
+  return config.allowedOrigins.some((allowed) => {
     if (allowed === '*') return true
     if (allowed === origin) return true
     // Support wildcard subdomains (e.g., *.example.com)
@@ -108,7 +103,7 @@ function getSecurityHeaders(): Record<string, string> {
     'Referrer-Policy': 'strict-origin-when-cross-origin',
   }
 
-  if (isProduction) {
+  if (config.nodeEnv === 'production') {
     headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     headers['Content-Security-Policy'] =
       "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss: ws:; font-src 'self'"
@@ -119,10 +114,6 @@ function getSecurityHeaders(): Record<string, string> {
 
 // Type alias for Bun's WebSocket
 export type BunWebSocket = ServerWebSocket<ClientData>
-
-// Static file serving for production
-const STATIC_DIR = process.env.STATIC_DIR || '../dist'
-const isProduction = process.env.NODE_ENV === 'production'
 
 // MIME types for static files
 const MIME_TYPES: Record<string, string> = {
@@ -147,7 +138,7 @@ async function serveStaticFile(pathname: string): Promise<Response | null> {
   const mimeType = MIME_TYPES[extname] || 'application/octet-stream'
 
   try {
-    const filePath = `${STATIC_DIR}${pathname}`
+    const filePath = `${config.staticDir}${pathname}`
     const file = Bun.file(filePath)
     if (await file.exists()) {
       return new Response(file, {
@@ -167,7 +158,7 @@ async function serveStaticFile(pathname: string): Promise<Response | null> {
 }
 
 const server = Bun.serve<ClientData>({
-  port: PORT,
+  port: config.port,
   hostname: '0.0.0.0', // Listen on all network interfaces for remote connections
 
   async fetch(req, server) {
@@ -215,7 +206,7 @@ const server = Bun.serve<ClientData>({
     }
 
     // In production, serve static files
-    if (isProduction) {
+    if (config.nodeEnv === 'production') {
       // Try to serve the requested file
       const staticResponse = await serveStaticFile(url.pathname)
       if (staticResponse) {
@@ -224,7 +215,7 @@ const server = Bun.serve<ClientData>({
 
       // For SPA routing, serve index.html for non-file requests
       if (!url.pathname.includes('.')) {
-        const indexFile = Bun.file(`${STATIC_DIR}/index.html`)
+        const indexFile = Bun.file(`${config.staticDir}/index.html`)
         if (await indexFile.exists()) {
           return new Response(indexFile, {
             headers: {
@@ -525,6 +516,7 @@ const server = Bun.serve<ClientData>({
               state,
               yourHand: playerHand?.cardIds ?? [],
               handCounts,
+              stateVersion: room.gameState.getVersion(),
             })
             break
           }
@@ -635,6 +627,10 @@ console.log(`   Local:   ws://localhost:${server.port}`)
 console.log(
   `   Network: ws://0.0.0.0:${server.port} (use your machine's IP for remote connections)`,
 )
+
+// Log startup info
+logConfigSummary()
+console.log(`Server listening on http://localhost:${config.port}`)
 
 // Graceful shutdown
 process.on('SIGINT', () => {

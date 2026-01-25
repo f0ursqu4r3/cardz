@@ -8,12 +8,8 @@
  * Token format: base64(playerId:roomCode:timestamp):signature
  */
 
-import { createHmac, randomBytes } from 'crypto'
-
-// Generate a secure server secret on startup
-// In production, this should be loaded from environment variable
-const SERVER_SECRET =
-  process.env.SESSION_SECRET || randomBytes(32).toString('hex')
+import { createHmac } from 'crypto'
+import { config } from '../config'
 
 // Token validity period (24 hours in milliseconds)
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000
@@ -28,7 +24,7 @@ interface SessionPayload {
  * Create an HMAC signature for the payload
  */
 function createSignature(payload: string): string {
-  const hmac = createHmac('sha256', SERVER_SECRET)
+  const hmac = createHmac('sha256', config.sessionSecret)
   hmac.update(payload)
   return hmac.digest('base64url')
 }

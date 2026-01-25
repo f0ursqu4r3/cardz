@@ -45,6 +45,7 @@ export function createInitialGameState(): GameState {
     nextStackId: 1,
     nextZoneId: 1,
     zCounter: 52,
+    stateVersion: 0,
   }
 }
 
@@ -62,6 +63,20 @@ export class GameStateManager {
     return this.state
   }
 
+  /**
+   * Get the current state version
+   */
+  getVersion(): number {
+    return this.state.stateVersion
+  }
+
+  /**
+   * Increment the state version (called on mutations)
+   */
+  private incrementVersion(): void {
+    this.state.stateVersion++
+  }
+
   // ============================================================================
   // Card Operations
   // ============================================================================
@@ -77,6 +92,7 @@ export class GameStateManager {
     card.x = x
     card.y = y
     card.z = ++this.state.zCounter
+    this.incrementVersion()
 
     return { card, z: card.z }
   }
@@ -86,6 +102,7 @@ export class GameStateManager {
     if (!card) return null
 
     card.faceUp = !card.faceUp
+    this.incrementVersion()
     return card
   }
 
@@ -145,6 +162,7 @@ export class GameStateManager {
       }
     }
 
+    this.incrementVersion()
     return { stack, cardUpdates }
   }
 
@@ -187,6 +205,7 @@ export class GameStateManager {
       }
     }
 
+    this.incrementVersion()
     return { stack, cardUpdates, zoneDetached }
   }
 
@@ -223,6 +242,7 @@ export class GameStateManager {
       card.faceUp = faceUp
     }
 
+    this.incrementVersion()
     return { x: card.x, y: card.y, z: card.z, faceUp: card.faceUp }
   }
 
@@ -248,9 +268,11 @@ export class GameStateManager {
         }
       }
       this.state.stacks = this.state.stacks.filter((s) => s.id !== stackId)
+      this.incrementVersion()
       return { stackId, stackDeleted: true }
     }
 
+    this.incrementVersion()
     return { stackId, stackDeleted: false }
   }
 
@@ -291,6 +313,7 @@ export class GameStateManager {
     // Delete source stack
     this.state.stacks = this.state.stacks.filter((s) => s.id !== sourceStackId)
 
+    this.incrementVersion()
     return { targetStack, cardUpdates }
   }
 
@@ -320,6 +343,7 @@ export class GameStateManager {
       }
     }
 
+    this.incrementVersion()
     return { newOrder: cardIds, cardUpdates }
   }
 
@@ -335,6 +359,7 @@ export class GameStateManager {
     card.faceUp = !card.faceUp
     const cardUpdates = [{ cardId: card.id, faceUp: card.faceUp }]
 
+    this.incrementVersion()
     return { cardUpdates }
   }
 
@@ -351,6 +376,9 @@ export class GameStateManager {
       }
     }
 
+    if (cardIds.length > 0) {
+      this.incrementVersion()
+    }
     return { cardIds }
   }
 
@@ -381,6 +409,7 @@ export class GameStateManager {
       }
     }
 
+    this.incrementVersion()
     return { newOrder: stack.cardIds, cardUpdates }
   }
 
@@ -426,6 +455,7 @@ export class GameStateManager {
     }
 
     this.state.zones.push(zone)
+    this.incrementVersion()
     return zone
   }
 
@@ -472,6 +502,7 @@ export class GameStateManager {
       }
     }
 
+    this.incrementVersion()
     return { zone, stackUpdate, cardUpdates }
   }
 
@@ -514,6 +545,7 @@ export class GameStateManager {
 
     this.state.zones = this.state.zones.filter((z) => z.id !== zoneId)
 
+    this.incrementVersion()
     return { convertedStack }
   }
 
@@ -651,6 +683,7 @@ export class GameStateManager {
     card.ownerId = playerId
     // Card position doesn't matter when in hand (client renders it locally)
 
+    this.incrementVersion()
     return card
   }
 
@@ -672,6 +705,7 @@ export class GameStateManager {
     card.z = ++this.state.zCounter
     card.faceUp = faceUp
 
+    this.incrementVersion()
     return card
   }
 
@@ -684,6 +718,7 @@ export class GameStateManager {
     const [cardId] = hand.cardIds.splice(fromIndex, 1)
     hand.cardIds.splice(toIndex, 0, cardId)
 
+    this.incrementVersion()
     return hand.cardIds
   }
 
@@ -710,6 +745,7 @@ export class GameStateManager {
     // Delete the stack
     this.state.stacks = this.state.stacks.filter((s) => s.id !== stackId)
 
+    this.incrementVersion()
     return { cardIds, newHand: hand.cardIds }
   }
 
@@ -758,6 +794,9 @@ export class GameStateManager {
     // Remove hand
     this.state.hands = this.state.hands.filter((h) => h.playerId !== playerId)
 
+    if (cardIds.length > 0) {
+      this.incrementVersion()
+    }
     return cardIds
   }
 }

@@ -94,7 +94,7 @@
 ### Game Entities
 
 - [ ] Additional entities (counters, tokens, dice, timers)
-- [ ] Custom card decks (upload images)
+- [ ] Custom card decks (upload images) (future future)
 - [ ] Card annotations/markers
 
 ### Social Features
@@ -107,6 +107,7 @@
 ### Advanced Card Mechanics
 
 - [ ] Card reveal (show card to specific players)
+- [ ] Card flipping animation (front/back sides)
 - [ ] Deal animation (distribute cards from deck)
 - [ ] Fan spread (view all cards in stack)
 - [ ] Peek at cards without revealing
