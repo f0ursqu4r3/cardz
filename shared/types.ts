@@ -757,6 +757,7 @@ export interface ActionError {
   originalAction: string
   code: ErrorCode
   message: string
+  requestId?: string // Echoed from client message for correlation
 }
 
 export type ErrorCode =
@@ -775,7 +776,8 @@ export type ErrorCode =
 // Union Types for Message Handling
 // ============================================================================
 
-export type ClientMessage =
+// Base client message union (internal)
+type ClientMessageBase =
   | RoomCreate
   | RoomJoin
   | RoomLeave
@@ -814,6 +816,9 @@ export type ClientMessage =
   | ChatSend
   | ChatTyping
   | Pong
+
+// All client messages can optionally include a requestId for error correlation
+export type ClientMessage = ClientMessageBase & { requestId?: string }
 
 export type ServerMessage =
   | RoomCreated

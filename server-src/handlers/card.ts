@@ -81,6 +81,7 @@ export function handleCardLock(
       originalAction: 'card:lock',
       code: 'NOT_FOUND',
       message: 'Card not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -100,6 +101,7 @@ export function handleCardLock(
       originalAction: 'card:lock',
       code: 'NOT_IN_HAND',
       message: 'Card is in a hand',
+      requestId: msg.requestId,
     })
     return
   }
@@ -111,6 +113,7 @@ export function handleCardLock(
       originalAction: 'card:lock',
       code: 'CARD_LOCKED',
       message: 'Card is locked by another player',
+      requestId: msg.requestId,
     })
     return
   }
@@ -167,6 +170,7 @@ export function handleCardFlip(
       originalAction: 'card:flip',
       code: 'NOT_FOUND',
       message: 'Card not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -178,6 +182,7 @@ export function handleCardFlip(
       originalAction: 'card:flip',
       code: 'NOT_YOUR_CARD',
       message: 'Card belongs to another player',
+      requestId: msg.requestId,
     })
     return
   }
@@ -189,6 +194,7 @@ export function handleCardFlip(
       originalAction: 'card:flip',
       code: 'CARD_LOCKED',
       message: 'Card is locked by another player',
+      requestId: msg.requestId,
     })
     return
   }

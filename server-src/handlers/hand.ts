@@ -19,6 +19,7 @@ export function handleHandAdd(
       originalAction: 'hand:add',
       code: 'NOT_FOUND',
       message: 'Card not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -51,6 +52,7 @@ export function handleHandAdd(
       originalAction: 'hand:add',
       code: 'NOT_YOUR_CARD',
       message: 'Card is already in a hand',
+      requestId: msg.requestId,
     })
     return
   }
@@ -63,6 +65,7 @@ export function handleHandAdd(
       originalAction: 'hand:add',
       code: 'CARD_LOCKED',
       message: 'Card is locked by another player',
+      requestId: msg.requestId,
     })
     return
   }
@@ -110,6 +113,7 @@ export function handleHandRemove(
       originalAction: 'hand:remove',
       code: 'NOT_YOUR_CARD',
       message: 'Card is not in your hand',
+      requestId: msg.requestId,
     })
     return
   }
@@ -136,6 +140,7 @@ export function handleHandReorder(ws: GenericWebSocket, msg: HandReorder, room: 
       originalAction: 'hand:reorder',
       code: 'INVALID_ACTION',
       message: 'Invalid reorder operation',
+      requestId: msg.requestId,
     })
     return
   }
@@ -163,6 +168,7 @@ export function handleHandAddStack(
       originalAction: 'hand:add_stack',
       code: 'NOT_FOUND',
       message: 'Stack not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -175,6 +181,7 @@ export function handleHandAddStack(
       originalAction: 'hand:add_stack',
       code: 'STACK_LOCKED',
       message: 'Stack is locked by another player',
+      requestId: msg.requestId,
     })
     return
   }

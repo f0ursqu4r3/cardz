@@ -58,6 +58,7 @@ export function handleZoneUpdate(
       originalAction: 'zone:update',
       code: 'NOT_FOUND',
       message: 'Zone not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -71,6 +72,7 @@ export function handleZoneUpdate(
       originalAction: 'zone:update',
       code: 'ZONE_LOCKED',
       message: 'Zone is locked',
+      requestId: msg.requestId,
     })
     return
   }
@@ -110,6 +112,7 @@ export function handleZoneDelete(
       originalAction: 'zone:delete',
       code: 'NOT_FOUND',
       message: 'Zone not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -120,6 +123,7 @@ export function handleZoneDelete(
       originalAction: 'zone:delete',
       code: 'ZONE_LOCKED',
       message: 'Zone is locked',
+      requestId: msg.requestId,
     })
     return
   }
@@ -151,6 +155,7 @@ export function handleZoneAddCard(
       originalAction: 'zone:add_card',
       code: 'NOT_FOUND',
       message: 'Zone not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -162,6 +167,7 @@ export function handleZoneAddCard(
       originalAction: 'zone:add_card',
       code: 'NOT_FOUND',
       message: 'Card not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -174,6 +180,7 @@ export function handleZoneAddCard(
       originalAction: 'zone:add_card',
       code: 'CARD_LOCKED',
       message: 'Card is locked by another player',
+      requestId: msg.requestId,
     })
     return
   }
@@ -184,6 +191,7 @@ export function handleZoneAddCard(
       originalAction: 'zone:add_card',
       code: 'NOT_IN_HAND',
       message: 'Card is in a hand',
+      requestId: msg.requestId,
     })
     return
   }
@@ -217,6 +225,7 @@ export function handleZoneAddCards(
       originalAction: 'zone:add_cards',
       code: 'NOT_FOUND',
       message: 'Zone not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -230,6 +239,7 @@ export function handleZoneAddCards(
         originalAction: 'zone:add_cards',
         code: 'NOT_FOUND',
         message: `Card ${cardId} not found`,
+        requestId: msg.requestId,
       })
       return
     }
@@ -241,6 +251,7 @@ export function handleZoneAddCards(
         originalAction: 'zone:add_cards',
         code: 'CARD_LOCKED',
         message: `Card ${cardId} is locked by another player`,
+        requestId: msg.requestId,
       })
       return
     }
@@ -251,6 +262,7 @@ export function handleZoneAddCards(
         originalAction: 'zone:add_cards',
         code: 'NOT_IN_HAND',
         message: `Card ${cardId} is in a hand`,
+        requestId: msg.requestId,
       })
       return
     }

@@ -4,14 +4,24 @@ import type {
   ServerMessage,
   GameState,
   Player,
-  CardState,
-  StackState,
-  ZoneState,
   TableSettings,
-  TableBackground,
   ChatMessage,
   Pong,
 } from '../../shared/types'
+import {
+  handleCardMessage,
+  handleStackMessage,
+  handleZoneMessage,
+  handleHandMessage,
+  handleRoomMessage,
+  handleTableMessage,
+  handleCursorMessage,
+  handleStateSyncMessage,
+  handleChatMessage,
+  handleErrorMessage,
+  type GameStateRefs,
+  type RoomStateRefs,
+} from './websocket/handlers'
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
 
@@ -335,507 +345,70 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     // Notify all registered handlers
     messageHandlers.forEach((handler) => handler(message))
 
-    switch (message.type) {
-      // Heartbeat response
-      case 'ping': {
-        const pong: Pong = { type: 'pong', timestamp: message.timestamp }
-        send(pong)
-        return
-      }
-
-      // Room events
-      case 'room:created':
-        roomCode.value = message.roomCode
-        playerId.value = message.playerId
-        gameState.value = message.state
-        players.value = [{ id: message.playerId, name: '', connected: true, color: '#ef4444', role: 'creator' }]
-        // Store HMAC-signed session token for secure reconnection
-        storeSessionToken(message.sessionToken)
-        console.log('[ws] room created:', message.roomCode)
-        break
-
-      case 'room:joined':
-        roomCode.value = message.roomCode
-        playerId.value = message.playerId
-        players.value = message.players
-        gameState.value = message.state
-        // Find our hand in the state
-        const ourHand = message.state.hands.find((h) => h.playerId === message.playerId)
-        if (ourHand) {
-          handCardIds.value = ourHand.cardIds
-        }
-        // Restore cursor positions from other players
-        if (message.cursors) {
-          const newCursors = new Map<
-            string,
-            { x: number; y: number; state: 'default' | 'grab' | 'grabbing' }
-          >()
-          for (const cursor of message.cursors) {
-            newCursors.set(cursor.playerId, { x: cursor.x, y: cursor.y, state: cursor.state })
-          }
-          cursors.value = newCursors
-        }
-        // Store HMAC-signed session token for secure reconnection
-        storeSessionToken(message.sessionToken)
-        console.log('[ws] joined room:', message.roomCode)
-        break
-
-      case 'room:player_joined':
-        players.value = [...players.value, message.player]
-        console.log('[ws] player joined:', message.player.name)
-        break
-
-      case 'room:player_left': {
-        players.value = players.value.filter((p) => p.id !== message.playerId)
-        const newCursors = new Map(cursors.value)
-        newCursors.delete(message.playerId)
-        cursors.value = newCursors
-        handCounts.value.delete(message.playerId)
-        console.log('[ws] player left:', message.playerId)
-        break
-      }
-
-      case 'room:error':
-        error.value = message.message
-        console.error('[ws] room error:', message.code, message.message)
-        break
-
-      // Card events - update local game state
-      case 'card:moved':
-        if (gameState.value) {
-          const card = gameState.value.cards.find((c) => c.id === message.cardId)
-          if (card) {
-            card.x = message.x
-            card.y = message.y
-            card.z = message.z
-          }
-        }
-        break
-
-      case 'card:locked':
-        if (gameState.value) {
-          const card = gameState.value.cards.find((c) => c.id === message.cardId)
-          if (card) card.lockedBy = message.playerId
-        }
-        break
-
-      case 'card:unlocked':
-        if (gameState.value) {
-          const card = gameState.value.cards.find((c) => c.id === message.cardId)
-          if (card) card.lockedBy = null
-        }
-        break
-
-      case 'card:flipped':
-        if (gameState.value) {
-          const card = gameState.value.cards.find((c) => c.id === message.cardId)
-          if (card) card.faceUp = message.faceUp
-        }
-        break
-
-      // Stack events
-      case 'stack:created':
-        if (gameState.value) {
-          gameState.value.stacks.push(message.stack)
-          message.cardUpdates.forEach((update) => {
-            const card = gameState.value!.cards.find((c) => c.id === update.cardId)
-            if (card) {
-              card.x = update.x
-              card.y = update.y
-              card.z = update.z
-              card.stackId = message.stack.id
-            }
-          })
-        }
-        break
-
-      case 'stack:moved':
-        if (gameState.value) {
-          const stack = gameState.value.stacks.find((s) => s.id === message.stackId)
-          if (stack) {
-            stack.anchorX = message.anchorX
-            stack.anchorY = message.anchorY
-          }
-          // Handle zone detachment
-          if (message.zoneDetached) {
-            const zone = gameState.value.zones.find((z) => z.id === message.zoneDetached!.zoneId)
-            if (zone) {
-              zone.stackId = null
-            }
-            if (stack) {
-              stack.zoneId = undefined
-              stack.kind = 'free'
-            }
-          }
-          message.cardUpdates.forEach((update) => {
-            const card = gameState.value!.cards.find((c) => c.id === update.cardId)
-            if (card) {
-              card.x = update.x
-              card.y = update.y
-            }
-          })
-        }
-        break
-
-      case 'stack:locked':
-        if (gameState.value) {
-          const stack = gameState.value.stacks.find((s) => s.id === message.stackId)
-          if (stack) stack.lockedBy = message.playerId
-        }
-        break
-
-      case 'stack:unlocked':
-        if (gameState.value) {
-          const stack = gameState.value.stacks.find((s) => s.id === message.stackId)
-          if (stack) stack.lockedBy = null
-        }
-        break
-
-      case 'stack:card_added':
-        if (gameState.value) {
-          const stack = gameState.value.stacks.find((s) => s.id === message.stackId)
-          const card = gameState.value.cards.find((c) => c.id === message.cardId)
-          if (stack && card) {
-            if (!stack.cardIds.includes(message.cardId)) {
-              stack.cardIds.push(message.cardId)
-            }
-            card.stackId = message.stackId
-            card.x = message.cardState.x
-            card.y = message.cardState.y
-            card.z = message.cardState.z
-            card.faceUp = message.cardState.faceUp
-          }
-        }
-        break
-
-      case 'stack:card_removed':
-        if (gameState.value) {
-          const stack = gameState.value.stacks.find((s) => s.id === message.stackId)
-          const card = gameState.value.cards.find((c) => c.id === message.cardId)
-          if (stack) {
-            stack.cardIds = stack.cardIds.filter((id) => id !== message.cardId)
-          }
-          if (card) {
-            card.stackId = null
-          }
-          if (message.stackDeleted) {
-            gameState.value.stacks = gameState.value.stacks.filter((s) => s.id !== message.stackId)
-          }
-        }
-        break
-
-      case 'stack:merged':
-        if (gameState.value) {
-          // Remove source stack
-          gameState.value.stacks = gameState.value.stacks.filter(
-            (s) => s.id !== message.sourceStackId,
-          )
-          // Update target stack
-          const targetStack = gameState.value.stacks.find((s) => s.id === message.targetStackId)
-          if (targetStack) {
-            Object.assign(targetStack, message.targetStack)
-          }
-          // Update cards
-          message.cardUpdates.forEach((update) => {
-            const card = gameState.value!.cards.find((c) => c.id === update.cardId)
-            if (card) {
-              card.x = update.x
-              card.y = update.y
-              card.z = update.z
-              card.stackId = message.targetStackId
-            }
-          })
-        }
-        break
-
-      case 'stack:shuffled':
-        if (gameState.value) {
-          const stack = gameState.value.stacks.find((s) => s.id === message.stackId)
-          if (stack) {
-            stack.cardIds = message.newOrder
-          }
-          message.cardUpdates.forEach((update) => {
-            const card = gameState.value!.cards.find((c) => c.id === update.cardId)
-            if (card) {
-              card.x = update.x
-              card.y = update.y
-            }
-          })
-        }
-        break
-
-      case 'stack:reordered':
-        if (gameState.value) {
-          const stack = gameState.value.stacks.find((s) => s.id === message.stackId)
-          if (stack) {
-            stack.cardIds = message.newOrder
-          }
-          message.cardUpdates.forEach((update) => {
-            const card = gameState.value!.cards.find((c) => c.id === update.cardId)
-            if (card) {
-              card.x = update.x
-              card.y = update.y
-            }
-          })
-        }
-        break
-
-      case 'stack:flipped':
-        if (gameState.value) {
-          message.cardUpdates.forEach((update) => {
-            const card = gameState.value!.cards.find((c) => c.id === update.cardId)
-            if (card) {
-              card.faceUp = update.faceUp
-            }
-          })
-        }
-        break
-
-      case 'stack:faces_set':
-        if (gameState.value) {
-          message.cardIds.forEach((cardId) => {
-            const card = gameState.value!.cards.find((c) => c.id === cardId)
-            if (card) {
-              card.faceUp = message.faceUp
-            }
-          })
-        }
-        break
-
-      // Zone events
-      case 'zone:created':
-        if (gameState.value) {
-          gameState.value.zones.push(message.zone)
-        }
-        break
-
-      case 'zone:updated':
-        if (gameState.value) {
-          const zoneIdx = gameState.value.zones.findIndex((z) => z.id === message.zoneId)
-          if (zoneIdx !== -1) {
-            gameState.value.zones[zoneIdx] = message.zone
-          }
-          if (message.stackUpdate) {
-            const stack = gameState.value.stacks.find((s) => s.id === message.stackUpdate!.stackId)
-            if (stack) {
-              stack.anchorX = message.stackUpdate.anchorX
-              stack.anchorY = message.stackUpdate.anchorY
-            }
-          }
-          if (message.cardUpdates) {
-            message.cardUpdates.forEach((update) => {
-              const card = gameState.value!.cards.find((c) => c.id === update.cardId)
-              if (card) {
-                card.x = update.x
-                card.y = update.y
-              }
-            })
-          }
-        }
-        break
-
-      case 'zone:deleted':
-        if (gameState.value) {
-          gameState.value.zones = gameState.value.zones.filter((z) => z.id !== message.zoneId)
-          // Convert zone stack to free stack
-          if (message.convertedStack) {
-            const stack = gameState.value.stacks.find(
-              (s) => s.id === message.convertedStack!.stackId,
-            )
-            if (stack) {
-              stack.kind = 'free'
-              stack.zoneId = undefined
-              stack.anchorX = message.convertedStack.anchorX
-              stack.anchorY = message.convertedStack.anchorY
-            }
-          }
-        }
-        break
-
-      case 'zone:card_added':
-        if (gameState.value) {
-          const zone = gameState.value.zones.find((z) => z.id === message.zoneId)
-          if (zone && message.stackCreated) {
-            // Stack was created, add it
-            gameState.value.stacks.push({
-              id: message.stackId,
-              cardIds: [message.cardState.cardId],
-              anchorX: message.cardState.x,
-              anchorY: message.cardState.y,
-              kind: 'zone',
-              zoneId: message.zoneId,
-              lockedBy: null,
-            })
-            zone.stackId = message.stackId
-          } else if (zone) {
-            // Add to existing stack
-            const stack = gameState.value.stacks.find((s) => s.id === message.stackId)
-            if (stack && !stack.cardIds.includes(message.cardState.cardId)) {
-              stack.cardIds.push(message.cardState.cardId)
-            }
-          }
-          const card = gameState.value.cards.find((c) => c.id === message.cardState.cardId)
-          if (card) {
-            card.x = message.cardState.x
-            card.y = message.cardState.y
-            card.z = message.cardState.z
-            card.faceUp = message.cardState.faceUp
-            card.stackId = message.stackId
-          }
-        }
-        break
-
-      // Hand events
-      case 'hand:card_added':
-        if (gameState.value) {
-          const card = gameState.value.cards.find((c) => c.id === message.cardId)
-          if (card) {
-            Object.assign(card, message.cardState)
-          }
-          if (!handCardIds.value.includes(message.cardId)) {
-            handCardIds.value.push(message.cardId)
-          }
-        }
-        break
-
-      case 'hand:card_added_other':
-        handCounts.value.set(message.playerId, message.handCount)
-        // Update card state so it's hidden from view (owned by another player)
-        if (gameState.value) {
-          const card = gameState.value.cards.find((c) => c.id === message.cardId)
-          if (card) {
-            card.ownerId = message.playerId
-          }
-        }
-        break
-
-      case 'hand:card_removed':
-        if (gameState.value) {
-          const card = gameState.value.cards.find((c) => c.id === message.cardState.id)
-          if (card) {
-            Object.assign(card, message.cardState)
-          }
-          // If it's our card being removed (returned from hand)
-          if (message.playerId === playerId.value) {
-            handCardIds.value = handCardIds.value.filter((id) => id !== message.cardState.id)
-          }
-        }
-        break
-
-      case 'hand:reordered':
-        handCardIds.value = message.newOrder
-        break
-
-      case 'hand:stack_added':
-        handCardIds.value = message.newHand
-        break
-
-      case 'hand:stack_added_other':
-        handCounts.value.set(message.playerId, message.handCount)
-        if (gameState.value) {
-          gameState.value.stacks = gameState.value.stacks.filter(
-            (s) => s.id !== message.stackDeleted,
-          )
-          // Mark cards as owned so they're hidden from view
-          for (const cardId of message.cardIds) {
-            const card = gameState.value.cards.find((c) => c.id === cardId)
-            if (card) {
-              card.ownerId = message.playerId
-              card.stackId = null
-            }
-          }
-        }
-        break
-
-      // Cursor events
-      case 'cursor:updated': {
-        const newCursors = new Map(cursors.value)
-        newCursors.set(message.playerId, { x: message.x, y: message.y, state: message.state })
-        cursors.value = newCursors
-        break
-      }
-
-      // State sync
-      case 'state:sync': {
-        gameState.value = message.state
-        // Preserve local hand order if the same cards exist (just reordered)
-        // Only update if cards have actually been added/removed
-        const currentSet = new Set(handCardIds.value)
-        const serverSet = new Set(message.yourHand)
-        const sameCards =
-          currentSet.size === serverSet.size && [...currentSet].every((id) => serverSet.has(id))
-
-        if (!sameCards) {
-          // Cards changed - use server's order
-          handCardIds.value = message.yourHand
-        }
-        // If same cards, keep local order to preserve recent reordering
-
-        handCounts.value.clear()
-        message.handCounts.forEach(({ playerId: pid, count }) => {
-          handCounts.value.set(pid, count)
-        })
-        break
-      }
-
-      // Table management
-      case 'table:reset':
-        gameState.value = message.state
-        handCardIds.value = []
-        console.log('[ws] table reset')
-        break
-
-      case 'table:settings_updated':
-        tableSettings.value = message.settings
-        console.log('[ws] table settings updated')
-        break
-
-      case 'table:visibility_updated':
-        tableIsPublic.value = message.isPublic
-        console.log('[ws] table visibility updated:', message.isPublic ? 'public' : 'private')
-        break
-
-      case 'table:name_updated':
-        tableName.value = message.name
-        console.log('[ws] table name updated:', message.name)
-        break
-
-      case 'table:info':
-        tableName.value = message.name
-        tableIsPublic.value = message.isPublic
-        tableSettings.value = message.settings
-        break
-
-      // Chat
-      case 'chat:message':
-        chatMessages.value = [...chatMessages.value, message]
-        break
-
-      case 'chat:history':
-        // Load chat history (prepend to any existing messages, avoiding duplicates)
-        const existingIds = new Set(chatMessages.value.map((m) => m.id))
-        const newMessages = message.messages
-          .filter((m) => !existingIds.has(m.id))
-          .map((m) => ({ ...m, type: 'chat:message' as const }))
-        chatMessages.value = [...newMessages, ...chatMessages.value]
-        break
-
-      case 'chat:typing_status':
-        if (message.isTyping) {
-          typingPlayers.value.set(message.playerId, message.playerName)
-        } else {
-          typingPlayers.value.delete(message.playerId)
-        }
-        // Trigger reactivity
-        typingPlayers.value = new Map(typingPlayers.value)
-        break
-
-      // Errors
-      case 'error':
-        console.error('[ws] error:', message.code, message.message)
-        error.value = message.message
-        break
+    // Heartbeat response - handle directly for minimal latency
+    if (message.type === 'ping') {
+      const pong: Pong = { type: 'pong', timestamp: message.timestamp }
+      send(pong)
+      return
     }
+
+    // Create refs objects for handlers
+    const gameStateRefs: GameStateRefs = {
+      gameState,
+      handCardIds,
+      handCounts,
+    }
+
+    const roomStateRefs: RoomStateRefs = {
+      roomCode,
+      playerId,
+      players,
+      gameState,
+      handCardIds,
+      handCounts,
+      cursors,
+      error,
+      tableSettings,
+      tableName,
+      tableIsPublic,
+      chatMessages,
+      typingPlayers,
+    }
+
+    const roomCallbacks = {
+      storeSessionToken,
+    }
+
+    // Try each handler category in order
+    // Room events (join, leave, errors)
+    if (handleRoomMessage(message, roomStateRefs, roomCallbacks)) return
+
+    // Table management (reset, settings, visibility, name)
+    if (handleTableMessage(message, roomStateRefs)) return
+
+    // Card events
+    if (handleCardMessage(message, gameStateRefs)) return
+
+    // Stack events
+    if (handleStackMessage(message, gameStateRefs)) return
+
+    // Zone events
+    if (handleZoneMessage(message, gameStateRefs)) return
+
+    // Hand events
+    if (handleHandMessage(message, gameStateRefs, playerId.value)) return
+
+    // Cursor events
+    if (handleCursorMessage(message, roomStateRefs)) return
+
+    // State sync
+    if (handleStateSyncMessage(message, roomStateRefs)) return
+
+    // Chat
+    if (handleChatMessage(message, roomStateRefs)) return
+
+    // Errors
+    if (handleErrorMessage(message, roomStateRefs)) return
   }
 
   const onMessage = (handler: (message: ServerMessage) => void) => {

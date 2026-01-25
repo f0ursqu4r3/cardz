@@ -33,6 +33,7 @@ export function handleStackCreate(
         originalAction: 'stack:create',
         code: 'NOT_FOUND',
         message: `Card ${cardId} not found`,
+        requestId: msg.requestId,
       })
       return
     }
@@ -43,6 +44,7 @@ export function handleStackCreate(
         originalAction: 'stack:create',
         code: 'NOT_IN_HAND',
         message: 'Cannot stack cards that are in a hand',
+        requestId: msg.requestId,
       })
       return
     }
@@ -61,6 +63,7 @@ export function handleStackCreate(
         originalAction: 'stack:create',
         code: 'CARD_LOCKED',
         message: 'One or more cards are locked by another player',
+        requestId: msg.requestId,
       })
       return
     }
@@ -101,6 +104,7 @@ export function handleStackMove(
       originalAction: 'stack:move',
       code: 'NOT_FOUND',
       message: 'Stack not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -112,6 +116,7 @@ export function handleStackMove(
       originalAction: 'stack:move',
       code: 'STACK_LOCKED',
       message: 'Stack is locked by another player',
+      requestId: msg.requestId,
     })
     return
   }
@@ -150,6 +155,7 @@ export function handleStackLock(
       originalAction: 'stack:lock',
       code: 'NOT_FOUND',
       message: 'Stack not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -160,6 +166,7 @@ export function handleStackLock(
       originalAction: 'stack:lock',
       code: 'STACK_LOCKED',
       message: 'Stack is locked by another player',
+      requestId: msg.requestId,
     })
     return
   }
@@ -211,6 +218,7 @@ export function handleStackAddCard(
       originalAction: 'stack:add_card',
       code: 'STACK_LOCKED',
       message: 'Stack is locked by another player',
+      requestId: msg.requestId,
     })
     return
   }
@@ -223,6 +231,7 @@ export function handleStackAddCard(
       originalAction: 'stack:add_card',
       code: 'CARD_LOCKED',
       message: 'Card is locked by another player',
+      requestId: msg.requestId,
     })
     return
   }
@@ -234,6 +243,7 @@ export function handleStackAddCard(
       originalAction: 'stack:add_card',
       code: 'NOT_FOUND',
       message: 'Card not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -244,6 +254,7 @@ export function handleStackAddCard(
       originalAction: 'stack:add_card',
       code: 'NOT_IN_HAND',
       message: 'Card is in a hand',
+      requestId: msg.requestId,
     })
     return
   }
@@ -256,6 +267,7 @@ export function handleStackAddCard(
       originalAction: 'stack:add_card',
       code: 'NOT_FOUND',
       message: 'Stack not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -269,6 +281,7 @@ export function handleStackAddCard(
       originalAction: 'stack:add_card',
       code: 'NOT_FOUND',
       message: 'Stack not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -298,6 +311,7 @@ export function handleStackRemoveCard(
       originalAction: 'stack:remove_card',
       code: 'NOT_FOUND',
       message: 'Card not found or not in a stack',
+      requestId: msg.requestId,
     })
     return
   }
@@ -310,6 +324,7 @@ export function handleStackRemoveCard(
       originalAction: 'stack:remove_card',
       code: 'STACK_LOCKED',
       message: 'Stack is locked by another player',
+      requestId: msg.requestId,
     })
     return
   }
@@ -344,6 +359,7 @@ export function handleStackMerge(
         originalAction: 'stack:merge',
         code: 'STACK_LOCKED',
         message: 'One or more stacks are locked',
+        requestId: msg.requestId,
       })
       return
     }
@@ -356,6 +372,7 @@ export function handleStackMerge(
       originalAction: 'stack:merge',
       code: 'NOT_FOUND',
       message: 'Stack not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -389,6 +406,7 @@ export function handleStackShuffle(
       originalAction: 'stack:shuffle',
       code: 'STACK_LOCKED',
       message: 'Stack is locked by another player',
+      requestId: msg.requestId,
     })
     return
   }
@@ -400,6 +418,7 @@ export function handleStackShuffle(
       originalAction: 'stack:shuffle',
       code: 'NOT_FOUND',
       message: 'Stack not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -429,6 +448,7 @@ export function handleStackFlip(
       originalAction: 'stack:flip',
       code: 'STACK_LOCKED',
       message: 'Stack is locked by another player',
+      requestId: msg.requestId,
     })
     return
   }
@@ -440,6 +460,7 @@ export function handleStackFlip(
       originalAction: 'stack:flip',
       code: 'NOT_FOUND',
       message: 'Stack not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -468,6 +489,7 @@ export function handleStackSetFaces(
       originalAction: 'stack:set_faces',
       code: 'STACK_LOCKED',
       message: 'Stack is locked by another player',
+      requestId: msg.requestId,
     })
     return
   }
@@ -479,6 +501,7 @@ export function handleStackSetFaces(
       originalAction: 'stack:set_faces',
       code: 'NOT_FOUND',
       message: 'Stack not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -508,6 +531,7 @@ export function handleStackReorder(
       originalAction: 'stack:reorder',
       code: 'STACK_LOCKED',
       message: 'Stack is locked by another player',
+      requestId: msg.requestId,
     })
     return
   }
@@ -519,6 +543,7 @@ export function handleStackReorder(
       originalAction: 'stack:reorder',
       code: 'INVALID_ACTION',
       message: 'Invalid reorder operation',
+      requestId: msg.requestId,
     })
     return
   }

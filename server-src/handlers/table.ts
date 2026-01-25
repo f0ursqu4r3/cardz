@@ -25,6 +25,7 @@ export function handleTableReset(
       originalAction: 'table:reset',
       code: 'INVALID_ACTION',
       message: 'Not in a room',
+      requestId: msg.requestId,
     })
     return
   }
@@ -36,6 +37,7 @@ export function handleTableReset(
       originalAction: 'table:reset',
       code: 'PERMISSION_DENIED',
       message: 'Only the table creator can reset the table',
+      requestId: msg.requestId,
     })
     return
   }
@@ -47,6 +49,7 @@ export function handleTableReset(
       originalAction: 'table:reset',
       code: 'NOT_FOUND',
       message: 'Room not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -79,6 +82,7 @@ export function handleTableUpdateSettings(
       originalAction: 'table:update_settings',
       code: 'INVALID_ACTION',
       message: 'Not in a room',
+      requestId: msg.requestId,
     })
     return
   }
@@ -90,6 +94,7 @@ export function handleTableUpdateSettings(
       originalAction: 'table:update_settings',
       code: 'PERMISSION_DENIED',
       message: 'Only the table creator can change settings',
+      requestId: msg.requestId,
     })
     return
   }
@@ -101,6 +106,7 @@ export function handleTableUpdateSettings(
       originalAction: 'table:update_settings',
       code: 'NOT_FOUND',
       message: 'Room not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -133,6 +139,7 @@ export function handleTableUpdateVisibility(
       originalAction: 'table:update_visibility',
       code: 'INVALID_ACTION',
       message: 'Not in a room',
+      requestId: msg.requestId,
     })
     return
   }
@@ -144,6 +151,7 @@ export function handleTableUpdateVisibility(
       originalAction: 'table:update_visibility',
       code: 'PERMISSION_DENIED',
       message: 'Only the table creator can change visibility',
+      requestId: msg.requestId,
     })
     return
   }
@@ -155,6 +163,7 @@ export function handleTableUpdateVisibility(
       originalAction: 'table:update_visibility',
       code: 'NOT_FOUND',
       message: 'Room not found',
+      requestId: msg.requestId,
     })
     return
   }
@@ -187,6 +196,7 @@ export function handleTableUpdateName(
       originalAction: 'table:update_name',
       code: 'INVALID_ACTION',
       message: 'Not in a room',
+      requestId: msg.requestId,
     })
     return
   }
@@ -198,6 +208,7 @@ export function handleTableUpdateName(
       originalAction: 'table:update_name',
       code: 'PERMISSION_DENIED',
       message: 'Only the table creator can change the table name',
+      requestId: msg.requestId,
     })
     return
   }
@@ -212,6 +223,7 @@ export function handleTableUpdateName(
       originalAction: 'table:update_name',
       code: 'NOT_FOUND',
       message: 'Room not found',
+      requestId: msg.requestId,
     })
     return
   }

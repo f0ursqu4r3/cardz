@@ -264,28 +264,32 @@ const server = Bun.serve<ClientData>({
       const clientData = ws.data
       const socket = ws as GenericWebSocket
 
-      // Rate limiting check
-      if (!rateLimiter.allowMessage(clientData.id)) {
-        send(socket, {
-          type: 'error',
-          originalAction: 'unknown',
-          code: 'RATE_LIMITED',
-          message: 'Too many requests. Please slow down.',
-        })
-        return
-      }
-
-      // Parse message
+      // Parse message first to extract requestId for error correlation
       let raw: unknown
+      let requestId: string | undefined
       try {
         const text = typeof message === 'string' ? message : new TextDecoder().decode(message)
         raw = JSON.parse(text)
+        // Extract requestId early for error correlation
+        requestId = (raw as Record<string, unknown>)?.requestId as string | undefined
       } catch {
         send(socket, {
           type: 'error',
           originalAction: 'unknown',
           code: 'INVALID_ACTION',
           message: 'Invalid JSON',
+        })
+        return
+      }
+
+      // Rate limiting check
+      if (!rateLimiter.allowMessage(clientData.id)) {
+        send(socket, {
+          type: 'error',
+          originalAction: (raw as Record<string, unknown>)?.type as string ?? 'unknown',
+          code: 'RATE_LIMITED',
+          message: 'Too many requests. Please slow down.',
+          requestId,
         })
         return
       }
@@ -298,6 +302,7 @@ const server = Bun.serve<ClientData>({
           originalAction: (raw as Record<string, unknown>)?.type as string ?? 'unknown',
           code: 'INVALID_ACTION',
           message: result.error.issues[0]?.message ?? 'Invalid message',
+          requestId,
         })
         return
       }
@@ -339,6 +344,7 @@ const server = Bun.serve<ClientData>({
             originalAction: msg.type,
             code: 'INVALID_ACTION',
             message: 'Not in a room',
+            requestId,
           })
           return
         }
@@ -351,6 +357,7 @@ const server = Bun.serve<ClientData>({
             originalAction: msg.type,
             code: 'NOT_FOUND',
             message: 'Room no longer exists',
+            requestId,
           })
           return
         }
@@ -592,6 +599,7 @@ const server = Bun.serve<ClientData>({
           originalAction: msg.type,
           code: 'INTERNAL_ERROR',
           message: 'Internal server error',
+          requestId,
         })
       }
     },
