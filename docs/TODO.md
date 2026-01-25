@@ -76,10 +76,10 @@
 
 ### 📐 Architecture Improvements
 
-- [ ] Add state versioning for client/server consistency
+- [x] Add state versioning for client/server consistency
 - [ ] Implement viewport-based selective broadcasting
 - [x] Add heartbeat/keep-alive mechanism for connection health
-- [ ] Configuration schema with validation (make timeouts/limits configurable)
+- [x] Configuration schema with validation (make timeouts/limits configurable)
 
 ---
 
@@ -117,3 +117,11 @@
 - [ ] Kick/ban players
 - [ ] Lock table (prevent new joins)
 - [ ] Permission system (who can move cards, create zones, etc.)
+
+### Server Enhancements
+
+- [ ] Horizontal scaling (multiple server instances)
+- [ ] Persistent chat history (database storage)
+- [ ] Analytics/dashboard (active tables, players, usage stats)
+- [ ] Automated backups of game state
+- [ ] Admin panel for server monitoring and management
