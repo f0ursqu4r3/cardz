@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { X, Trash2, Play, Pause, RotateCcw } from 'lucide-vue-next'
 import type { Timer, TimerMode } from '@/types'
 
@@ -78,18 +78,19 @@ onUnmounted(() => {
   }
 })
 
-// Watch for status changes
-const timerStatus = computed(() => props.timer.status)
-const timerStartedAt = computed(() => props.timer.startedAt)
-
-// Re-start animation when timer status changes to running
-const checkAnimation = () => {
-  if (props.timer.status === 'running') {
-    startAnimation()
-  } else {
-    displayMs.value = calculateCurrentTime()
-  }
-}
+// Watch for timer state changes and restart animation as needed
+watch(
+  () => [props.timer.status, props.timer.startedAt, props.timer.elapsedMs],
+  () => {
+    if (props.timer.status === 'running') {
+      startAnimation()
+    } else {
+      // Update display immediately when paused/reset
+      displayMs.value = calculateCurrentTime()
+    }
+  },
+  { immediate: true },
+)
 
 // Format time as MM:SS or HH:MM:SS
 const formattedTime = computed(() => {
@@ -166,12 +167,6 @@ const statusClass = computed(() => {
   if (props.timer.status === 'finished') return 'timer--finished'
   if (props.timer.status === 'running') return 'timer--running'
   return ''
-})
-
-// Update display when props change
-const unwatchStatus = computed(() => {
-  checkAnimation()
-  return props.timer.status
 })
 
 defineExpose({ openModal })
@@ -281,20 +276,11 @@ defineExpose({ openModal })
   background: rgba(30, 30, 35, 0.95);
   border-radius: 8px;
   padding: 8px 12px;
-  cursor: grab;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.timer--dragging {
-  cursor: grabbing;
-}
-
-.timer--locked {
-  cursor: not-allowed;
 }
 
 .timer--locked::after {

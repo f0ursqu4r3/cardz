@@ -187,7 +187,6 @@ defineExpose({ openModal, rollDie })
   position: absolute;
   width: 40px;
   height: 40px;
-  cursor: grab;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -195,12 +194,7 @@ defineExpose({ openModal, rollDie })
 }
 
 .die--dragging {
-  cursor: grabbing;
   transition: none; /* Disable transition during drag for smooth movement */
-}
-
-.die--locked {
-  cursor: not-allowed;
 }
 
 .die--locked::after {

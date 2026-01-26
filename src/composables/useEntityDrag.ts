@@ -31,6 +31,8 @@ export interface EntityDragConfig<T extends DraggableEntity> {
   sendMessage: (msg: ClientMessage) => void
   /** Function to track user activity */
   trackActivity: () => void
+  /** Function to set cursor type */
+  setCursor: (type: 'default' | 'grab' | 'grabbing') => void
 }
 
 /**
@@ -49,6 +51,7 @@ export function useEntityDrag<T extends DraggableEntity>(config: EntityDragConfi
     viewport,
     sendMessage,
     trackActivity,
+    setCursor,
   } = config
 
   // Drag state
@@ -86,6 +89,7 @@ export function useEntityDrag<T extends DraggableEntity>(config: EntityDragConfi
     }
 
     draggingId.value = entityId
+    setCursor('grabbing')
 
     // Lock the entity
     trackActivity()
@@ -151,6 +155,7 @@ export function useEntityDrag<T extends DraggableEntity>(config: EntityDragConfi
     } as ClientMessage)
 
     draggingId.value = null
+    setCursor('grab')
   }
 
   /**

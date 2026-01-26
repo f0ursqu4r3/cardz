@@ -236,7 +236,6 @@ defineExpose({ openModal })
   padding: 8px 12px;
   min-width: 80px;
   color: #f0f0f0;
-  cursor: grab;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -247,7 +246,6 @@ defineExpose({ openModal })
 }
 
 .counter--dragging {
-  cursor: grabbing;
   box-shadow:
     0 4px 16px rgba(0, 0, 0, 0.4),
     0 0 0 2px var(--counter-color, #3b82f6);
@@ -258,7 +256,6 @@ defineExpose({ openModal })
   box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.3),
     0 0 12px 2px var(--lock-color, #888);
-  cursor: not-allowed;
 }
 
 .counter__label {

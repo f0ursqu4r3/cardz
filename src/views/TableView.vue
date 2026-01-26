@@ -80,7 +80,7 @@ const playerColor = computed(() => {
 })
 
 // Custom cursor based on player color (sets up global style via side effect)
-useCursor(playerColor)
+const cursor = useCursor(playerColor)
 
 // Create refs for template binding
 const canvasRef = ref<HTMLElement | null>(null)
@@ -237,6 +237,7 @@ const counterDrag = useEntityDrag({
   viewport,
   sendMessage: ws.send,
   trackActivity,
+  setCursor: cursor.setCursor,
 })
 
 const tokenDrag = useEntityDrag({
@@ -247,6 +248,7 @@ const tokenDrag = useEntityDrag({
   viewport,
   sendMessage: ws.send,
   trackActivity,
+  setCursor: cursor.setCursor,
 })
 
 const dieDrag = useEntityDrag({
@@ -257,6 +259,7 @@ const dieDrag = useEntityDrag({
   viewport,
   sendMessage: ws.send,
   trackActivity,
+  setCursor: cursor.setCursor,
 })
 
 const timerDrag = useEntityDrag({
@@ -267,6 +270,7 @@ const timerDrag = useEntityDrag({
   viewport,
   sendMessage: ws.send,
   trackActivity,
+  setCursor: cursor.setCursor,
 })
 
 // Ghost card for hand dragging

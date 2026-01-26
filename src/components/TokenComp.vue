@@ -296,7 +296,6 @@ defineExpose({ openModal })
   position: absolute;
   width: var(--token-size);
   height: var(--token-size);
-  cursor: grab;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -308,12 +307,7 @@ defineExpose({ openModal })
 }
 
 .token--dragging {
-  cursor: grabbing;
   transition: none; /* Disable transition during drag for smooth movement */
-}
-
-.token--locked {
-  cursor: not-allowed;
 }
 
 .token--locked::after {
