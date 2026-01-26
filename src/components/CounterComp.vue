@@ -106,6 +106,7 @@ defineExpose({ openModal })
       transform: `translate3d(${counter.x}px, ${counter.y}px, 0)`,
       '--counter-color': counter.color,
       '--lock-color': lockColor,
+      zIndex: isDragging ? 1000 : counter.z,
     }"
     @pointerdown="emit('pointerdown', $event)"
     @pointermove="emit('pointermove', $event)"
@@ -238,6 +239,7 @@ defineExpose({ openModal })
   cursor: grab;
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   transition:
     box-shadow 0.15s ease,
@@ -249,7 +251,7 @@ defineExpose({ openModal })
   box-shadow:
     0 4px 16px rgba(0, 0, 0, 0.4),
     0 0 0 2px var(--counter-color, #3b82f6);
-  z-index: 1000;
+  transition: none; /* Disable transition during drag for smooth movement */
 }
 
 .counter--locked {
@@ -278,6 +280,8 @@ defineExpose({ openModal })
   align-items: center;
   justify-content: center;
   gap: 8px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .counter__value {
@@ -287,6 +291,8 @@ defineExpose({ openModal })
   min-width: 40px;
   text-align: center;
   color: var(--counter-color, #3b82f6);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .counter__btn {

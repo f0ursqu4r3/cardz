@@ -95,6 +95,21 @@ export class GameStateManager {
         nextDieId: initialState.nextDieId ?? 1,
         nextTimerId: initialState.nextTimerId ?? 1,
       }
+      // Ensure z values exist for legacy entities (created before z-order support)
+      let maxZ = this.state.zCounter
+      for (const counter of this.state.counters) {
+        if (counter.z === undefined) counter.z = ++maxZ
+      }
+      for (const token of this.state.tokens) {
+        if (token.z === undefined) token.z = ++maxZ
+      }
+      for (const die of this.state.dice) {
+        if (die.z === undefined) die.z = ++maxZ
+      }
+      for (const timer of this.state.timers) {
+        if (timer.z === undefined) timer.z = ++maxZ
+      }
+      this.state.zCounter = maxZ
     }
   }
 
@@ -863,6 +878,7 @@ export class GameStateManager {
       id: this.state.nextCounterId++,
       x,
       y,
+      z: ++this.state.zCounter,
       label,
       value,
       min: options.min,
@@ -883,6 +899,11 @@ export class GameStateManager {
   ): CounterState | null {
     const counter = this.getCounter(counterId)
     if (!counter) return null
+
+    // Bump z-order on position update
+    if (updates.x !== undefined || updates.y !== undefined) {
+      counter.z = ++this.state.zCounter
+    }
 
     // Apply updates
     if (updates.x !== undefined) counter.x = updates.x
@@ -960,6 +981,7 @@ export class GameStateManager {
       id: this.state.nextTokenId++,
       x,
       y,
+      z: ++this.state.zCounter,
       kind,
       shape: kind === 'color' ? (options.shape ?? 'circle') : undefined,
       color: options.color ?? '#ef4444', // Default red
@@ -980,6 +1002,11 @@ export class GameStateManager {
   ): TokenState | null {
     const token = this.getToken(tokenId)
     if (!token) return null
+
+    // Bump z-order on position update
+    if (updates.x !== undefined || updates.y !== undefined) {
+      token.z = ++this.state.zCounter
+    }
 
     // Apply updates
     if (updates.x !== undefined) token.x = updates.x
@@ -1033,6 +1060,7 @@ export class GameStateManager {
       id: this.state.nextDieId++,
       x,
       y,
+      z: ++this.state.zCounter,
       value,
       isRolling: false,
       color: options.color ?? '#f5f5f5', // Default white/light gray
@@ -1063,6 +1091,11 @@ export class GameStateManager {
   ): DieState | null {
     const die = this.getDie(dieId)
     if (!die) return null
+
+    // Bump z-order on position update
+    if (updates.x !== undefined || updates.y !== undefined) {
+      die.z = ++this.state.zCounter
+    }
 
     if (updates.x !== undefined) die.x = updates.x
     if (updates.y !== undefined) die.y = updates.y
@@ -1110,6 +1143,7 @@ export class GameStateManager {
       id: this.state.nextTimerId++,
       x,
       y,
+      z: ++this.state.zCounter,
       mode,
       durationMs: options.durationMs ?? (mode === 'countdown' ? 60000 : 0), // Default 1 minute for countdown
       elapsedMs: 0,
@@ -1193,6 +1227,11 @@ export class GameStateManager {
   ): TimerState | null {
     const timer = this.getTimer(timerId)
     if (!timer) return null
+
+    // Bump z-order on position update
+    if (updates.x !== undefined || updates.y !== undefined) {
+      timer.z = ++this.state.zCounter
+    }
 
     if (updates.x !== undefined) timer.x = updates.x
     if (updates.y !== undefined) timer.y = updates.y

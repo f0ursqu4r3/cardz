@@ -117,6 +117,7 @@ defineExpose({ openModal, rollDie })
       transform: `translate3d(${die.x - DIE_SIZE / 2}px, ${die.y - DIE_SIZE / 2}px, 0)`,
       '--die-color': die.color,
       '--lock-color': lockColor,
+      zIndex: isDragging ? 1000 : die.z,
     }"
     @pointerdown="emit('pointerdown', $event)"
     @pointermove="emit('pointermove', $event)"
@@ -189,12 +190,13 @@ defineExpose({ openModal, rollDie })
   cursor: grab;
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
   transition: transform 0.05s ease;
 }
 
 .die--dragging {
   cursor: grabbing;
-  z-index: 1000;
+  transition: none; /* Disable transition during drag for smooth movement */
 }
 
 .die--locked {

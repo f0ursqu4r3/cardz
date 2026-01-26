@@ -1021,6 +1021,7 @@ const onZoneDelete = (zoneId: number) => {
 // Counter drag state
 const draggingCounterId = ref<number | null>(null)
 const counterDragOffset = ref({ x: 0, y: 0 })
+let lastCounterPositionUpdate = 0
 
 // Create new counter at center of viewport
 const addCounter = () => {
@@ -1116,7 +1117,11 @@ const onCounterPointerMove = (event: PointerEvent) => {
   counter.x = newX
   counter.y = newY
 
-  // Send position update to server (throttled via the normal message flow)
+  // Throttle server updates to avoid rate limiting
+  const now = Date.now()
+  if (now - lastCounterPositionUpdate < CURSOR_THROTTLE_MS) return
+  lastCounterPositionUpdate = now
+
   trackActivity()
   ws.send({
     type: 'counter:update',
@@ -1128,6 +1133,17 @@ const onCounterPointerMove = (event: PointerEvent) => {
 const onCounterPointerUp = (event: PointerEvent) => {
   if (draggingCounterId.value === null) return
   ;(event.target as HTMLElement).releasePointerCapture(event.pointerId)
+
+  const counter = cardStore.getCounterById(draggingCounterId.value)
+
+  // Send final position update
+  if (counter) {
+    ws.send({
+      type: 'counter:update',
+      counterId: draggingCounterId.value,
+      updates: { x: counter.x, y: counter.y },
+    })
+  }
 
   // Unlock the counter
   ws.send({
@@ -1161,6 +1177,7 @@ const getCounterLockColor = (counter: { lockedBy: string | null }): string | und
 // Token drag state
 const draggingTokenId = ref<number | null>(null)
 const tokenDragOffset = ref({ x: 0, y: 0 })
+let lastTokenPositionUpdate = 0
 
 // Create new token at center of viewport
 const addColorToken = () => {
@@ -1263,7 +1280,11 @@ const onTokenPointerMove = (event: PointerEvent) => {
   token.x = newX
   token.y = newY
 
-  // Send position update to server
+  // Throttle server updates to avoid rate limiting
+  const now = Date.now()
+  if (now - lastTokenPositionUpdate < CURSOR_THROTTLE_MS) return
+  lastTokenPositionUpdate = now
+
   trackActivity()
   ws.send({
     type: 'token:update',
@@ -1275,6 +1296,17 @@ const onTokenPointerMove = (event: PointerEvent) => {
 const onTokenPointerUp = (event: PointerEvent) => {
   if (draggingTokenId.value === null) return
   ;(event.target as HTMLElement).releasePointerCapture(event.pointerId)
+
+  const token = cardStore.getTokenById(draggingTokenId.value)
+
+  // Send final position update
+  if (token) {
+    ws.send({
+      type: 'token:update',
+      tokenId: draggingTokenId.value,
+      updates: { x: token.x, y: token.y },
+    })
+  }
 
   // Unlock the token
   ws.send({
@@ -1308,6 +1340,7 @@ const getTokenLockColor = (token: { lockedBy: string | null }): string | undefin
 // Die drag state
 const draggingDieId = ref<number | null>(null)
 const dieDragOffset = ref({ x: 0, y: 0 })
+let lastDiePositionUpdate = 0
 
 // Create new die at center of viewport
 const addDie = () => {
@@ -1401,7 +1434,11 @@ const onDiePointerMove = (event: PointerEvent) => {
   die.x = newX
   die.y = newY
 
-  // Send position update to server
+  // Throttle server updates to avoid rate limiting
+  const now = Date.now()
+  if (now - lastDiePositionUpdate < CURSOR_THROTTLE_MS) return
+  lastDiePositionUpdate = now
+
   trackActivity()
   ws.send({
     type: 'die:update',
@@ -1413,6 +1450,17 @@ const onDiePointerMove = (event: PointerEvent) => {
 const onDiePointerUp = (event: PointerEvent) => {
   if (draggingDieId.value === null) return
   ;(event.target as HTMLElement).releasePointerCapture(event.pointerId)
+
+  const die = cardStore.getDieById(draggingDieId.value)
+
+  // Send final position update
+  if (die) {
+    ws.send({
+      type: 'die:update',
+      dieId: draggingDieId.value,
+      updates: { x: die.x, y: die.y },
+    })
+  }
 
   // Unlock the die
   ws.send({
@@ -1446,6 +1494,7 @@ const getDieLockColor = (die: { lockedBy: string | null }): string | undefined =
 // Timer drag state
 const draggingTimerId = ref<number | null>(null)
 const timerDragOffset = ref({ x: 0, y: 0 })
+let lastTimerPositionUpdate = 0
 
 // Create new timer at center of viewport
 const addTimer = (mode: 'countdown' | 'stopwatch' = 'countdown') => {
@@ -1556,7 +1605,11 @@ const onTimerPointerMove = (event: PointerEvent) => {
   timer.x = newX
   timer.y = newY
 
-  // Send position update to server
+  // Throttle server updates to avoid rate limiting
+  const now = Date.now()
+  if (now - lastTimerPositionUpdate < CURSOR_THROTTLE_MS) return
+  lastTimerPositionUpdate = now
+
   trackActivity()
   ws.send({
     type: 'timer:update',
@@ -1568,6 +1621,17 @@ const onTimerPointerMove = (event: PointerEvent) => {
 const onTimerPointerUp = (event: PointerEvent) => {
   if (draggingTimerId.value === null) return
   ;(event.target as HTMLElement).releasePointerCapture(event.pointerId)
+
+  const timer = cardStore.getTimerById(draggingTimerId.value)
+
+  // Send final position update
+  if (timer) {
+    ws.send({
+      type: 'timer:update',
+      timerId: draggingTimerId.value,
+      updates: { x: timer.x, y: timer.y },
+    })
+  }
 
   // Unlock the timer
   ws.send({

@@ -100,6 +100,7 @@ defineExpose({ openModal })
       '--token-color': token.color,
       '--lock-color': lockColor,
       '--token-size': `${tokenSize}px`,
+      zIndex: isDragging ? 1000 : token.z,
     }"
     @pointerdown="emit('pointerdown', $event)"
     @pointermove="emit('pointermove', $event)"
@@ -298,6 +299,7 @@ defineExpose({ openModal })
   cursor: grab;
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -306,7 +308,7 @@ defineExpose({ openModal })
 
 .token--dragging {
   cursor: grabbing;
-  z-index: 1000;
+  transition: none; /* Disable transition during drag for smooth movement */
 }
 
 .token--locked {

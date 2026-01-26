@@ -1061,6 +1061,7 @@ export const useCardStore = defineStore('cards', () => {
     id: state.id,
     x: state.x,
     y: state.y,
+    z: state.z ?? 0,
     label: state.label,
     value: state.value,
     min: state.min,
@@ -1077,6 +1078,7 @@ export const useCardStore = defineStore('cards', () => {
 
     if (updates.x !== undefined) counter.x = updates.x
     if (updates.y !== undefined) counter.y = updates.y
+    if (updates.z !== undefined) counter.z = updates.z
     if (updates.label !== undefined) counter.label = updates.label
     if (updates.value !== undefined) counter.value = updates.value
     if (updates.min !== undefined) counter.min = updates.min
@@ -1105,6 +1107,7 @@ export const useCardStore = defineStore('cards', () => {
     id: state.id,
     x: state.x,
     y: state.y,
+    z: state.z ?? 0,
     kind: state.kind,
     shape: state.shape,
     color: state.color,
@@ -1121,6 +1124,7 @@ export const useCardStore = defineStore('cards', () => {
 
     if (updates.x !== undefined) token.x = updates.x
     if (updates.y !== undefined) token.y = updates.y
+    if (updates.z !== undefined) token.z = updates.z
     if (updates.shape !== undefined) token.shape = updates.shape
     if (updates.color !== undefined) token.color = updates.color
     if (updates.label !== undefined) token.label = updates.label
@@ -1148,6 +1152,7 @@ export const useCardStore = defineStore('cards', () => {
     id: state.id,
     x: state.x,
     y: state.y,
+    z: state.z ?? 0,
     value: state.value as DieValue,
     isRolling: state.isRolling,
     color: state.color,
@@ -1161,6 +1166,7 @@ export const useCardStore = defineStore('cards', () => {
 
     if (updates.x !== undefined) die.x = updates.x
     if (updates.y !== undefined) die.y = updates.y
+    if (updates.z !== undefined) die.z = updates.z
     if (updates.value !== undefined) die.value = updates.value as DieValue
     if (updates.isRolling !== undefined) die.isRolling = updates.isRolling
     if (updates.color !== undefined) die.color = updates.color
@@ -1194,6 +1200,7 @@ export const useCardStore = defineStore('cards', () => {
     id: state.id,
     x: state.x,
     y: state.y,
+    z: state.z ?? 0,
     mode: state.mode as TimerMode,
     durationMs: state.durationMs,
     elapsedMs: state.elapsedMs,
@@ -1210,6 +1217,7 @@ export const useCardStore = defineStore('cards', () => {
 
     if (updates.x !== undefined) timer.x = updates.x
     if (updates.y !== undefined) timer.y = updates.y
+    if (updates.z !== undefined) timer.z = updates.z
     if (updates.mode !== undefined) timer.mode = updates.mode as TimerMode
     if (updates.durationMs !== undefined) timer.durationMs = updates.durationMs
     if (updates.elapsedMs !== undefined) timer.elapsedMs = updates.elapsedMs

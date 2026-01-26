@@ -52,6 +52,7 @@ export type Counter = {
   id: number
   x: number
   y: number
+  z: number
   label: string
   value: number
   min?: number
@@ -69,6 +70,7 @@ export type Token = {
   id: number
   x: number
   y: number
+  z: number
   kind: 'color' | 'sprite'
   shape?: TokenShape
   color: string
@@ -84,6 +86,7 @@ export type Die = {
   id: number
   x: number
   y: number
+  z: number
   value: DieValue
   isRolling: boolean
   color: string
@@ -97,6 +100,7 @@ export type Timer = {
   id: number
   x: number
   y: number
+  z: number
   mode: TimerMode
   durationMs: number
   elapsedMs: number

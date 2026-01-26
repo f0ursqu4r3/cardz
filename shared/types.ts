@@ -79,6 +79,7 @@ export interface CounterState {
   id: number
   x: number
   y: number
+  z: number // Z-order for stacking
   label: string // Custom text label (e.g., "Life", "Score")
   value: number // Current counter value
   min?: number // Optional minimum (default: no limit)
@@ -100,6 +101,7 @@ export interface TokenState {
   id: number
   x: number
   y: number
+  z: number // Z-order for stacking
   kind: 'color' | 'sprite' // Color shape or sprite-based token
   shape?: TokenShape // For color tokens (circle, square, etc.)
   color: string // Display color (hex)
@@ -119,6 +121,7 @@ export interface DieState {
   id: number
   x: number
   y: number
+  z: number // Z-order for stacking
   value: DieValue // Current face value (1-6)
   isRolling: boolean // True while animation is playing
   color: string // Die color (hex)
@@ -136,6 +139,7 @@ export interface TimerState {
   id: number
   x: number
   y: number
+  z: number // Z-order for stacking
   mode: TimerMode // 'countdown' or 'stopwatch'
   durationMs: number // For countdown: initial duration; for stopwatch: ignored
   elapsedMs: number // Current elapsed time (paused value)

@@ -188,6 +188,7 @@ defineExpose({ openModal })
     :style="{
       transform: `translate3d(${timer.x - 70}px, ${timer.y - 30}px, 0)`,
       '--lock-color': lockColor,
+      zIndex: isDragging ? 1000 : timer.z,
     }"
     @pointerdown="emit('pointerdown', $event)"
     @pointermove="emit('pointermove', $event)"
@@ -283,13 +284,13 @@ defineExpose({ openModal })
   cursor: grab;
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .timer--dragging {
   cursor: grabbing;
-  z-index: 1000;
 }
 
 .timer--locked {
@@ -323,6 +324,8 @@ defineExpose({ openModal })
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .timer__display {
@@ -332,6 +335,8 @@ defineExpose({ openModal })
   color: #f0f0f0;
   text-align: center;
   letter-spacing: 2px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .timer--running .timer__display {
@@ -378,6 +383,8 @@ defineExpose({ openModal })
   margin-top: 4px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* Modal styles */
