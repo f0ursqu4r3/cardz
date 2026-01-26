@@ -1,0 +1,191 @@
+/**
+ * Design System Variables
+ *
+ * This file defines the design tokens used throughout the application.
+ * Import this file in main.css to make these variables available globally.
+ */
+
+:root {
+  /* ==========================================================================
+     Card tilemap settings (existing)
+     ========================================================================== */
+  --tile-w: 42px;
+  --tile-h: 60px;
+  --pad-x: 11px;
+  --pad-y: 2px;
+  --gap-x: 22px;
+  --gap-y: 4px;
+  --atlas: url('/cardsLarge_tilemap_packed.png');
+
+  /* ==========================================================================
+     Surface Colors (backgrounds)
+     ========================================================================== */
+  --color-surface-100: #1a1a1a;           /* Darkest - page background */
+  --color-surface-200: #2a2a2a;           /* Modal/panel background */
+  --color-surface-300: rgba(0, 0, 0, 0.7); /* Card/entity background */
+  --color-surface-input: rgba(0, 0, 0, 0.3); /* Input background */
+
+  /* Transparent surfaces */
+  --color-surface-overlay: rgba(0, 0, 0, 0.6);  /* Modal backdrop */
+  --color-surface-hover: rgba(255, 255, 255, 0.1);
+  --color-surface-active: rgba(255, 255, 255, 0.2);
+
+  /* ==========================================================================
+     Text Colors
+     ========================================================================== */
+  --color-text-primary: #f0f0f0;          /* Main text */
+  --color-text-secondary: #888;           /* Labels, muted text */
+  --color-text-tertiary: #666;            /* Very muted text */
+
+  /* ==========================================================================
+     Border Colors
+     ========================================================================== */
+  --color-border-subtle: rgba(255, 255, 255, 0.1);  /* Dividers, separators */
+  --color-border-default: rgba(255, 255, 255, 0.2); /* Input borders */
+  --color-border-focus: rgba(255, 255, 255, 0.4);   /* Focused inputs */
+
+  /* ==========================================================================
+     Semantic Colors - Primary (Blue)
+     ========================================================================== */
+  --color-primary: #3b82f6;               /* Solid primary */
+  --color-primary-light: #a0d0ff;         /* Light text on dark bg */
+  --color-primary-bg: rgba(60, 120, 180, 0.4);
+  --color-primary-bg-hover: rgba(60, 120, 180, 0.6);
+  --color-primary-border: rgba(60, 120, 180, 0.6);
+  --color-primary-border-active: rgba(60, 120, 180, 0.8);
+
+  /* ==========================================================================
+     Semantic Colors - Success (Green)
+     ========================================================================== */
+  --color-success: #22c55e;               /* Solid success */
+  --color-success-light: #a0f0c0;         /* Light text on dark bg */
+  --color-success-muted: #a0e0a0;         /* Slightly muted */
+  --color-success-bg: rgba(60, 180, 120, 0.4);
+  --color-success-bg-hover: rgba(60, 180, 120, 0.6);
+  --color-success-border: rgba(60, 180, 120, 0.6);
+  /* Toggle active state */
+  --color-toggle-active-bg: rgba(100, 180, 100, 0.3);
+  --color-toggle-active-border: rgba(100, 180, 100, 0.5);
+  --color-toggle-active-text: #a0e0a0;
+
+  /* ==========================================================================
+     Semantic Colors - Danger (Red)
+     ========================================================================== */
+  --color-danger: #ef4444;                /* Solid danger */
+  --color-danger-light: #e08080;          /* Light text on dark bg */
+  --color-danger-bg: rgba(180, 60, 60, 0.3);
+  --color-danger-bg-hover: rgba(180, 60, 60, 0.5);
+  --color-danger-border: rgba(180, 60, 60, 0.5);
+
+  /* ==========================================================================
+     Semantic Colors - Warning (Yellow/Orange)
+     ========================================================================== */
+  --color-warning: #ffc864;
+  --color-warning-border: rgba(255, 200, 100, 0.7);
+
+  /* ==========================================================================
+     Semantic Colors - Info (Cyan/Blue)
+     ========================================================================== */
+  --color-info-bg: rgba(100, 180, 255, 0.2);
+  --color-info-border: rgba(100, 180, 255, 0.5);
+  --color-info-text: #a0d0ff;
+  --color-info-muted: rgba(100, 180, 255, 0.8);
+
+  /* ==========================================================================
+     Semantic Colors - Special (Purple)
+     ========================================================================== */
+  --color-special-border: rgba(180, 100, 180, 0.7);
+  --color-special-bg: rgba(100, 50, 100, 0.15);
+  --color-special-text: rgba(180, 100, 180, 0.8);
+
+  /* ==========================================================================
+     Spacing Scale
+     ========================================================================== */
+  --spacing-0: 0;
+  --spacing-1: 2px;
+  --spacing-2: 4px;
+  --spacing-3: 6px;
+  --spacing-4: 8px;
+  --spacing-5: 10px;
+  --spacing-6: 12px;
+  --spacing-8: 16px;
+  --spacing-10: 20px;
+  --spacing-12: 24px;
+
+  /* ==========================================================================
+     Border Radius
+     ========================================================================== */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-full: 50%;
+
+  /* ==========================================================================
+     Shadows
+     ========================================================================== */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-inset: inset 0 1px 1px rgba(255, 255, 255, 0.2), inset 0 -1px 1px rgba(0, 0, 0, 0.1);
+
+  /* Lock/selection glow */
+  --shadow-glow: 0 0 12px 2px var(--glow-color, #888);
+
+  /* ==========================================================================
+     Typography
+     ========================================================================== */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+    Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-md: 12px;
+  --font-size-base: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 24px;
+
+  --font-weight-normal: 400;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --letter-spacing-label: 0.05em;
+  --letter-spacing-wide: 0.08em;
+
+  /* ==========================================================================
+     Z-Index Scale
+     ========================================================================== */
+  --z-base: 1;
+  --z-dropdown: 100;
+  --z-sticky: 500;
+  --z-overlay: 1000;
+  --z-modal: 10000;
+  --z-dragging: 10000;
+  --z-toast: 11000;
+  --z-tooltip: 12000;
+
+  /* ==========================================================================
+     Transitions
+     ========================================================================== */
+  --transition-fast: 0.05s ease;
+  --transition-normal: 0.15s ease;
+  --transition-slow: 0.3s ease;
+
+  /* ==========================================================================
+     Component-Specific Tokens
+     ========================================================================== */
+
+  /* Modal dimensions */
+  --modal-min-width: 280px;
+  --modal-max-width: 90vw;
+  --modal-header-padding: var(--spacing-6) var(--spacing-8);
+  --modal-body-padding: var(--spacing-8);
+  --modal-footer-padding: var(--spacing-6) var(--spacing-8);
+
+  /* Input dimensions */
+  --input-padding: var(--spacing-4) var(--spacing-5);
+  --input-height: 36px;
+
+  /* Button dimensions */
+  --btn-padding-sm: var(--spacing-3) var(--spacing-6);
+  --btn-padding-md: var(--spacing-4) var(--spacing-8);
+}

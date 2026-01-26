@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, nextTick, computed } from 'vue'
-import { X, Trash2, Star, Skull, Circle, Coins, Heart, Shield, Gem, Square, Triangle } from 'lucide-vue-next'
+import { Trash2, Star, Skull, Circle, Coins, Heart, Shield, Gem, Square, Triangle } from 'lucide-vue-next'
+import ModalBase from '@/components/ui/ModalBase.vue'
 import type { Token, TokenShape, TokenSprite, TokenSize } from '@/types'
 
 const props = defineProps<{
@@ -71,20 +72,6 @@ const deleteToken = () => {
   emit('token:delete', props.token.id)
 }
 
-const onBackdropClick = (event: MouseEvent) => {
-  if ((event.target as HTMLElement).classList.contains('token-modal')) {
-    closeModal()
-  }
-}
-
-const onKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Enter') {
-    saveChanges()
-  } else if (event.key === 'Escape') {
-    closeModal()
-  }
-}
-
 defineExpose({ openModal })
 </script>
 
@@ -132,163 +119,151 @@ defineExpose({ openModal })
   </div>
 
   <!-- Token Properties Modal -->
-  <Teleport to="body">
-    <div v-if="showModal" class="token-modal" @click="onBackdropClick">
-      <div class="token-modal__content" @pointerdown.stop>
-        <div class="token-modal__header">
-          <h3>Token Properties</h3>
-          <button class="token-modal__close" @click="closeModal">
-            <X :size="16" />
-          </button>
-        </div>
-        <div class="token-modal__body">
-          <label class="token-modal__field">
-            <span class="token-modal__label">Label (optional)</span>
-            <input
-              ref="labelInputRef"
-              v-model="formLabel"
-              type="text"
-              class="token-modal__input"
-              placeholder="None"
-              maxlength="16"
-              @keydown="onKeydown"
-            />
-          </label>
+  <ModalBase v-if="showModal" title="Token Properties" @close="closeModal">
+    <label class="form-field">
+      <span class="form-label">Label (optional)</span>
+      <input
+        ref="labelInputRef"
+        v-model="formLabel"
+        type="text"
+        class="form-input"
+        placeholder="None"
+        maxlength="16"
+      />
+    </label>
 
-          <!-- Shape selector (for color tokens) -->
-          <div v-if="token.kind === 'color'" class="token-modal__field">
-            <span class="token-modal__label">Shape</span>
-            <div class="token-modal__shapes">
-              <button
-                class="token-modal__shape-btn"
-                :class="{ 'token-modal__shape-btn--active': formShape === 'circle' }"
-                @click="formShape = 'circle'"
-              >
-                <Circle :size="20" />
-              </button>
-              <button
-                class="token-modal__shape-btn"
-                :class="{ 'token-modal__shape-btn--active': formShape === 'square' }"
-                @click="formShape = 'square'"
-              >
-                <Square :size="20" />
-              </button>
-              <button
-                class="token-modal__shape-btn"
-                :class="{ 'token-modal__shape-btn--active': formShape === 'star' }"
-                @click="formShape = 'star'"
-              >
-                <Star :size="20" />
-              </button>
-              <button
-                class="token-modal__shape-btn"
-                :class="{ 'token-modal__shape-btn--active': formShape === 'triangle' }"
-                @click="formShape = 'triangle'"
-              >
-                <Triangle :size="20" />
-              </button>
-            </div>
-          </div>
-
-          <!-- Sprite selector (for sprite tokens) -->
-          <div v-if="token.kind === 'sprite'" class="token-modal__field">
-            <span class="token-modal__label">Icon</span>
-            <div class="token-modal__shapes">
-              <button
-                class="token-modal__shape-btn"
-                :class="{ 'token-modal__shape-btn--active': formSprite === 'star' }"
-                @click="formSprite = 'star'"
-              >
-                <Star :size="20" />
-              </button>
-              <button
-                class="token-modal__shape-btn"
-                :class="{ 'token-modal__shape-btn--active': formSprite === 'skull' }"
-                @click="formSprite = 'skull'"
-              >
-                <Skull :size="20" />
-              </button>
-              <button
-                class="token-modal__shape-btn"
-                :class="{ 'token-modal__shape-btn--active': formSprite === 'coin' }"
-                @click="formSprite = 'coin'"
-              >
-                <Coins :size="20" />
-              </button>
-              <button
-                class="token-modal__shape-btn"
-                :class="{ 'token-modal__shape-btn--active': formSprite === 'heart' }"
-                @click="formSprite = 'heart'"
-              >
-                <Heart :size="20" />
-              </button>
-              <button
-                class="token-modal__shape-btn"
-                :class="{ 'token-modal__shape-btn--active': formSprite === 'shield' }"
-                @click="formSprite = 'shield'"
-              >
-                <Shield :size="20" />
-              </button>
-              <button
-                class="token-modal__shape-btn"
-                :class="{ 'token-modal__shape-btn--active': formSprite === 'gem' }"
-                @click="formSprite = 'gem'"
-              >
-                <Gem :size="20" />
-              </button>
-            </div>
-          </div>
-
-          <label class="token-modal__field">
-            <span class="token-modal__label">Size</span>
-            <div class="token-modal__sizes">
-              <button
-                class="token-modal__size-btn"
-                :class="{ 'token-modal__size-btn--active': formSize === 'small' }"
-                @click="formSize = 'small'"
-              >
-                S
-              </button>
-              <button
-                class="token-modal__size-btn"
-                :class="{ 'token-modal__size-btn--active': formSize === 'medium' }"
-                @click="formSize = 'medium'"
-              >
-                M
-              </button>
-              <button
-                class="token-modal__size-btn"
-                :class="{ 'token-modal__size-btn--active': formSize === 'large' }"
-                @click="formSize = 'large'"
-              >
-                L
-              </button>
-            </div>
-          </label>
-
-          <label class="token-modal__field">
-            <span class="token-modal__label">Color</span>
-            <div class="token-modal__color-row">
-              <input v-model="formColor" type="color" class="token-modal__color-picker" />
-              <input
-                v-model="formColor"
-                type="text"
-                class="token-modal__input token-modal__input--color"
-                pattern="^#[0-9a-fA-F]{6}$"
-              />
-            </div>
-          </label>
-        </div>
-        <div class="token-modal__footer">
-          <button class="token-modal__delete" @click="deleteToken">
-            <Trash2 :size="14" />
-            Delete
-          </button>
-          <button class="token-modal__save" @click="saveChanges">Save</button>
-        </div>
+    <!-- Shape selector (for color tokens) -->
+    <div v-if="token.kind === 'color'" class="form-field">
+      <span class="form-label">Shape</span>
+      <div class="option-group">
+        <button
+          class="option-btn"
+          :class="{ 'option-btn--active': formShape === 'circle' }"
+          @click="formShape = 'circle'"
+        >
+          <Circle :size="20" />
+        </button>
+        <button
+          class="option-btn"
+          :class="{ 'option-btn--active': formShape === 'square' }"
+          @click="formShape = 'square'"
+        >
+          <Square :size="20" />
+        </button>
+        <button
+          class="option-btn"
+          :class="{ 'option-btn--active': formShape === 'star' }"
+          @click="formShape = 'star'"
+        >
+          <Star :size="20" />
+        </button>
+        <button
+          class="option-btn"
+          :class="{ 'option-btn--active': formShape === 'triangle' }"
+          @click="formShape = 'triangle'"
+        >
+          <Triangle :size="20" />
+        </button>
       </div>
     </div>
-  </Teleport>
+
+    <!-- Sprite selector (for sprite tokens) -->
+    <div v-if="token.kind === 'sprite'" class="form-field">
+      <span class="form-label">Icon</span>
+      <div class="option-group">
+        <button
+          class="option-btn"
+          :class="{ 'option-btn--active': formSprite === 'star' }"
+          @click="formSprite = 'star'"
+        >
+          <Star :size="20" />
+        </button>
+        <button
+          class="option-btn"
+          :class="{ 'option-btn--active': formSprite === 'skull' }"
+          @click="formSprite = 'skull'"
+        >
+          <Skull :size="20" />
+        </button>
+        <button
+          class="option-btn"
+          :class="{ 'option-btn--active': formSprite === 'coin' }"
+          @click="formSprite = 'coin'"
+        >
+          <Coins :size="20" />
+        </button>
+        <button
+          class="option-btn"
+          :class="{ 'option-btn--active': formSprite === 'heart' }"
+          @click="formSprite = 'heart'"
+        >
+          <Heart :size="20" />
+        </button>
+        <button
+          class="option-btn"
+          :class="{ 'option-btn--active': formSprite === 'shield' }"
+          @click="formSprite = 'shield'"
+        >
+          <Shield :size="20" />
+        </button>
+        <button
+          class="option-btn"
+          :class="{ 'option-btn--active': formSprite === 'gem' }"
+          @click="formSprite = 'gem'"
+        >
+          <Gem :size="20" />
+        </button>
+      </div>
+    </div>
+
+    <label class="form-field">
+      <span class="form-label">Size</span>
+      <div class="option-group">
+        <button
+          class="option-btn option-btn--text"
+          :class="{ 'option-btn--active': formSize === 'small' }"
+          @click="formSize = 'small'"
+        >
+          S
+        </button>
+        <button
+          class="option-btn option-btn--text"
+          :class="{ 'option-btn--active': formSize === 'medium' }"
+          @click="formSize = 'medium'"
+        >
+          M
+        </button>
+        <button
+          class="option-btn option-btn--text"
+          :class="{ 'option-btn--active': formSize === 'large' }"
+          @click="formSize = 'large'"
+        >
+          L
+        </button>
+      </div>
+    </label>
+
+    <label class="form-field">
+      <span class="form-label">Color</span>
+      <div class="color-row">
+        <input v-model="formColor" type="color" class="color-picker" />
+        <input
+          v-model="formColor"
+          type="text"
+          class="form-input form-input--color"
+          pattern="^#[0-9a-fA-F]{6}$"
+        />
+      </div>
+    </label>
+
+    <template #footer>
+      <button class="btn btn--danger" @click="deleteToken">
+        <Trash2 :size="14" />
+        Delete
+      </button>
+      <button class="btn btn--primary" @click="saveChanges">Save</button>
+    </template>
+  </ModalBase>
 </template>
 
 <style scoped>
@@ -302,27 +277,27 @@ defineExpose({ openModal })
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.05s ease;
+  transition: transform var(--transition-fast);
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
 .token--dragging {
-  transition: none; /* Disable transition during drag for smooth movement */
+  transition: none;
 }
 
 .token--locked {
-  /* Smooth interpolation for remote player drag movements */
   transition:
-    left 0.05s linear,
-    top 0.05s linear;
+    left var(--transition-fast),
+    top var(--transition-fast);
 }
 
 .token--locked::after {
   content: '';
   position: absolute;
   inset: -4px;
-  border-radius: 50%;
-  box-shadow: 0 0 12px 2px var(--lock-color, #888);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-glow);
+  --glow-color: var(--lock-color, #888);
   pointer-events: none;
 }
 
@@ -334,11 +309,11 @@ defineExpose({ openModal })
 }
 
 .token__shape--circle {
-  border-radius: 50%;
+  border-radius: var(--radius-full);
 }
 
 .token__shape--square {
-  border-radius: 4px;
+  border-radius: var(--radius-md);
 }
 
 .token__shape--star {
@@ -371,224 +346,142 @@ defineExpose({ openModal })
   bottom: -16px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 10px;
-  color: #f0f0f0;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 1px 4px;
-  border-radius: 2px;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-primary);
+  background: var(--color-surface-overlay);
+  padding: 1px var(--spacing-2);
+  border-radius: var(--radius-sm);
   white-space: nowrap;
   max-width: 60px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Modal styles */
-.token-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10000;
-}
-
-.token-modal__content {
-  background: #2a2a2a;
-  border-radius: 8px;
-  min-width: 280px;
-  max-width: 90vw;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-}
-
-.token-modal__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.token-modal__header h3 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #f0f0f0;
-}
-
-.token-modal__close {
-  background: none;
-  border: none;
-  color: #888;
-  cursor: pointer;
-  padding: 4px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.token-modal__close:hover {
-  color: #f0f0f0;
-}
-
-.token-modal__body {
-  padding: 16px;
+/* Form styles for modal content */
+.form-field {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--spacing-2);
 }
 
-.token-modal__field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.token-modal__label {
-  font-size: 11px;
+.form-label {
+  font-size: var(--font-size-sm);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #888;
+  letter-spacing: var(--letter-spacing-label);
+  color: var(--color-text-secondary);
 }
 
-.token-modal__input {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 8px 10px;
-  color: #f0f0f0;
-  font-size: 14px;
+.form-input {
+  background: var(--color-surface-input);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  padding: var(--input-padding);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
   outline: none;
+  transition: border-color var(--transition-normal);
 }
 
-.token-modal__input:focus {
-  border-color: rgba(255, 255, 255, 0.4);
+.form-input:focus {
+  border-color: var(--color-border-focus);
 }
 
-.token-modal__input--color {
+.form-input--color {
   flex: 1;
 }
 
-.token-modal__shapes {
+.option-group {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-4);
   flex-wrap: wrap;
 }
 
-.token-modal__shape-btn {
+.option-btn {
   width: 40px;
   height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.3);
-  color: #888;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-input);
+  color: var(--color-text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all var(--transition-normal);
 }
 
-.token-modal__shape-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #f0f0f0;
-}
-
-.token-modal__shape-btn--active {
-  border-color: rgba(60, 120, 180, 0.8);
-  background: rgba(60, 120, 180, 0.3);
-  color: #a0d0ff;
-}
-
-.token-modal__sizes {
-  display: flex;
-  gap: 8px;
-}
-
-.token-modal__size-btn {
-  width: 40px;
+.option-btn--text {
   height: 32px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.3);
-  color: #888;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
 }
 
-.token-modal__size-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #f0f0f0;
+.option-btn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
 }
 
-.token-modal__size-btn--active {
-  border-color: rgba(60, 120, 180, 0.8);
-  background: rgba(60, 120, 180, 0.3);
-  color: #a0d0ff;
+.option-btn--active {
+  border-color: var(--color-primary-border-active);
+  background: var(--color-info-bg);
+  color: var(--color-info-text);
 }
 
-.token-modal__color-row {
+.color-row {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-4);
   align-items: center;
 }
 
-.token-modal__color-picker {
+.color-picker {
   width: 40px;
-  height: 36px;
+  height: var(--input-height);
   padding: 0;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   background: transparent;
 }
 
-.token-modal__color-picker::-webkit-color-swatch-wrapper {
+.color-picker::-webkit-color-swatch-wrapper {
   padding: 0;
 }
 
-.token-modal__color-picker::-webkit-color-swatch {
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+.color-picker::-webkit-color-swatch {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-default);
 }
 
-.token-modal__footer {
-  padding: 12px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.token-modal__delete {
-  background: rgba(180, 60, 60, 0.3);
-  border: 1px solid rgba(180, 60, 60, 0.5);
-  border-radius: 4px;
-  padding: 6px 12px;
-  color: #e08080;
-  font-size: 12px;
+/* Button styles */
+.btn {
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--spacing-3);
+  transition: background var(--transition-normal);
 }
 
-.token-modal__delete:hover {
-  background: rgba(180, 60, 60, 0.5);
+.btn--primary {
+  background: var(--color-primary-bg);
+  border: 1px solid var(--color-primary-border);
+  padding: var(--btn-padding-sm);
+  color: var(--color-primary-light);
 }
 
-.token-modal__save {
-  background: rgba(60, 120, 180, 0.4);
-  border: 1px solid rgba(60, 120, 180, 0.6);
-  border-radius: 4px;
-  padding: 6px 16px;
-  color: #a0d0ff;
-  font-size: 12px;
-  cursor: pointer;
+.btn--primary:hover {
+  background: var(--color-primary-bg-hover);
 }
 
-.token-modal__save:hover {
-  background: rgba(60, 120, 180, 0.6);
+.btn--danger {
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+  padding: var(--btn-padding-sm);
+  color: var(--color-danger-light);
+}
+
+.btn--danger:hover {
+  background: var(--color-danger-bg-hover);
 }
 </style>

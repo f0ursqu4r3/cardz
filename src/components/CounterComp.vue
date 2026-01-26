@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
-import { Minus, Plus, X, Trash2 } from 'lucide-vue-next'
+import { Minus, Plus, Trash2 } from 'lucide-vue-next'
+import ModalBase from '@/components/ui/ModalBase.vue'
 import type { Counter } from '@/types'
 
 const props = defineProps<{
@@ -22,7 +23,6 @@ const emit = defineEmits<{
 
 const showModal = ref(false)
 const labelInputRef = ref<HTMLInputElement | null>(null)
-const valueInputRef = ref<HTMLInputElement | null>(null)
 
 // Local form state for modal
 const formLabel = ref('')
@@ -78,20 +78,6 @@ const deleteCounter = () => {
   emit('counter:delete', props.counter.id)
 }
 
-const onBackdropClick = (event: MouseEvent) => {
-  if ((event.target as HTMLElement).classList.contains('counter-modal')) {
-    closeModal()
-  }
-}
-
-const onKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Enter') {
-    saveChanges()
-  } else if (event.key === 'Escape') {
-    closeModal()
-  }
-}
-
 defineExpose({ openModal })
 </script>
 
@@ -140,135 +126,118 @@ defineExpose({ openModal })
   </div>
 
   <!-- Counter Properties Modal -->
-  <Teleport to="body">
-    <div v-if="showModal" class="counter-modal" @click="onBackdropClick">
-      <div class="counter-modal__content" @pointerdown.stop>
-        <div class="counter-modal__header">
-          <h3>Counter Properties</h3>
-          <button class="counter-modal__close" @click="closeModal">
-            <X :size="16" />
-          </button>
-        </div>
-        <div class="counter-modal__body">
-          <label class="counter-modal__field">
-            <span class="counter-modal__label">Label</span>
-            <input
-              ref="labelInputRef"
-              v-model="formLabel"
-              type="text"
-              class="counter-modal__input"
-              @keydown="onKeydown"
-            />
-          </label>
-          <label class="counter-modal__field">
-            <span class="counter-modal__label">Value</span>
-            <input
-              ref="valueInputRef"
-              v-model.number="formValue"
-              type="number"
-              class="counter-modal__input"
-              @keydown="onKeydown"
-            />
-          </label>
-          <div class="counter-modal__row">
-            <label class="counter-modal__field counter-modal__field--half">
-              <span class="counter-modal__label">Min (optional)</span>
-              <input
-                v-model.number="formMin"
-                type="number"
-                class="counter-modal__input"
-                placeholder="None"
-                @keydown="onKeydown"
-              />
-            </label>
-            <label class="counter-modal__field counter-modal__field--half">
-              <span class="counter-modal__label">Max (optional)</span>
-              <input
-                v-model.number="formMax"
-                type="number"
-                class="counter-modal__input"
-                placeholder="None"
-                @keydown="onKeydown"
-              />
-            </label>
-          </div>
-          <label class="counter-modal__field">
-            <span class="counter-modal__label">Step</span>
-            <input
-              v-model.number="formStep"
-              type="number"
-              min="1"
-              class="counter-modal__input"
-              @keydown="onKeydown"
-            />
-          </label>
-          <label class="counter-modal__field">
-            <span class="counter-modal__label">Color</span>
-            <div class="counter-modal__color-row">
-              <input v-model="formColor" type="color" class="counter-modal__color-picker" />
-              <input
-                v-model="formColor"
-                type="text"
-                class="counter-modal__input counter-modal__input--color"
-                pattern="^#[0-9a-fA-F]{6}$"
-              />
-            </div>
-          </label>
-        </div>
-        <div class="counter-modal__footer">
-          <button class="counter-modal__delete" @click="deleteCounter">
-            <Trash2 :size="14" />
-            Delete
-          </button>
-          <button class="counter-modal__save" @click="saveChanges">Save</button>
-        </div>
-      </div>
+  <ModalBase v-if="showModal" title="Counter Properties" @close="closeModal">
+    <label class="form-field">
+      <span class="form-label">Label</span>
+      <input
+        ref="labelInputRef"
+        v-model="formLabel"
+        type="text"
+        class="form-input"
+      />
+    </label>
+    <label class="form-field">
+      <span class="form-label">Value</span>
+      <input
+        v-model.number="formValue"
+        type="number"
+        class="form-input"
+      />
+    </label>
+    <div class="form-row">
+      <label class="form-field form-field--half">
+        <span class="form-label">Min (optional)</span>
+        <input
+          v-model.number="formMin"
+          type="number"
+          class="form-input"
+          placeholder="None"
+        />
+      </label>
+      <label class="form-field form-field--half">
+        <span class="form-label">Max (optional)</span>
+        <input
+          v-model.number="formMax"
+          type="number"
+          class="form-input"
+          placeholder="None"
+        />
+      </label>
     </div>
-  </Teleport>
+    <label class="form-field">
+      <span class="form-label">Step</span>
+      <input
+        v-model.number="formStep"
+        type="number"
+        min="1"
+        class="form-input"
+      />
+    </label>
+    <label class="form-field">
+      <span class="form-label">Color</span>
+      <div class="color-row">
+        <input v-model="formColor" type="color" class="color-picker" />
+        <input
+          v-model="formColor"
+          type="text"
+          class="form-input form-input--color"
+          pattern="^#[0-9a-fA-F]{6}$"
+        />
+      </div>
+    </label>
+
+    <template #footer>
+      <button class="btn btn--danger" @click="deleteCounter">
+        <Trash2 :size="14" />
+        Delete
+      </button>
+      <button class="btn btn--primary" @click="saveChanges">Save</button>
+    </template>
+  </ModalBase>
 </template>
 
 <style scoped>
 .counter {
   position: absolute;
-  background: rgba(0, 0, 0, 0.7);
-  border: 2px solid var(--counter-color, #3b82f6);
-  border-radius: 8px;
-  padding: 8px 12px;
+  background: var(--color-surface-300);
+  border: 2px solid var(--counter-color, var(--color-primary));
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4) var(--spacing-6);
   min-width: 80px;
-  color: #f0f0f0;
+  color: var(--color-text-primary);
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-md);
   transition:
-    box-shadow 0.15s ease,
-    transform 0.05s ease;
+    box-shadow var(--transition-normal),
+    transform var(--transition-fast);
 }
 
 .counter--dragging {
   box-shadow:
     0 4px 16px rgba(0, 0, 0, 0.4),
-    0 0 0 2px var(--counter-color, #3b82f6);
-  transition: none; /* Disable transition during drag for smooth movement */
+    0 0 0 2px var(--counter-color, var(--color-primary));
+  transition: none;
 }
 
 .counter--locked {
   box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.3),
-    0 0 12px 2px var(--lock-color, #888);
-  /* Smooth interpolation for remote player drag movements */
+    var(--shadow-md),
+    var(--shadow-glow);
+  --glow-color: var(--lock-color, #888);
   transition:
-    left 0.05s linear,
-    top 0.05s linear,
-    box-shadow 0.15s ease;
+    left var(--transition-fast),
+    top var(--transition-fast),
+    box-shadow var(--transition-normal);
 }
 
 .counter__label {
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #888;
-  margin-bottom: 4px;
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-2);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -281,18 +250,18 @@ defineExpose({ openModal })
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--spacing-4);
   user-select: none;
   -webkit-user-select: none;
 }
 
 .counter__value {
-  font-size: 24px;
-  font-weight: 700;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
   min-width: 40px;
   text-align: center;
-  color: var(--counter-color, #3b82f6);
+  color: var(--counter-color, var(--color-primary));
   user-select: none;
   -webkit-user-select: none;
 }
@@ -301,19 +270,19 @@ defineExpose({ openModal })
   width: 24px;
   height: 24px;
   border: none;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #f0f0f0;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: background 0.15s ease;
+  transition: background var(--transition-normal);
 }
 
 .counter__btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--color-surface-active);
 }
 
 .counter__btn:active:not(:disabled) {
@@ -325,165 +294,103 @@ defineExpose({ openModal })
   cursor: not-allowed;
 }
 
-/* Modal styles */
-.counter-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10000;
-}
-
-.counter-modal__content {
-  background: #2a2a2a;
-  border-radius: 8px;
-  min-width: 280px;
-  max-width: 90vw;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-}
-
-.counter-modal__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.counter-modal__header h3 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #f0f0f0;
-}
-
-.counter-modal__close {
-  background: none;
-  border: none;
-  color: #888;
-  cursor: pointer;
-  padding: 4px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.counter-modal__close:hover {
-  color: #f0f0f0;
-}
-
-.counter-modal__body {
-  padding: 16px;
+/* Form styles for modal content */
+.form-field {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--spacing-2);
 }
 
-.counter-modal__row {
-  display: flex;
-  gap: 12px;
-}
-
-.counter-modal__field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.counter-modal__field--half {
+.form-field--half {
   flex: 1;
 }
 
-.counter-modal__label {
-  font-size: 11px;
+.form-row {
+  display: flex;
+  gap: var(--spacing-6);
+}
+
+.form-label {
+  font-size: var(--font-size-sm);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #888;
+  letter-spacing: var(--letter-spacing-label);
+  color: var(--color-text-secondary);
 }
 
-.counter-modal__input {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 8px 10px;
-  color: #f0f0f0;
-  font-size: 14px;
+.form-input {
+  background: var(--color-surface-input);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  padding: var(--input-padding);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
   outline: none;
+  transition: border-color var(--transition-normal);
 }
 
-.counter-modal__input:focus {
-  border-color: rgba(255, 255, 255, 0.4);
+.form-input:focus {
+  border-color: var(--color-border-focus);
 }
 
-.counter-modal__input--color {
+.form-input--color {
   flex: 1;
 }
 
-.counter-modal__color-row {
+.color-row {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-4);
   align-items: center;
-  user-select: none;
 }
 
-.counter-modal__color-picker {
+.color-picker {
   width: 40px;
-  height: 36px;
+  height: var(--input-height);
   padding: 0;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   background: transparent;
 }
 
-.counter-modal__color-picker::-webkit-color-swatch-wrapper {
+.color-picker::-webkit-color-swatch-wrapper {
   padding: 0;
 }
 
-.counter-modal__color-picker::-webkit-color-swatch {
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+.color-picker::-webkit-color-swatch {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-default);
 }
 
-.counter-modal__footer {
-  padding: 12px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.counter-modal__delete {
-  background: rgba(180, 60, 60, 0.3);
-  border: 1px solid rgba(180, 60, 60, 0.5);
-  border-radius: 4px;
-  padding: 6px 12px;
-  color: #e08080;
-  font-size: 12px;
+/* Button styles */
+.btn {
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--spacing-3);
+  transition: background var(--transition-normal);
 }
 
-.counter-modal__delete:hover {
-  background: rgba(180, 60, 60, 0.5);
+.btn--primary {
+  background: var(--color-primary-bg);
+  border: 1px solid var(--color-primary-border);
+  padding: var(--btn-padding-sm);
+  color: var(--color-primary-light);
 }
 
-.counter-modal__save {
-  background: rgba(60, 120, 180, 0.4);
-  border: 1px solid rgba(60, 120, 180, 0.6);
-  border-radius: 4px;
-  padding: 6px 16px;
-  color: #a0d0ff;
-  font-size: 12px;
-  cursor: pointer;
+.btn--primary:hover {
+  background: var(--color-primary-bg-hover);
 }
 
-.counter-modal__save:hover {
-  background: rgba(60, 120, 180, 0.6);
+.btn--danger {
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+  padding: var(--btn-padding-sm);
+  color: var(--color-danger-light);
+}
+
+.btn--danger:hover {
+  background: var(--color-danger-bg-hover);
 }
 </style>

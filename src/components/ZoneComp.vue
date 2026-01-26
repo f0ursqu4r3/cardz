@@ -7,7 +7,6 @@ import {
   Eye,
   EyeOff,
   Trash2,
-  X,
   Users,
   User,
   EyeClosed,
@@ -18,6 +17,7 @@ import {
   Circle,
   CircleDot,
 } from 'lucide-vue-next'
+import ModalBase from '@/components/ui/ModalBase.vue'
 import { useCardStore } from '@/stores/cards'
 import type { Zone, ZoneLayout } from '@/types'
 
@@ -155,13 +155,6 @@ const deleteZone = () => {
   emit('zone:delete', props.zone.id)
 }
 
-// Close modal on outside click
-const onBackdropClick = (event: MouseEvent) => {
-  if ((event.target as HTMLElement).classList.contains('zone-modal')) {
-    closeModal()
-  }
-}
-
 // Handle double-click to open modal (only if not locked)
 const handleDoubleClick = (event: MouseEvent) => {
   emit('dblclick', event)
@@ -229,213 +222,201 @@ defineExpose({ openModal })
   </div>
 
   <!-- Zone Properties Modal -->
-  <Teleport to="body">
-    <div v-if="showModal" class="zone-modal" @click="onBackdropClick">
-      <div class="zone-modal__content" @pointerdown.stop>
-        <div class="zone-modal__header">
-          <h3>Zone Properties</h3>
-          <button class="zone-modal__close" @click="closeModal">
-            <X :size="16" />
-          </button>
-        </div>
-        <div class="zone-modal__body">
-          <label class="zone-modal__field">
-            <span class="zone-modal__label">Label</span>
-            <input
-              ref="labelInputRef"
-              type="text"
-              class="zone-modal__input"
-              :value="zone.label"
-              @input="onLabelInput"
-              @keydown="onLabelKeydown"
-            />
-          </label>
-          <label class="zone-modal__field zone-modal__field--row">
-            <span class="zone-modal__label">Cards face up</span>
-            <button
-              class="zone-modal__toggle"
-              :class="{ 'zone-modal__toggle--active': zone.faceUp }"
-              @click="toggleFaceUp"
-            >
-              <Eye v-if="zone.faceUp" :size="14" />
-              <EyeOff v-else :size="14" />
-              {{ zone.faceUp ? 'Yes' : 'No' }}
-            </button>
-          </label>
-          <div class="zone-modal__field">
-            <span class="zone-modal__label">Visibility</span>
-            <div class="zone-modal__visibility-options">
-              <button
-                class="zone-modal__visibility-btn"
-                :class="{ 'zone-modal__visibility-btn--active': zone.visibility === 'public' }"
-                @click="setVisibility('public')"
-                title="Everyone can see cards"
-              >
-                <Users :size="14" />
-                Public
-              </button>
-              <button
-                class="zone-modal__visibility-btn"
-                :class="{ 'zone-modal__visibility-btn--active': zone.visibility === 'owner' }"
-                @click="setVisibility('owner')"
-                title="Only you can see cards"
-              >
-                <User :size="14" />
-                Private
-              </button>
-              <button
-                class="zone-modal__visibility-btn"
-                :class="{ 'zone-modal__visibility-btn--active': zone.visibility === 'hidden' }"
-                @click="setVisibility('hidden')"
-                title="No one can see cards"
-              >
-                <EyeClosed :size="14" />
-                Hidden
-              </button>
-            </div>
-          </div>
-          <div class="zone-modal__field">
-            <span class="zone-modal__label">Card Layout</span>
-            <div class="zone-modal__layout-options">
-              <button
-                class="zone-modal__layout-btn"
-                :class="{ 'zone-modal__layout-btn--active': zone.layout === 'stack' }"
-                @click="setLayout('stack')"
-                title="Stack cards on top of each other"
-              >
-                <Layers :size="14" />
-                Stack
-              </button>
-              <button
-                class="zone-modal__layout-btn"
-                :class="{ 'zone-modal__layout-btn--active': zone.layout === 'row' }"
-                @click="setLayout('row')"
-                title="Arrange cards in a row"
-              >
-                <AlignHorizontalJustifyStart :size="14" />
-                Row
-              </button>
-              <button
-                class="zone-modal__layout-btn"
-                :class="{ 'zone-modal__layout-btn--active': zone.layout === 'column' }"
-                @click="setLayout('column')"
-                title="Arrange cards in a column"
-              >
-                <AlignVerticalJustifyStart :size="14" />
-                Column
-              </button>
-              <button
-                class="zone-modal__layout-btn"
-                :class="{ 'zone-modal__layout-btn--active': zone.layout === 'grid' }"
-                @click="setLayout('grid')"
-                title="Arrange cards in a grid"
-              >
-                <Grid3X3 :size="14" />
-                Grid
-              </button>
-              <button
-                class="zone-modal__layout-btn"
-                :class="{ 'zone-modal__layout-btn--active': zone.layout === 'fan' }"
-                @click="setLayout('fan')"
-                title="Fan cards in an arc"
-              >
-                <Circle :size="14" />
-                Fan
-              </button>
-              <button
-                class="zone-modal__layout-btn"
-                :class="{ 'zone-modal__layout-btn--active': zone.layout === 'circle' }"
-                @click="setLayout('circle')"
-                title="Arrange cards in a circle"
-              >
-                <CircleDot :size="14" />
-                Circle
-              </button>
-            </div>
-          </div>
-          <div v-if="zone.layout !== 'stack'" class="zone-modal__field">
-            <span class="zone-modal__label">Card Spacing</span>
-            <div class="zone-modal__slider-row">
-              <span class="zone-modal__slider-label">Tight</span>
-              <input
-                type="range"
-                class="zone-modal__slider"
-                min="0"
-                max="1"
-                step="0.1"
-                :value="zone.cardSettings?.cardSpacing ?? 0.5"
-                @input="onSpacingChange"
-              />
-              <span class="zone-modal__slider-label">Spread</span>
-            </div>
-          </div>
-          <div v-if="zone.layout !== 'stack'" class="zone-modal__field">
-            <span class="zone-modal__label">Random Offset</span>
-            <div class="zone-modal__slider-row">
-              <span class="zone-modal__slider-label">None</span>
-              <input
-                type="range"
-                class="zone-modal__slider"
-                min="0"
-                max="30"
-                step="2"
-                :value="zone.cardSettings?.randomOffset ?? 0"
-                @input="onRandomOffsetChange"
-              />
-              <span class="zone-modal__slider-label">Max</span>
-            </div>
-            <span class="zone-modal__value">{{ zone.cardSettings?.randomOffset ?? 0 }}px</span>
-          </div>
-          <div v-if="zone.layout !== 'stack'" class="zone-modal__field">
-            <span class="zone-modal__label">Random Rotation</span>
-            <div class="zone-modal__slider-row">
-              <span class="zone-modal__slider-label">None</span>
-              <input
-                type="range"
-                class="zone-modal__slider"
-                min="0"
-                max="45"
-                step="5"
-                :value="zone.cardSettings?.randomRotation ?? 0"
-                @input="onRandomRotationChange"
-              />
-              <span class="zone-modal__slider-label">Max</span>
-            </div>
-            <span class="zone-modal__value">±{{ zone.cardSettings?.randomRotation ?? 0 }}°</span>
-          </div>
-          <label class="zone-modal__field zone-modal__field--row">
-            <span class="zone-modal__label">Locked</span>
-            <button
-              class="zone-modal__toggle"
-              :class="{ 'zone-modal__toggle--active': zone.locked }"
-              @click="toggleLocked"
-            >
-              <Lock v-if="zone.locked" :size="14" />
-              <LockOpen v-else :size="14" />
-              {{ zone.locked ? 'Yes' : 'No' }}
-            </button>
-          </label>
-        </div>
-        <div class="zone-modal__footer">
-          <button class="zone-modal__delete" @click="deleteZone">
-            <Trash2 :size="14" />
-            Delete Zone
-          </button>
-        </div>
+  <ModalBase v-if="showModal" title="Zone Properties" @close="closeModal">
+    <label class="form-field">
+      <span class="form-label">Label</span>
+      <input
+        ref="labelInputRef"
+        type="text"
+        class="form-input"
+        :value="zone.label"
+        @input="onLabelInput"
+        @keydown="onLabelKeydown"
+      />
+    </label>
+    <label class="form-field form-field--row">
+      <span class="form-label">Cards face up</span>
+      <button
+        class="toggle-btn"
+        :class="{ 'toggle-btn--active': zone.faceUp }"
+        @click="toggleFaceUp"
+      >
+        <Eye v-if="zone.faceUp" :size="14" />
+        <EyeOff v-else :size="14" />
+        {{ zone.faceUp ? 'Yes' : 'No' }}
+      </button>
+    </label>
+    <div class="form-field">
+      <span class="form-label">Visibility</span>
+      <div class="option-group option-group--stretch">
+        <button
+          class="option-btn option-btn--vertical"
+          :class="{ 'option-btn--active': zone.visibility === 'public' }"
+          @click="setVisibility('public')"
+          title="Everyone can see cards"
+        >
+          <Users :size="14" />
+          Public
+        </button>
+        <button
+          class="option-btn option-btn--vertical"
+          :class="{ 'option-btn--active': zone.visibility === 'owner' }"
+          @click="setVisibility('owner')"
+          title="Only you can see cards"
+        >
+          <User :size="14" />
+          Private
+        </button>
+        <button
+          class="option-btn option-btn--vertical"
+          :class="{ 'option-btn--active': zone.visibility === 'hidden' }"
+          @click="setVisibility('hidden')"
+          title="No one can see cards"
+        >
+          <EyeClosed :size="14" />
+          Hidden
+        </button>
       </div>
     </div>
-  </Teleport>
+    <div class="form-field">
+      <span class="form-label">Card Layout</span>
+      <div class="option-group option-group--wrap">
+        <button
+          class="option-btn option-btn--small"
+          :class="{ 'option-btn--active': zone.layout === 'stack' }"
+          @click="setLayout('stack')"
+          title="Stack cards on top of each other"
+        >
+          <Layers :size="14" />
+          Stack
+        </button>
+        <button
+          class="option-btn option-btn--small"
+          :class="{ 'option-btn--active': zone.layout === 'row' }"
+          @click="setLayout('row')"
+          title="Arrange cards in a row"
+        >
+          <AlignHorizontalJustifyStart :size="14" />
+          Row
+        </button>
+        <button
+          class="option-btn option-btn--small"
+          :class="{ 'option-btn--active': zone.layout === 'column' }"
+          @click="setLayout('column')"
+          title="Arrange cards in a column"
+        >
+          <AlignVerticalJustifyStart :size="14" />
+          Column
+        </button>
+        <button
+          class="option-btn option-btn--small"
+          :class="{ 'option-btn--active': zone.layout === 'grid' }"
+          @click="setLayout('grid')"
+          title="Arrange cards in a grid"
+        >
+          <Grid3X3 :size="14" />
+          Grid
+        </button>
+        <button
+          class="option-btn option-btn--small"
+          :class="{ 'option-btn--active': zone.layout === 'fan' }"
+          @click="setLayout('fan')"
+          title="Fan cards in an arc"
+        >
+          <Circle :size="14" />
+          Fan
+        </button>
+        <button
+          class="option-btn option-btn--small"
+          :class="{ 'option-btn--active': zone.layout === 'circle' }"
+          @click="setLayout('circle')"
+          title="Arrange cards in a circle"
+        >
+          <CircleDot :size="14" />
+          Circle
+        </button>
+      </div>
+    </div>
+    <div v-if="zone.layout !== 'stack'" class="form-field">
+      <span class="form-label">Card Spacing</span>
+      <div class="slider-row">
+        <span class="slider-label">Tight</span>
+        <input
+          type="range"
+          class="slider"
+          min="0"
+          max="1"
+          step="0.1"
+          :value="zone.cardSettings?.cardSpacing ?? 0.5"
+          @input="onSpacingChange"
+        />
+        <span class="slider-label">Spread</span>
+      </div>
+    </div>
+    <div v-if="zone.layout !== 'stack'" class="form-field">
+      <span class="form-label">Random Offset</span>
+      <div class="slider-row">
+        <span class="slider-label">None</span>
+        <input
+          type="range"
+          class="slider"
+          min="0"
+          max="30"
+          step="2"
+          :value="zone.cardSettings?.randomOffset ?? 0"
+          @input="onRandomOffsetChange"
+        />
+        <span class="slider-label">Max</span>
+      </div>
+      <span class="slider-value">{{ zone.cardSettings?.randomOffset ?? 0 }}px</span>
+    </div>
+    <div v-if="zone.layout !== 'stack'" class="form-field">
+      <span class="form-label">Random Rotation</span>
+      <div class="slider-row">
+        <span class="slider-label">None</span>
+        <input
+          type="range"
+          class="slider"
+          min="0"
+          max="45"
+          step="5"
+          :value="zone.cardSettings?.randomRotation ?? 0"
+          @input="onRandomRotationChange"
+        />
+        <span class="slider-label">Max</span>
+      </div>
+      <span class="slider-value">±{{ zone.cardSettings?.randomRotation ?? 0 }}°</span>
+    </div>
+    <label class="form-field form-field--row">
+      <span class="form-label">Locked</span>
+      <button
+        class="toggle-btn"
+        :class="{ 'toggle-btn--active': zone.locked }"
+        @click="toggleLocked"
+      >
+        <Lock v-if="zone.locked" :size="14" />
+        <LockOpen v-else :size="14" />
+        {{ zone.locked ? 'Yes' : 'No' }}
+      </button>
+    </label>
+
+    <template #footer>
+      <button class="btn btn--danger" @click="deleteZone">
+        <Trash2 :size="14" />
+        Delete Zone
+      </button>
+    </template>
+  </ModalBase>
 </template>
 
 <style scoped>
 .zone {
   position: absolute;
   border: 2px dashed rgba(255, 255, 255, 0.7);
-  border-radius: 8px;
-  color: #f0f0f0;
+  border-radius: var(--radius-lg);
+  color: var(--color-text-primary);
   background-color: rgba(0, 0, 0, 0.15);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2) inset;
-  /* Cursor handled by parent .table-view with custom colored cursors */
   cursor: inherit;
   touch-action: none;
 }
@@ -445,38 +426,34 @@ defineExpose({ openModal })
 }
 
 .zone--face-down {
-  border-color: rgba(255, 200, 100, 0.7);
-}
-
-.zone--locked {
-  /* Cursor handled by .table-view custom cursor styles - shows not-allowed for locked zones */
+  border-color: var(--color-warning-border);
 }
 
 .zone--private {
-  border-color: rgba(100, 180, 255, 0.7);
+  border-color: var(--color-info-border);
   background-color: rgba(50, 100, 150, 0.15);
 }
 
 .zone--hidden {
-  border-color: rgba(180, 100, 180, 0.7);
-  background-color: rgba(100, 50, 100, 0.15);
+  border-color: var(--color-special-border);
+  background-color: var(--color-special-bg);
 }
 
 .zone__header {
   position: absolute;
-  top: 4px;
-  left: 4px;
-  right: 4px;
+  top: var(--spacing-2);
+  left: var(--spacing-2);
+  right: var(--spacing-2);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 4px;
+  gap: var(--spacing-2);
   pointer-events: none;
 }
 
 .zone__label {
-  font-size: 10px;
-  letter-spacing: 0.08em;
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
@@ -484,23 +461,23 @@ defineExpose({ openModal })
 }
 
 .zone__count {
-  font-weight: 700;
-  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
   flex-shrink: 0;
 }
 
 .zone__controls {
   position: absolute;
-  bottom: 4px;
-  left: 4px;
+  bottom: var(--spacing-2);
+  left: var(--spacing-2);
   display: flex;
-  gap: 4px;
+  gap: var(--spacing-2);
 }
 
 .zone__controls--locked {
   opacity: 0;
   pointer-events: auto;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--transition-normal);
 }
 
 .zone__controls--locked:hover,
@@ -514,10 +491,10 @@ defineExpose({ openModal })
   height: 20px;
   border: none;
   border-radius: 3px;
-  background: rgba(0, 0, 0, 0.3);
-  color: #f0f0f0;
+  background: var(--color-surface-input);
+  color: var(--color-text-primary);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-size-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -531,25 +508,25 @@ defineExpose({ openModal })
 
 .zone__visibility-indicator {
   position: absolute;
-  bottom: 4px;
-  right: 4px;
+  bottom: var(--spacing-2);
+  right: var(--spacing-2);
   width: 16px;
   height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 3px;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--color-surface-input);
   color: rgba(255, 255, 255, 0.6);
   pointer-events: none;
 }
 
 .zone--private .zone__visibility-indicator {
-  color: rgba(100, 180, 255, 0.8);
+  color: var(--color-info-muted);
 }
 
 .zone--hidden .zone__visibility-indicator {
-  color: rgba(180, 100, 180, 0.8);
+  color: var(--color-special-text);
 }
 
 .zone__resize-handle {
@@ -563,258 +540,191 @@ defineExpose({ openModal })
   border-radius: 0 0 6px 0;
 }
 
-/* Modal styles */
-.zone-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10000;
-}
-
-.zone-modal__content {
-  background: #2a2a2a;
-  border-radius: 8px;
-  min-width: 280px;
-  max-width: 90vw;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-}
-
-.zone-modal__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.zone-modal__header h3 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #f0f0f0;
-}
-
-.zone-modal__close {
-  background: none;
-  border: none;
-  color: #888;
-  cursor: pointer;
-  padding: 4px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.zone-modal__close:hover {
-  color: #f0f0f0;
-}
-
-.zone-modal__body {
-  padding: 16px;
+/* Form styles for modal content */
+.form-field {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--spacing-2);
 }
 
-.zone-modal__field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.zone-modal__field--row {
+.form-field--row {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
 }
 
-.zone-modal__label {
-  font-size: 11px;
+.form-label {
+  font-size: var(--font-size-sm);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #888;
+  letter-spacing: var(--letter-spacing-label);
+  color: var(--color-text-secondary);
 }
 
-.zone-modal__input {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 8px 10px;
-  color: #f0f0f0;
-  font-size: 14px;
+.form-input {
+  background: var(--color-surface-input);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  padding: var(--input-padding);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
   outline: none;
+  transition: border-color var(--transition-normal);
 }
 
-.zone-modal__input:focus {
-  border-color: rgba(255, 255, 255, 0.4);
+.form-input:focus {
+  border-color: var(--color-border-focus);
 }
 
-.zone-modal__toggle {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 6px 12px;
-  color: #888;
-  font-size: 12px;
+.toggle-btn {
+  background: var(--color-surface-input);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-3) var(--spacing-6);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-md);
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--spacing-3);
+  transition: all var(--transition-normal);
 }
 
-.zone-modal__toggle:hover {
+.toggle-btn:hover {
   background: rgba(0, 0, 0, 0.4);
 }
 
-.zone-modal__toggle--active {
-  background: rgba(100, 180, 100, 0.3);
-  border-color: rgba(100, 180, 100, 0.5);
-  color: #a0e0a0;
+.toggle-btn--active {
+  background: var(--color-toggle-active-bg);
+  border-color: var(--color-toggle-active-border);
+  color: var(--color-toggle-active-text);
 }
 
-.zone-modal__visibility-options {
+.option-group {
   display: flex;
-  gap: 8px;
-  margin-top: 4px;
+  gap: var(--spacing-4);
+  margin-top: var(--spacing-2);
 }
 
-.zone-modal__visibility-btn {
+.option-group--stretch {
+  gap: var(--spacing-4);
+}
+
+.option-group--stretch .option-btn {
   flex: 1;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 8px 10px;
-  color: #888;
-  font-size: 11px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  transition: all 0.15s ease;
 }
 
-.zone-modal__visibility-btn:hover {
-  background: rgba(0, 0, 0, 0.4);
-  color: #bbb;
-}
-
-.zone-modal__visibility-btn--active {
-  background: rgba(100, 180, 255, 0.2);
-  border-color: rgba(100, 180, 255, 0.5);
-  color: #a0d0ff;
-}
-
-.zone-modal__footer {
-  padding: 12px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  justify-content: flex-end;
-}
-
-.zone-modal__delete {
-  background: rgba(180, 60, 60, 0.3);
-  border: 1px solid rgba(180, 60, 60, 0.5);
-  border-radius: 4px;
-  padding: 6px 12px;
-  color: #e08080;
-  font-size: 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.zone-modal__delete:hover {
-  background: rgba(180, 60, 60, 0.5);
-}
-
-.zone-modal__layout-options {
-  display: flex;
+.option-group--wrap {
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
+  gap: var(--spacing-3);
 }
 
-.zone-modal__layout-btn {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 6px 10px;
-  color: #888;
-  font-size: 10px;
+.option-btn {
+  background: var(--color-surface-input);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-4) var(--spacing-5);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  transition: all 0.15s ease;
-  min-width: 50px;
+  gap: var(--spacing-2);
+  transition: all var(--transition-normal);
 }
 
-.zone-modal__layout-btn:hover {
+.option-btn--vertical {
+  flex-direction: column;
+}
+
+.option-btn--small {
+  min-width: 50px;
+  padding: var(--spacing-3) var(--spacing-5);
+  font-size: var(--font-size-xs);
+  gap: 3px;
+}
+
+.option-btn:hover {
   background: rgba(0, 0, 0, 0.4);
   color: #bbb;
 }
 
-.zone-modal__layout-btn--active {
-  background: rgba(100, 180, 255, 0.2);
-  border-color: rgba(100, 180, 255, 0.5);
-  color: #a0d0ff;
+.option-btn--active {
+  background: var(--color-info-bg);
+  border-color: var(--color-info-border);
+  color: var(--color-info-text);
 }
 
-.zone-modal__slider-row {
+.slider-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 4px;
+  gap: var(--spacing-4);
+  margin-top: var(--spacing-2);
 }
 
-.zone-modal__slider-label {
-  font-size: 10px;
-  color: #666;
+.slider-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
   min-width: 36px;
 }
 
-.zone-modal__slider-label:last-child {
+.slider-label:last-child {
   text-align: right;
 }
 
-.zone-modal__slider {
+.slider {
   flex: 1;
   height: 4px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 2px;
+  background: var(--color-border-default);
+  border-radius: var(--radius-sm);
   appearance: none;
   cursor: pointer;
 }
 
-.zone-modal__slider::-webkit-slider-thumb {
+.slider::-webkit-slider-thumb {
   appearance: none;
   width: 14px;
   height: 14px;
-  background: #a0d0ff;
-  border-radius: 50%;
+  background: var(--color-info-text);
+  border-radius: var(--radius-full);
   cursor: pointer;
 }
 
-.zone-modal__slider::-moz-range-thumb {
+.slider::-moz-range-thumb {
   width: 14px;
   height: 14px;
-  background: #a0d0ff;
-  border-radius: 50%;
+  background: var(--color-info-text);
+  border-radius: var(--radius-full);
   border: none;
   cursor: pointer;
 }
 
-.zone-modal__value {
-  font-size: 10px;
-  color: #888;
+.slider-value {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
   text-align: center;
-  margin-top: 2px;
+  margin-top: var(--spacing-1);
+}
+
+/* Button styles */
+.btn {
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  transition: background var(--transition-normal);
+}
+
+.btn--danger {
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+  padding: var(--btn-padding-sm);
+  color: var(--color-danger-light);
+}
+
+.btn--danger:hover {
+  background: var(--color-danger-bg-hover);
 }
 </style>
