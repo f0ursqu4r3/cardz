@@ -99,8 +99,8 @@ const lastCursorUpdate = new Map<string, number>()
 
 // Rate limiter for WebSocket messages
 const rateLimiter = new RateLimiter({
-  maxTokens: 100, // Allow burst of 100 messages
-  refillRate: 50, // Refill 50 tokens per second (allows sustained 50 msg/s)
+  maxTokens: 150, // Allow burst of 150 messages
+  refillRate: 100, // Refill 100 tokens per second (handles drag + cursor updates)
   messageCost: 1,
 })
 
@@ -419,11 +419,26 @@ const server = Bun.serve<ClientData>({
         return
       }
 
+      // Determine rate limit cost based on message type
+      // High-frequency position updates are cheaper to allow smooth dragging
+      const messageType = (raw as Record<string, unknown>)?.type as string
+      const LOW_COST_MESSAGES = new Set([
+        'cursor:update',
+        'card:move',
+        'stack:move',
+        'counter:update',
+        'token:update',
+        'die:update',
+        'timer:update',
+        'zone:update',
+      ])
+      const messageCost = LOW_COST_MESSAGES.has(messageType) ? 0.25 : 1
+
       // Rate limiting check
-      if (!rateLimiter.allowMessage(clientData.id)) {
+      if (!rateLimiter.allowMessage(clientData.id, messageCost)) {
         send(socket, {
           type: 'error',
-          originalAction: ((raw as Record<string, unknown>)?.type as string) ?? 'unknown',
+          originalAction: messageType ?? 'unknown',
           code: 'RATE_LIMITED',
           message: 'Too many requests. Please slow down.',
           requestId,

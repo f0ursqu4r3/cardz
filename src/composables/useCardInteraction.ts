@@ -971,6 +971,29 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     if (!drag.isValidPointer(event.pointerId)) return
     drag.updatePending(event, canvasRef)
     drag.schedulePositionUpdate(applyPendingPosition)
+
+    // Broadcast zone position during drag for live updates to other players
+    const now = Date.now()
+    if (now - lastDragBroadcast >= CURSOR_THROTTLE_MS) {
+      lastDragBroadcast = now
+      const { x, y } = drag.getPending()
+
+      // Broadcast cursor position during zone drag
+      options.onCursorMove?.(x, y)
+
+      // Broadcast zone position during zone drag/resize
+      if (drag.target.value?.type === 'zone' || drag.target.value?.type === 'zone-resize') {
+        const zoneId = drag.target.value.zoneId
+        const zone = cardStore.getZoneById(zoneId)
+        if (zone) {
+          send({
+            type: 'zone:update',
+            zoneId: zone.id,
+            updates: { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
+          })
+        }
+      }
+    }
   }
 
   const onZonePointerUp = (event: PointerEvent) => {

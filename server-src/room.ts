@@ -515,6 +515,16 @@ export class RoomManager {
     // Generate a new stable playerId for new players
     const newPlayerId = stablePlayerId || nanoid()
 
+    // Determine role - restore creator role if this player is the original creator
+    let role: 'creator' | 'member' | 'spectator'
+    if (asSpectator) {
+      role = 'spectator'
+    } else if (newPlayerId === room.creatorPlayerId) {
+      role = 'creator'
+    } else {
+      role = 'member'
+    }
+
     // Assign next available color
     const usedColors = new Set([...room.players.values()].map((p) => p.color))
     const availableColor = PLAYER_COLORS.find((c) => !usedColors.has(c)) ?? PLAYER_COLORS[0]
@@ -525,7 +535,7 @@ export class RoomManager {
       connected: true,
       color: availableColor,
       sessionId,
-      role: asSpectator ? 'spectator' : 'member',
+      role,
     }
 
     room.players.set(newPlayerId, player)
