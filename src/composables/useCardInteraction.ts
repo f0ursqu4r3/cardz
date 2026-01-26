@@ -380,6 +380,7 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
 
     // If clicking on a selected card, drag the entire selection
     if (card && cardStore.isSelected(card.id)) {
+      event.stopPropagation() // Prevent canvas from clearing selection
       const { x, y } = drag.getPending()
       selectionDragStart.value = { x, y }
       startSelectionDrag(index)
