@@ -323,12 +323,14 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       target,
     )
 
-    // Store initial positions for all selected cards
+    // Store initial positions for all selected cards and lock them
     selectionStartPositions.value = new Map()
     cardStore.getSelectedIds().forEach((id) => {
       const c = cardStore.getCardById(id)
       if (c) {
         selectionStartPositions.value.set(id, { x: c.x, y: c.y })
+        // Lock each selected card so other players see the grab
+        send({ type: 'card:lock', cardId: id })
       }
     })
 
@@ -642,6 +644,16 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
           })
         }
       }
+
+      // Broadcast all selected card positions during selection drag
+      if (drag.target.value?.type === 'selection') {
+        selectionStartPositions.value.forEach((_, id) => {
+          const card = cardStore.getCardById(id)
+          if (card) {
+            send({ type: 'card:move', cardId: card.id, x: card.x, y: card.y })
+          }
+        })
+      }
     }
   }
 
@@ -789,6 +801,11 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
           }
         })
       }
+
+      // Unlock all cards in the selection
+      draggedIds.forEach((id) => {
+        send({ type: 'card:unlock', cardId: id })
+      })
 
       selectionStartPositions.value.clear()
       selectionDragStart.value = null
