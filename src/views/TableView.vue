@@ -15,6 +15,7 @@ import TableButton from '@/components/ui/TableButton.vue'
 import TableSettingsPanel from '@/components/ui/TableSettingsPanel.vue'
 import PlayersPanel from '@/components/ui/PlayersPanel.vue'
 import ChatPanel from '@/components/ui/ChatPanel.vue'
+import ActivityPanel from '@/components/ui/ActivityPanel.vue'
 import InstructionsPanel from '@/components/ui/InstructionsPanel.vue'
 import RadialMenu from '@/components/ui/RadialMenu.vue'
 import { useCardStore } from '@/stores/cards'
@@ -70,6 +71,7 @@ const codeCopied = ref(false)
 const showSettings = ref(false)
 const showPlayers = ref(false)
 const showChat = ref(false)
+const showActivity = ref(false)
 const showInstructions = ref(false)
 const editingZoneId = ref<number | null>(null)
 
@@ -922,7 +924,7 @@ onBeforeUnmount(() => {
           :canvas-height="canvasDimensions.height"
         />
 
-        <TablePanel class="table-ui__add-panel" title="Add Item" column>
+        <TablePanel class="table-ui__add-panel" title="Add Item">
           <TableButton title="Add Zone" @click="addZone">
             <SquarePlus />
           </TableButton>
@@ -1126,15 +1128,24 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- Chat Panel -->
-    <ChatPanel
-      v-if="ws.isConnected.value"
-      :messages="ws.chatMessages.value"
-      :typing-players="ws.typingPlayers.value"
-      v-model:is-open="showChat"
-      @send="ws.sendChat"
-      @typing="ws.sendTyping"
-    />
+    <!-- Top-left panels container -->
+    <div v-if="ws.isConnected.value" class="panels-container-top-left">
+      <ActivityPanel
+        :entries="ws.activityLog.value"
+        v-model:is-open="showActivity"
+      />
+    </div>
+
+    <!-- Bottom-right panels container -->
+    <div v-if="ws.isConnected.value" class="panels-container-bottom-right">
+      <ChatPanel
+        :messages="ws.chatMessages.value"
+        :typing-players="ws.typingPlayers.value"
+        v-model:is-open="showChat"
+        @send="ws.sendChat"
+        @typing="ws.sendTyping"
+      />
+    </div>
 
     <!-- Instructions Panel -->
     <InstructionsPanel v-model:is-open="showInstructions" />
@@ -1336,11 +1347,15 @@ onBeforeUnmount(() => {
   z-index: 2500;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 0.5rem;
 }
 
 .table-ui__add-panel {
   margin-top: 0.5rem;
+  flex-wrap: wrap;
+  width: 0;
+  min-width: 100%;
 }
 
 .world {
@@ -1454,5 +1469,27 @@ onBeforeUnmount(() => {
   font-weight: 500;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   z-index: 200;
+}
+
+.panels-container-top-left {
+  position: fixed;
+  top: 4rem;
+  left: 1rem;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.5rem;
+  z-index: 100;
+}
+
+.panels-container-bottom-right {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 0.5rem;
+  z-index: 100;
 }
 </style>

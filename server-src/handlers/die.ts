@@ -2,6 +2,7 @@ import type { DieCreate, DieRoll, DieUpdate, DieDelete, DieLock, DieUnlock } fro
 import type { Room } from '../room'
 import type { GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
+import { logDieRolled } from '../activity'
 
 export function handleDieCreate(
   ws: GenericWebSocket,
@@ -70,6 +71,9 @@ export function handleDieRoll(
     value: result.value,
     playerId: clientData.id,
   })
+
+  // Log activity (sides defaults to 6 for standard dice)
+  logDieRolled(clients, room.code, clientData.playerId ?? clientData.id, clientData.name, die.sides ?? 6, result.value)
 }
 
 export function handleDieUpdate(

@@ -159,6 +159,7 @@ export const RoomJoinSchema = z.object({
   playerName: z.string().min(1).max(32),
   sessionId: z.string().optional(),
   deviceId: z.string().uuid().optional(),
+  asSpectator: z.boolean().optional(),
 })
 
 export const RoomLeaveSchema = z.object({

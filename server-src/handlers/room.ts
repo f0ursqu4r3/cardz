@@ -6,6 +6,7 @@ import { loadChatMessages } from '../persistence'
 import { sanitizePlayerName, sanitizeTableName } from '../utils/sanitize'
 import { createSessionToken, verifySessionToken } from '../utils/session'
 import { trackTableCreated } from '../analytics'
+import { logPlayerJoined, logPlayerLeft, logPlayerSpectating, getActivityHistory } from '../activity'
 
 export function handleRoomCreate(
   ws: GenericWebSocket,
@@ -129,6 +130,7 @@ export function handleRoomJoin(
     playerName,
     verifiedPlayerId ? msg.sessionId : undefined, // session token
     verifiedPlayerId, // stable player ID from verified token
+    msg.asSpectator, // join as spectator
   )
 
   if ('error' in result) {
@@ -198,6 +200,15 @@ export function handleRoomJoin(
     })
   }
 
+  // Send activity history
+  const activityHistory = getActivityHistory(room.code)
+  if (activityHistory.length > 0) {
+    send(ws, {
+      type: 'activity:history',
+      entries: activityHistory,
+    })
+  }
+
   // Notify others: use player_reconnected for reconnections, player_joined for new joins
   if (isReconnect) {
     broadcastToRoom(
@@ -219,6 +230,13 @@ export function handleRoomJoin(
       },
       clientData.id, // Exclude by socket ID
     )
+
+    // Log player join activity (spectator or regular)
+    if (player.role === 'spectator') {
+      logPlayerSpectating(roomManager.getClients(), room.code, playerId, playerName)
+    } else {
+      logPlayerJoined(roomManager.getClients(), room.code, playerId, playerName)
+    }
   }
 }
 
@@ -227,13 +245,20 @@ export function handleRoomLeave(ws: GenericWebSocket, roomManager: RoomManager):
 
   if (!clientData.roomCode || !clientData.playerId) return
 
-  const room = roomManager.leaveRoom(clientData.playerId, clientData.roomCode)
+  const roomCode = clientData.roomCode
+  const playerId = clientData.playerId
+  const playerName = clientData.name || 'Player'
+
+  const room = roomManager.leaveRoom(playerId, roomCode)
 
   if (room) {
     broadcastToRoom(roomManager.getClients(), room.code, {
       type: 'room:player_left',
-      playerId: clientData.playerId,
+      playerId,
     })
+
+    // Log player left activity
+    logPlayerLeft(roomManager.getClients(), roomCode, playerId, playerName)
   }
 
   clientData.roomCode = null

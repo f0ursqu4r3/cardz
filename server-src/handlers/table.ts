@@ -8,6 +8,7 @@ import type { RoomManager } from '../room'
 import type { GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
 import { sanitizeTableName } from '../utils/sanitize'
+import { logTableReset, logSettingsChanged } from '../activity'
 
 /**
  * Handle table reset request
@@ -64,6 +65,9 @@ export function handleTableReset(
     state: newState,
   })
 
+  // Log activity
+  logTableReset(roomManager.getClients(), clientData.roomCode, clientData.playerId ?? clientData.id, clientData.name)
+
   console.log(`[table:reset] Table ${clientData.roomCode} reset by ${clientData.name}`)
 }
 
@@ -119,6 +123,10 @@ export function handleTableUpdateSettings(
     settings,
     playerId: clientData.id,
   })
+
+  // Log activity - describe what setting changed
+  const changedSettings = Object.keys(msg.settings).join(', ')
+  logSettingsChanged(roomManager.getClients(), clientData.roomCode, clientData.playerId ?? clientData.id, clientData.name, changedSettings)
 
   console.log(
     `[table:settings] Table ${clientData.roomCode} settings updated by ${clientData.name}`,

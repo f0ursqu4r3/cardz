@@ -212,10 +212,7 @@ onUnmounted(() => {
 
 <style scoped>
 .chat {
-  position: fixed;
-  bottom: 1rem;
-  right: 1rem;
-  z-index: 100;
+  position: relative;
 }
 
 .chat__toggle {
@@ -266,9 +263,6 @@ onUnmounted(() => {
 }
 
 .chat__panel {
-  position: absolute;
-  bottom: 0;
-  right: 0;
   width: 320px;
   max-height: 450px;
   background: rgba(30, 30, 40, 0.95);

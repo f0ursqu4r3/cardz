@@ -10,6 +10,7 @@ import type { Room } from '../room'
 import type { GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
 import { sanitizeZoneLabel } from '../utils/sanitize'
+import { logCounterChanged } from '../activity'
 
 export function handleCounterCreate(
   ws: GenericWebSocket,
@@ -128,6 +129,10 @@ export function handleCounterIncrement(
     return
   }
 
+  // Store old value for activity logging
+  const oldValue = counter.value
+  const counterName = counter.label
+
   const result = gameState.incrementCounter(msg.counterId, msg.delta)
   if (!result) return
 
@@ -146,6 +151,9 @@ export function handleCounterIncrement(
     value: result.value,
     playerId: clientData.id,
   })
+
+  // Log activity
+  logCounterChanged(clients, room.code, clientData.playerId ?? clientData.id, clientData.name, counterName, oldValue, result.value)
 }
 
 export function handleCounterDelete(

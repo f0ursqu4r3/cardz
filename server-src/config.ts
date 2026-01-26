@@ -17,12 +17,7 @@ function loadEnvFiles(): void {
 
   const nodeEnv = process.env.NODE_ENV || 'development'
 
-  const envFiles = [
-    '.env',
-    '.env.local',
-    `.env.${nodeEnv}`,
-    `.env.${nodeEnv}.local`,
-  ]
+  const envFiles = ['.env', '.env.local', `.env.${nodeEnv}`, `.env.${nodeEnv}.local`]
 
   for (const file of envFiles) {
     const filePath = join(projectRoot, file)
@@ -40,7 +35,10 @@ function loadEnvFiles(): void {
         let value = trimmed.slice(eqIndex + 1).trim()
 
         // Remove surrounding quotes if present
-        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        if (
+          (value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))
+        ) {
           value = value.slice(1, -1)
         }
 
@@ -123,7 +121,7 @@ function loadConfig(): Config {
     dataDir: process.env.DATA_DIR,
     sessionSecret: process.env.SESSION_SECRET,
     nodeEnv: process.env.NODE_ENV,
-    adminPassword: process.env.ADMIN_PASSWORD,
+    adminPassword: process.env.VITE_ADMIN_PASSWORD,
   }
 
   const result = configSchema.safeParse(raw)
@@ -149,7 +147,11 @@ export function logConfigSummary(): void {
   console.log(`  Environment: ${config.nodeEnv}`)
   console.log(`  Static dir: ${config.staticDir}`)
   console.log(`  Data dir: ${config.dataDir}`)
-  console.log(`  Allowed origins: ${config.allowedOrigins?.join(', ') ?? '(development mode - all origins)'}`)
+  console.log(
+    `  Allowed origins: ${config.allowedOrigins?.join(', ') ?? '(development mode - all origins)'}`,
+  )
   console.log(`  Session secret: ${config.sessionSecret ? '[configured]' : '[auto-generated]'}`)
-  console.log(`  Admin dashboard: ${config.adminPassword ? '[enabled]' : '[disabled - set ADMIN_PASSWORD to enable]'}`)
+  console.log(
+    `  Admin dashboard: ${config.adminPassword ? '[enabled]' : '[disabled - set VITE_ADMIN_PASSWORD to enable]'}`,
+  )
 }

@@ -264,10 +264,13 @@ const server = Bun.serve<ClientData>({
     if (url.pathname === '/admin') {
       // Check if admin password is configured
       if (!config.adminPassword) {
-        return new Response('Admin dashboard not enabled. Set ADMIN_PASSWORD environment variable.', {
-          status: 503,
-          headers: getSecurityHeaders(),
-        })
+        return new Response(
+          'Admin dashboard not enabled. Set VITE_ADMIN_PASSWORD environment variable.',
+          {
+            status: 503,
+            headers: getSecurityHeaders(),
+          },
+        )
       }
 
       // Check basic auth
@@ -418,7 +421,7 @@ const server = Bun.serve<ClientData>({
       if (!rateLimiter.allowMessage(clientData.id)) {
         send(socket, {
           type: 'error',
-          originalAction: (raw as Record<string, unknown>)?.type as string ?? 'unknown',
+          originalAction: ((raw as Record<string, unknown>)?.type as string) ?? 'unknown',
           code: 'RATE_LIMITED',
           message: 'Too many requests. Please slow down.',
           requestId,
@@ -431,7 +434,7 @@ const server = Bun.serve<ClientData>({
       if (!result.success) {
         send(socket, {
           type: 'error',
-          originalAction: (raw as Record<string, unknown>)?.type as string ?? 'unknown',
+          originalAction: ((raw as Record<string, unknown>)?.type as string) ?? 'unknown',
           code: 'INVALID_ACTION',
           message: result.error.issues[0]?.message ?? 'Invalid message',
           requestId,
@@ -495,6 +498,29 @@ const server = Bun.serve<ClientData>({
         }
 
         const clients = roomManager.getClients()
+
+        // Block game actions for spectators (allow chat, cursor, viewport updates)
+        const spectatorAllowedActions = [
+          'chat:send',
+          'chat:typing',
+          'cursor:update',
+          'viewport:update',
+          'state:request',
+        ]
+        if (
+          clientData.playerId &&
+          roomManager.isSpectator(clientData.roomCode, clientData.playerId) &&
+          !spectatorAllowedActions.includes(msg.type)
+        ) {
+          send(socket, {
+            type: 'error',
+            originalAction: msg.type,
+            code: 'SPECTATOR_READONLY',
+            message: 'Spectators cannot perform this action',
+            requestId,
+          })
+          return
+        }
 
         // Route to appropriate handler
         switch (msg.type) {
@@ -866,7 +892,7 @@ heartbeatManager.setTimeoutCallback((clientId) => {
     console.log(`[heartbeat] Closing timed-out connection for ${clientId}`)
     // Close with code 4000 to indicate heartbeat timeout
     try {
-      (ws as ServerWebSocket<ClientData>).close(4000, 'Heartbeat timeout')
+      ;(ws as ServerWebSocket<ClientData>).close(4000, 'Heartbeat timeout')
     } catch {
       // Connection may already be closed
     }

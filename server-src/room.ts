@@ -308,6 +308,7 @@ export class RoomManager {
    * @param playerName - The player's display name
    * @param sessionId - Optional session token for reconnection
    * @param stablePlayerId - Optional verified player ID from session token
+   * @param asSpectator - Whether to join as a view-only spectator
    */
   loadOrCreateRoom(
     roomCode: string,
@@ -315,6 +316,7 @@ export class RoomManager {
     playerName: string,
     sessionId?: string,
     stablePlayerId?: string,
+    asSpectator?: boolean,
   ):
     | { room: Room; player: Player; isReconnect: boolean; loaded: boolean; playerId: string }
     | { error: 'NOT_FOUND' | 'FULL' } {
@@ -322,7 +324,7 @@ export class RoomManager {
     const existingRoom = this.rooms.get(roomCode)
     if (existingRoom) {
       // Use normal join flow
-      const result = this.joinRoom(roomCode, socketId, playerName, sessionId, stablePlayerId)
+      const result = this.joinRoom(roomCode, socketId, playerName, sessionId, stablePlayerId, asSpectator)
       if ('error' in result) return result
       return { ...result, loaded: false }
     }
@@ -336,23 +338,30 @@ export class RoomManager {
     // Generate a stable player ID for the first person to load this persisted room
     const playerId = stablePlayerId || nanoid()
 
-    // Check if this player is the original creator
-    // For legacy tables without creatorPlayerId, first person to load becomes creator
-    const isLegacyTable = !persisted.metadata.creatorPlayerId
-    const isOriginalCreator = isLegacyTable || playerId === persisted.metadata.creatorPlayerId
+    // Determine the role for this player
+    let role: 'creator' | 'member' | 'spectator'
+    if (asSpectator) {
+      role = 'spectator'
+    } else {
+      // Check if this player is the original creator
+      // For legacy tables without creatorPlayerId, first person to load becomes creator
+      const isLegacyTable = !persisted.metadata.creatorPlayerId
+      const isOriginalCreator = isLegacyTable || playerId === persisted.metadata.creatorPlayerId
+      role = isOriginalCreator ? 'creator' : 'member'
+    }
 
-    // For legacy tables, set the creatorPlayerId to this player
-    const creatorPlayerId = isLegacyTable ? playerId : persisted.metadata.creatorPlayerId
+    // For legacy tables, set the creatorPlayerId to this player (only if not spectator)
+    const isLegacyTable = !persisted.metadata.creatorPlayerId
+    const creatorPlayerId = isLegacyTable && !asSpectator ? playerId : persisted.metadata.creatorPlayerId
 
     // Recreate the room from persisted data
-    // Only the original creator gets the creator role
     const player: Player = {
       id: playerId,
       name: playerName,
       connected: true,
       color: PLAYER_COLORS[0],
       sessionId,
-      role: isOriginalCreator ? 'creator' : 'member',
+      role,
     }
 
     const room: Room = {
@@ -375,8 +384,10 @@ export class RoomManager {
     // Update socket mapping
     this.updateSocketMapping(socketId, playerId)
 
-    // Create hand for the player
-    room.gameState.getOrCreateHand(playerId)
+    // Create hand for the player (not for spectators)
+    if (!asSpectator) {
+      room.gameState.getOrCreateHand(playerId)
+    }
 
     // Track session for reconnection
     if (sessionId) {
@@ -408,12 +419,23 @@ export class RoomManager {
   }
 
   /**
+   * Check if a player is a spectator
+   */
+  isSpectator(roomCode: string, playerId: string): boolean {
+    const room = this.rooms.get(roomCode)
+    if (!room) return false
+    const player = room.players.get(playerId)
+    return player?.role === 'spectator'
+  }
+
+  /**
    * Join an existing room
    * @param roomCode - The room code to join
    * @param socketId - The WebSocket connection ID (for routing)
    * @param playerName - The player's display name
    * @param sessionId - Optional session token for reconnection
    * @param stablePlayerId - Optional verified player ID from session token (for reconnection)
+   * @param asSpectator - Whether to join as a view-only spectator
    */
   joinRoom(
     roomCode: string,
@@ -421,6 +443,7 @@ export class RoomManager {
     playerName: string,
     sessionId?: string,
     stablePlayerId?: string,
+    asSpectator?: boolean,
   ): { room: Room; player: Player; isReconnect: boolean; playerId: string } | { error: 'NOT_FOUND' | 'FULL' } {
     const room = this.rooms.get(roomCode)
     if (!room) {
@@ -451,8 +474,11 @@ export class RoomManager {
       }
     }
 
-    // Check if room is full (8 players max)
-    if (room.players.size >= 8) {
+    // Count non-spectator players for the limit check
+    const playerCount = [...room.players.values()].filter((p) => p.role !== 'spectator').length
+
+    // Check if room is full (8 players max, spectators don't count)
+    if (!asSpectator && playerCount >= 8) {
       return { error: 'FULL' }
     }
 
@@ -469,7 +495,7 @@ export class RoomManager {
       connected: true,
       color: availableColor,
       sessionId,
-      role: 'member',
+      role: asSpectator ? 'spectator' : 'member',
     }
 
     room.players.set(newPlayerId, player)
@@ -477,8 +503,10 @@ export class RoomManager {
     // Update socket mapping
     this.updateSocketMapping(socketId, newPlayerId)
 
-    // Create hand for new player
-    room.gameState.getOrCreateHand(newPlayerId)
+    // Create hand for new player (not for spectators)
+    if (!asSpectator) {
+      room.gameState.getOrCreateHand(newPlayerId)
+    }
 
     // Track session for reconnection
     if (sessionId) {

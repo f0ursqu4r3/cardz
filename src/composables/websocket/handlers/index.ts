@@ -18,6 +18,7 @@ export {
   handleStateSyncMessage,
   handleChatMessage,
   handleErrorMessage,
+  handleActivityMessage,
   type RoomStateRefs,
   type RoomHandlerCallbacks,
 } from './roomHandlers'

@@ -2,6 +2,7 @@ import type { TimerCreate, TimerStart, TimerPause, TimerReset, TimerUpdate, Time
 import type { Room } from '../room'
 import type { GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
+import { logTimerStarted, logTimerStopped } from '../activity'
 
 export function handleTimerCreate(
   ws: GenericWebSocket,
@@ -80,6 +81,9 @@ export function handleTimerStart(
     startedAt: result.startedAt,
     playerId: clientData.id,
   })
+
+  // Log activity
+  logTimerStarted(clients, room.code, clientData.playerId ?? clientData.id, clientData.name, timer.label ?? 'Timer')
 }
 
 export function handleTimerPause(
@@ -130,6 +134,9 @@ export function handleTimerPause(
     elapsedMs: result.elapsedMs,
     playerId: clientData.id,
   })
+
+  // Log activity (timer stopped/paused)
+  logTimerStopped(clients, room.code, clientData.playerId ?? clientData.id, clientData.name, timer.label ?? 'Timer')
 }
 
 export function handleTimerReset(

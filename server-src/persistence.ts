@@ -127,6 +127,25 @@ function getDb(): Database {
     CREATE INDEX IF NOT EXISTS idx_analytics_name_time ON analytics (metric_name, recorded_at DESC)
   `)
 
+  // Create activity_log table for recording player actions
+  db.run(`
+    CREATE TABLE IF NOT EXISTS activity_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_code TEXT NOT NULL,
+      player_id TEXT,
+      player_name TEXT,
+      action_type TEXT NOT NULL,
+      action_data TEXT,
+      timestamp INTEGER NOT NULL,
+      FOREIGN KEY (room_code) REFERENCES tables(code) ON DELETE CASCADE
+    )
+  `)
+
+  // Create index for loading activity by room
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_activity_room_time ON activity_log (room_code, timestamp DESC)
+  `)
+
   console.log(`[persistence] SQLite database initialized at ${DB_PATH}`)
 
   return db
@@ -774,6 +793,138 @@ export function cleanupOldAnalytics(maxAgeMs: number = 30 * 24 * 60 * 60 * 1000)
     return result.changes
   } catch (err) {
     console.error(`[persistence] Failed to cleanup old analytics:`, err)
+    return 0
+  }
+}
+
+// ============================================================================
+// Activity Log Persistence
+// ============================================================================
+
+import type { ActivityType, ActivityLogEntry } from '../shared/types'
+
+export interface PersistedActivityEntry {
+  roomCode: string
+  playerId: string | null
+  playerName: string | null
+  actionType: ActivityType
+  actionData?: Record<string, unknown>
+  timestamp: number
+}
+
+/**
+ * Save an activity log entry to the database
+ */
+export function saveActivityLog(entry: PersistedActivityEntry): number | null {
+  try {
+    const database = getDb()
+
+    const stmt = database.prepare(`
+      INSERT INTO activity_log (room_code, player_id, player_name, action_type, action_data, timestamp)
+      VALUES ($room_code, $player_id, $player_name, $action_type, $action_data, $timestamp)
+    `)
+
+    const result = stmt.run({
+      $room_code: entry.roomCode,
+      $player_id: entry.playerId,
+      $player_name: entry.playerName,
+      $action_type: entry.actionType,
+      $action_data: entry.actionData ? JSON.stringify(entry.actionData) : null,
+      $timestamp: entry.timestamp,
+    })
+
+    return Number(result.lastInsertRowid)
+  } catch (err) {
+    console.error(`[persistence] Failed to save activity log in room ${entry.roomCode}:`, err)
+    return null
+  }
+}
+
+/**
+ * Load recent activity log entries for a room
+ * @param roomCode The room code
+ * @param limit Maximum number of entries to load (default 100)
+ */
+export function loadActivityLog(roomCode: string, limit: number = 100): ActivityLogEntry[] {
+  const database = getDb()
+
+  const stmt = database.prepare(`
+    SELECT id, player_id, player_name, action_type, action_data, timestamp
+    FROM activity_log
+    WHERE room_code = $room_code
+    ORDER BY timestamp DESC
+    LIMIT $limit
+  `)
+
+  const rows = stmt.all({ $room_code: roomCode, $limit: limit }) as {
+    id: number
+    player_id: string | null
+    player_name: string | null
+    action_type: string
+    action_data: string | null
+    timestamp: number
+  }[]
+
+  // Return in chronological order (oldest first)
+  return rows
+    .map((row) => ({
+      id: row.id,
+      playerId: row.player_id,
+      playerName: row.player_name,
+      actionType: row.action_type as ActivityType,
+      actionData: row.action_data ? JSON.parse(row.action_data) : undefined,
+      timestamp: row.timestamp,
+    }))
+    .reverse()
+}
+
+/**
+ * Delete all activity log entries for a room
+ */
+export function deleteActivityLog(roomCode: string): void {
+  const database = getDb()
+  const stmt = database.prepare('DELETE FROM activity_log WHERE room_code = ?')
+  stmt.run(roomCode)
+}
+
+/**
+ * Clean up old activity log entries, keeping only the most recent per room
+ * @param maxPerRoom Maximum entries to keep per room (default 500)
+ */
+export function cleanupActivityLog(maxPerRoom: number = 500): number {
+  try {
+    const database = getDb()
+
+    // Get all room codes with activity
+    const roomsStmt = database.prepare(`
+      SELECT DISTINCT room_code FROM activity_log
+    `)
+    const rooms = roomsStmt.all() as { room_code: string }[]
+
+    let totalDeleted = 0
+    for (const { room_code } of rooms) {
+      // Delete entries older than the Nth most recent
+      const deleteStmt = database.prepare(`
+        DELETE FROM activity_log
+        WHERE room_code = $room_code
+        AND id NOT IN (
+          SELECT id FROM activity_log
+          WHERE room_code = $room_code
+          ORDER BY timestamp DESC
+          LIMIT $limit
+        )
+      `)
+      const result = deleteStmt.run({ $room_code: room_code, $limit: maxPerRoom })
+      totalDeleted += result.changes
+    }
+
+    if (totalDeleted > 0) {
+      console.log(`[persistence] Cleaned up ${totalDeleted} old activity log entries`)
+    }
+
+    return totalDeleted
+  } catch (err) {
+    console.error(`[persistence] Failed to cleanup activity log:`, err)
     return 0
   }
 }

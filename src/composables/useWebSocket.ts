@@ -6,6 +6,7 @@ import type {
   Player,
   TableSettings,
   ChatMessage,
+  ActivityLogEntry,
   Pong,
 } from '../../shared/types'
 import {
@@ -19,6 +20,7 @@ import {
   handleStateSyncMessage,
   handleChatMessage,
   handleErrorMessage,
+  handleActivityMessage,
   type GameStateRefs,
   type RoomStateRefs,
 } from './websocket/handlers'
@@ -50,6 +52,7 @@ export interface UseWebSocketReturn {
   cursors: Ref<Map<string, { x: number; y: number; state: 'default' | 'grab' | 'grabbing' }>>
   chatMessages: Ref<ChatMessage[]>
   typingPlayers: Ref<Map<string, string>> // playerId -> playerName
+  activityLog: Ref<ActivityLogEntry[]>
 
   // Table settings
   tableSettings: Ref<TableSettings>
@@ -179,6 +182,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
   >(new Map())
   const chatMessages = ref<ChatMessage[]>([])
   const typingPlayers = ref<Map<string, string>>(new Map())
+  const activityLog = ref<ActivityLogEntry[]>([])
 
   // Table settings
   const tableSettings = ref<TableSettings>({ background: 'green-felt' })
@@ -277,6 +281,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     cursors.value.clear()
     chatMessages.value = []
     typingPlayers.value.clear()
+    activityLog.value = []
     tableSettings.value = { background: 'green-felt' }
     tableName.value = ''
     tableIsPublic.value = false
@@ -329,6 +334,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     cursors.value.clear()
     chatMessages.value = []
     typingPlayers.value.clear()
+    activityLog.value = []
     tableSettings.value = { background: 'green-felt' }
     tableName.value = ''
     tableIsPublic.value = false
@@ -395,6 +401,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
       tableIsPublic,
       chatMessages,
       typingPlayers,
+      activityLog,
     }
 
     const roomCallbacks = {
@@ -429,6 +436,9 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     // Chat
     if (handleChatMessage(message, roomStateRefs)) return
 
+    // Activity log
+    if (handleActivityMessage(message, roomStateRefs)) return
+
     // Errors
     if (handleErrorMessage(message, roomStateRefs)) return
   }
@@ -459,6 +469,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     cursors,
     chatMessages,
     typingPlayers,
+    activityLog,
     tableSettings,
     tableName,
     tableIsPublic,

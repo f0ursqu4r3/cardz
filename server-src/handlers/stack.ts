@@ -12,8 +12,9 @@ import type {
   StackReorder,
 } from '../../shared/types'
 import type { Room } from '../room'
-import type { GenericWebSocket } from '../utils/broadcast'
+import type { ClientData, GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom, broadcastToViewport, getClientData } from '../utils/broadcast'
+import { logStackCreated, logStackShuffled, logStackFlipped } from '../activity'
 
 export function handleStackCreate(
   ws: GenericWebSocket,
@@ -90,6 +91,9 @@ export function handleStackCreate(
     },
     { x: msg.anchorX, y: msg.anchorY },
   )
+
+  // Log activity
+  logStackCreated(clients, room.code, clientData.playerId ?? clientData.id, clientData.name, msg.cardIds.length)
 }
 
 export function handleStackMove(
@@ -488,6 +492,9 @@ export function handleStackShuffle(
     },
     { x: stack.anchorX, y: stack.anchorY },
   )
+
+  // Log activity
+  logStackShuffled(clients, room.code, clientData.playerId ?? clientData.id, clientData.name, result.newOrder.length)
 }
 
 export function handleStackFlip(
@@ -541,6 +548,9 @@ export function handleStackFlip(
     },
     { x: stack.anchorX, y: stack.anchorY },
   )
+
+  // Log activity
+  logStackFlipped(clients, room.code, clientData.playerId ?? clientData.id, clientData.name, result.cardUpdates.length)
 }
 
 export function handleStackSetFaces(

@@ -5,7 +5,7 @@
 // Core Types
 // ============================================================================
 
-export type PlayerRole = 'creator' | 'member'
+export type PlayerRole = 'creator' | 'member' | 'spectator'
 
 export interface Player {
   id: string
@@ -187,6 +187,7 @@ export interface RoomJoin {
   playerName: string
   sessionId?: string // For reconnection after refresh
   deviceId?: string // Persistent device identifier
+  asSpectator?: boolean // Join as view-only spectator
 }
 
 export interface RoomLeave {
@@ -1214,6 +1215,50 @@ export interface ChatTypingStatus {
 }
 
 // ============================================================================
+// Activity Log Types
+// ============================================================================
+
+export type ActivityType =
+  | 'player_joined'
+  | 'player_left'
+  | 'player_spectating'
+  | 'card_placed'
+  | 'stack_created'
+  | 'stack_shuffled'
+  | 'stack_flipped'
+  | 'zone_created'
+  | 'zone_deleted'
+  | 'die_rolled'
+  | 'counter_changed'
+  | 'timer_started'
+  | 'timer_stopped'
+  | 'table_reset'
+  | 'settings_changed'
+
+export interface ActivityLogEntry {
+  id: number
+  playerId: string | null
+  playerName: string | null
+  actionType: ActivityType
+  actionData?: Record<string, unknown>
+  timestamp: number
+}
+
+// ============================================================================
+// Activity Log Messages (Server → Client)
+// ============================================================================
+
+export interface ActivityLogged {
+  type: 'activity:logged'
+  entry: ActivityLogEntry
+}
+
+export interface ActivityHistory {
+  type: 'activity:history'
+  entries: ActivityLogEntry[]
+}
+
+// ============================================================================
 // Heartbeat Messages (for connection health monitoring)
 // ============================================================================
 
@@ -1250,6 +1295,7 @@ export type ErrorCode =
   | 'RATE_LIMITED'
   | 'INTERNAL_ERROR'
   | 'PERMISSION_DENIED'
+  | 'SPECTATOR_READONLY'
 
 // ============================================================================
 // Union Types for Message Handling
@@ -1400,6 +1446,8 @@ type ServerMessageBase =
   | ChatMessage
   | ChatHistory
   | ChatTypingStatus
+  | ActivityLogged
+  | ActivityHistory
   | Ping
 
 // All server messages can optionally include a requestId echoed from the client for correlation

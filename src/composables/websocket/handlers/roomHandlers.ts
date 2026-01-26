@@ -10,6 +10,7 @@ import type {
   ServerMessage,
   TableSettings,
   ChatMessage,
+  ActivityLogEntry,
 } from '../../../../shared/types'
 
 interface RoomStateRefs {
@@ -26,6 +27,7 @@ interface RoomStateRefs {
   tableIsPublic: Ref<boolean>
   chatMessages: Ref<ChatMessage[]>
   typingPlayers: Ref<Map<string, string>>
+  activityLog: Ref<ActivityLogEntry[]>
 }
 
 interface RoomHandlerCallbacks {
@@ -283,6 +285,33 @@ export function handleErrorMessage(
       error.value = message.message
       console.error('[ws] error:', message.originalAction, message.code, message.message)
       return true
+
+    default:
+      return false
+  }
+}
+
+/**
+ * Handle activity log messages
+ */
+export function handleActivityMessage(
+  message: ServerMessage,
+  refs: RoomStateRefs,
+): boolean {
+  const { activityLog } = refs
+
+  switch (message.type) {
+    case 'activity:logged':
+      activityLog.value = [...activityLog.value, message.entry]
+      return true
+
+    case 'activity:history': {
+      // Load activity history (prepend to any existing entries, avoiding duplicates)
+      const existingIds = new Set(activityLog.value.map((e) => e.id))
+      const newEntries = message.entries.filter((e) => !existingIds.has(e.id))
+      activityLog.value = [...newEntries, ...activityLog.value]
+      return true
+    }
 
     default:
       return false

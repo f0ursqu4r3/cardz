@@ -9,6 +9,7 @@ import type { Room } from '../room'
 import type { GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToViewport, getClientData } from '../utils/broadcast'
 import { sanitizeZoneLabel } from '../utils/sanitize'
+import { logZoneCreated, logZoneDeleted } from '../activity'
 
 export function handleZoneCreate(
   ws: GenericWebSocket,
@@ -46,6 +47,9 @@ export function handleZoneCreate(
     },
     { x: msg.x, y: msg.y, width: msg.width, height: msg.height },
   )
+
+  // Log activity
+  logZoneCreated(clients, room.code, clientData.playerId ?? clientData.id, clientData.name, sanitizedLabel)
 }
 
 export function handleZoneUpdate(
@@ -140,8 +144,9 @@ export function handleZoneDelete(
     return
   }
 
-  // Store zone position before deletion for viewport broadcasting
+  // Store zone info before deletion for viewport broadcasting and logging
   const zonePos = { x: zone.x, y: zone.y, width: zone.width, height: zone.height }
+  const zoneName = zone.label
 
   const result = gameState.deleteZone(msg.zoneId)
   if (!result) return
@@ -158,6 +163,9 @@ export function handleZoneDelete(
     },
     zonePos,
   )
+
+  // Log activity
+  logZoneDeleted(clients, room.code, clientData.playerId ?? clientData.id, clientData.name, zoneName)
 }
 
 export function handleZoneAddCard(

@@ -59,6 +59,11 @@
 - [x] Analytics dashboard (active tables, players, usage stats)
 - [x] Admin panel for server monitoring (`/admin` route)
 
+### Moderation
+
+- [x] Spectator mode (view-only access)
+- [x] Table activity log (record actions taken by players)
+
 ---
 
 ## Future Features 🚀
@@ -88,10 +93,11 @@
 - [ ] Fan spread (view all cards in stack)
 - [ ] Peek at cards without revealing
 
-### Moderation
+### Moderation (Continued)
 
+- [ ] Player reporting system
 - [ ] Kick/ban players
-- [ ] Lock table (prevent new joins)
+- [ ] Lock table (prevent new joins, spectators only, invite-only)
 - [ ] Granular permission system (who can manage the table, move cards, create zones, etc.)
 
 ### Server Enhancements
