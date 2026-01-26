@@ -48,6 +48,64 @@ export type Zone = {
   cardSettings: ZoneCardSettings // Card size and spacing settings
 }
 
+export type Counter = {
+  id: number
+  x: number
+  y: number
+  label: string
+  value: number
+  min?: number
+  max?: number
+  step: number
+  color: string
+  lockedBy: string | null
+}
+
+export type TokenShape = 'circle' | 'square' | 'star' | 'triangle'
+export type TokenSprite = 'star' | 'skull' | 'coin' | 'heart' | 'shield' | 'gem'
+export type TokenSize = 'small' | 'medium' | 'large'
+
+export type Token = {
+  id: number
+  x: number
+  y: number
+  kind: 'color' | 'sprite'
+  shape?: TokenShape
+  color: string
+  label?: string
+  sprite?: TokenSprite
+  size: TokenSize
+  lockedBy: string | null
+}
+
+export type DieValue = 1 | 2 | 3 | 4 | 5 | 6
+
+export type Die = {
+  id: number
+  x: number
+  y: number
+  value: DieValue
+  isRolling: boolean
+  color: string
+  lockedBy: string | null
+}
+
+export type TimerMode = 'countdown' | 'stopwatch'
+export type TimerStatus = 'stopped' | 'running' | 'paused' | 'finished'
+
+export type Timer = {
+  id: number
+  x: number
+  y: number
+  mode: TimerMode
+  durationMs: number
+  elapsedMs: number
+  status: TimerStatus
+  startedAt: number | null
+  label: string
+  lockedBy: string | null
+}
+
 export type DragTarget =
   | { type: 'card'; index: number }
   | { type: 'stack'; stackId: number; index: number }
@@ -55,6 +113,10 @@ export type DragTarget =
   | { type: 'hand-card'; index: number }
   | { type: 'zone'; zoneId: number }
   | { type: 'zone-resize'; zoneId: number; handle: 'se' }
+  | { type: 'counter'; counterId: number }
+  | { type: 'token'; tokenId: number }
+  | { type: 'die'; dieId: number }
+  | { type: 'timer'; timerId: number }
 
 export const CARD_W = 42
 export const CARD_H = 60

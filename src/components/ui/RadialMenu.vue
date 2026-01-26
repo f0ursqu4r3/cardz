@@ -2,6 +2,7 @@
 import { computed, ref, watch, onMounted, onUnmounted, type Component } from 'vue'
 import {
   RotateCw,
+  RotateCcw,
   Hand,
   ArrowUp,
   Shuffle,
@@ -13,13 +14,19 @@ import {
   Square,
   SquarePlus,
   Search,
+  Eye,
   EyeOff,
   ArrowUpFromLine,
+  Copy,
+  Dices,
+  Pause,
+  Play,
 } from 'lucide-vue-next'
 
 // Map icon names to components
 const iconComponents: Record<string, Component> = {
   'rotate-cw': RotateCw,
+  'rotate-ccw': RotateCcw,
   hand: Hand,
   'arrow-up': ArrowUp,
   shuffle: Shuffle,
@@ -31,8 +38,13 @@ const iconComponents: Record<string, Component> = {
   square: Square,
   'square-plus': SquarePlus,
   search: Search,
+  eye: Eye,
   'eye-off': EyeOff,
   'arrow-up-from-line': ArrowUpFromLine,
+  copy: Copy,
+  dices: Dices,
+  pause: Pause,
+  play: Play,
 }
 
 export interface RadialMenuItem {

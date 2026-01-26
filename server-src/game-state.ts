@@ -1,4 +1,20 @@
-import type { CardState, GameState, HandState, StackState, ZoneState } from '../shared/types'
+import type {
+  CardState,
+  CounterState,
+  DieState,
+  DieValue,
+  GameState,
+  HandState,
+  StackState,
+  TimerMode,
+  TimerState,
+  TimerStatus,
+  TokenShape,
+  TokenSize,
+  TokenSprite,
+  TokenState,
+  ZoneState,
+} from '../shared/types'
 
 const STACK_OFFSET_Y = -1
 
@@ -42,8 +58,16 @@ export function createInitialGameState(): GameState {
     stacks: [initialStack],
     zones: [],
     hands: [],
+    counters: [],
+    tokens: [],
+    dice: [],
+    timers: [],
     nextStackId: 1,
     nextZoneId: 1,
+    nextCounterId: 1,
+    nextTokenId: 1,
+    nextDieId: 1,
+    nextTimerId: 1,
     zCounter: 52,
     stateVersion: 0,
   }
@@ -56,7 +80,22 @@ export class GameStateManager {
   private state: GameState
 
   constructor(initialState?: GameState) {
-    this.state = initialState ?? createInitialGameState()
+    if (!initialState) {
+      this.state = createInitialGameState()
+    } else {
+      // Ensure all required arrays exist for legacy state (created before new entity types)
+      this.state = {
+        ...initialState,
+        counters: initialState.counters ?? [],
+        tokens: initialState.tokens ?? [],
+        dice: initialState.dice ?? [],
+        timers: initialState.timers ?? [],
+        nextCounterId: initialState.nextCounterId ?? 1,
+        nextTokenId: initialState.nextTokenId ?? 1,
+        nextDieId: initialState.nextDieId ?? 1,
+        nextTimerId: initialState.nextTimerId ?? 1,
+      }
+    }
   }
 
   getState(): GameState {
@@ -798,5 +837,387 @@ export class GameStateManager {
       this.incrementVersion()
     }
     return cardIds
+  }
+
+  // ============================================================================
+  // Counter Operations
+  // ============================================================================
+
+  getCounter(counterId: number): CounterState | undefined {
+    return this.state.counters.find((c) => c.id === counterId)
+  }
+
+  createCounter(
+    x: number,
+    y: number,
+    label: string,
+    value: number = 0,
+    options: {
+      min?: number
+      max?: number
+      step?: number
+      color?: string
+    } = {},
+  ): CounterState {
+    const counter: CounterState = {
+      id: this.state.nextCounterId++,
+      x,
+      y,
+      label,
+      value,
+      min: options.min,
+      max: options.max,
+      step: options.step ?? 1,
+      color: options.color ?? '#3b82f6', // Default blue
+      lockedBy: null,
+    }
+
+    this.state.counters.push(counter)
+    this.incrementVersion()
+    return counter
+  }
+
+  updateCounter(
+    counterId: number,
+    updates: Partial<Pick<CounterState, 'x' | 'y' | 'label' | 'value' | 'min' | 'max' | 'step' | 'color'>>,
+  ): CounterState | null {
+    const counter = this.getCounter(counterId)
+    if (!counter) return null
+
+    // Apply updates
+    if (updates.x !== undefined) counter.x = updates.x
+    if (updates.y !== undefined) counter.y = updates.y
+    if (updates.label !== undefined) counter.label = updates.label
+    if (updates.value !== undefined) {
+      // Clamp value to min/max if set
+      let newValue = updates.value
+      if (counter.min !== undefined) newValue = Math.max(counter.min, newValue)
+      if (counter.max !== undefined) newValue = Math.min(counter.max, newValue)
+      counter.value = newValue
+    }
+    if (updates.min !== undefined) counter.min = updates.min
+    if (updates.max !== undefined) counter.max = updates.max
+    if (updates.step !== undefined) counter.step = updates.step
+    if (updates.color !== undefined) counter.color = updates.color
+
+    this.incrementVersion()
+    return counter
+  }
+
+  incrementCounter(counterId: number, delta: number): { value: number } | null {
+    const counter = this.getCounter(counterId)
+    if (!counter) return null
+
+    let newValue = counter.value + delta
+
+    // Clamp to min/max if set
+    if (counter.min !== undefined) newValue = Math.max(counter.min, newValue)
+    if (counter.max !== undefined) newValue = Math.min(counter.max, newValue)
+
+    counter.value = newValue
+    this.incrementVersion()
+    return { value: counter.value }
+  }
+
+  deleteCounter(counterId: number): boolean {
+    const index = this.state.counters.findIndex((c) => c.id === counterId)
+    if (index === -1) return false
+
+    this.state.counters.splice(index, 1)
+    this.incrementVersion()
+    return true
+  }
+
+  setCounterLock(counterId: number, playerId: string | null): boolean {
+    const counter = this.getCounter(counterId)
+    if (!counter) return false
+
+    counter.lockedBy = playerId
+    return true
+  }
+
+  // ============================================================================
+  // Token Operations
+  // ============================================================================
+
+  getToken(tokenId: number): TokenState | undefined {
+    return this.state.tokens.find((t) => t.id === tokenId)
+  }
+
+  createToken(
+    x: number,
+    y: number,
+    kind: 'color' | 'sprite',
+    options: {
+      shape?: TokenShape
+      color?: string
+      label?: string
+      sprite?: TokenSprite
+      size?: TokenSize
+    } = {},
+  ): TokenState {
+    const token: TokenState = {
+      id: this.state.nextTokenId++,
+      x,
+      y,
+      kind,
+      shape: kind === 'color' ? (options.shape ?? 'circle') : undefined,
+      color: options.color ?? '#ef4444', // Default red
+      label: options.label,
+      sprite: kind === 'sprite' ? (options.sprite ?? 'star') : undefined,
+      size: options.size ?? 'medium',
+      lockedBy: null,
+    }
+
+    this.state.tokens.push(token)
+    this.incrementVersion()
+    return token
+  }
+
+  updateToken(
+    tokenId: number,
+    updates: Partial<Pick<TokenState, 'x' | 'y' | 'shape' | 'color' | 'label' | 'sprite' | 'size'>>,
+  ): TokenState | null {
+    const token = this.getToken(tokenId)
+    if (!token) return null
+
+    // Apply updates
+    if (updates.x !== undefined) token.x = updates.x
+    if (updates.y !== undefined) token.y = updates.y
+    if (updates.shape !== undefined) token.shape = updates.shape
+    if (updates.color !== undefined) token.color = updates.color
+    if (updates.label !== undefined) token.label = updates.label
+    if (updates.sprite !== undefined) token.sprite = updates.sprite
+    if (updates.size !== undefined) token.size = updates.size
+
+    this.incrementVersion()
+    return token
+  }
+
+  deleteToken(tokenId: number): boolean {
+    const index = this.state.tokens.findIndex((t) => t.id === tokenId)
+    if (index === -1) return false
+
+    this.state.tokens.splice(index, 1)
+    this.incrementVersion()
+    return true
+  }
+
+  setTokenLock(tokenId: number, playerId: string | null): boolean {
+    const token = this.getToken(tokenId)
+    if (!token) return false
+
+    token.lockedBy = playerId
+    return true
+  }
+
+  // ============================================================================
+  // Die Operations
+  // ============================================================================
+
+  getDie(dieId: number): DieState | undefined {
+    return this.state.dice.find((d) => d.id === dieId)
+  }
+
+  createDie(
+    x: number,
+    y: number,
+    options: {
+      color?: string
+    } = {},
+  ): DieState {
+    // Generate random initial value
+    const value = (Math.floor(Math.random() * 6) + 1) as DieValue
+
+    const die: DieState = {
+      id: this.state.nextDieId++,
+      x,
+      y,
+      value,
+      isRolling: false,
+      color: options.color ?? '#f5f5f5', // Default white/light gray
+      lockedBy: null,
+    }
+
+    this.state.dice.push(die)
+    this.incrementVersion()
+    return die
+  }
+
+  rollDie(dieId: number): { value: DieValue } | null {
+    const die = this.getDie(dieId)
+    if (!die) return null
+
+    // Generate new random value
+    const value = (Math.floor(Math.random() * 6) + 1) as DieValue
+    die.value = value
+    die.isRolling = false // Server doesn't track animation state
+
+    this.incrementVersion()
+    return { value }
+  }
+
+  updateDie(
+    dieId: number,
+    updates: Partial<Pick<DieState, 'x' | 'y' | 'color'>>,
+  ): DieState | null {
+    const die = this.getDie(dieId)
+    if (!die) return null
+
+    if (updates.x !== undefined) die.x = updates.x
+    if (updates.y !== undefined) die.y = updates.y
+    if (updates.color !== undefined) die.color = updates.color
+
+    this.incrementVersion()
+    return die
+  }
+
+  deleteDie(dieId: number): boolean {
+    const index = this.state.dice.findIndex((d) => d.id === dieId)
+    if (index === -1) return false
+
+    this.state.dice.splice(index, 1)
+    this.incrementVersion()
+    return true
+  }
+
+  setDieLock(dieId: number, playerId: string | null): boolean {
+    const die = this.getDie(dieId)
+    if (!die) return false
+
+    die.lockedBy = playerId
+    return true
+  }
+
+  // ============================================================================
+  // Timer Operations
+  // ============================================================================
+
+  getTimer(timerId: number): TimerState | undefined {
+    return this.state.timers.find((t) => t.id === timerId)
+  }
+
+  createTimer(
+    x: number,
+    y: number,
+    mode: TimerMode,
+    options: {
+      durationMs?: number
+      label?: string
+    } = {},
+  ): TimerState {
+    const timer: TimerState = {
+      id: this.state.nextTimerId++,
+      x,
+      y,
+      mode,
+      durationMs: options.durationMs ?? (mode === 'countdown' ? 60000 : 0), // Default 1 minute for countdown
+      elapsedMs: 0,
+      status: 'stopped',
+      startedAt: null,
+      label: options.label ?? (mode === 'countdown' ? 'Countdown' : 'Stopwatch'),
+      lockedBy: null,
+    }
+
+    this.state.timers.push(timer)
+    this.incrementVersion()
+    return timer
+  }
+
+  startTimer(timerId: number): { startedAt: number } | null {
+    const timer = this.getTimer(timerId)
+    if (!timer) return null
+    if (timer.status === 'running') return null
+    if (timer.status === 'finished') return null // Must reset first
+
+    const startedAt = Date.now()
+    timer.status = 'running'
+    timer.startedAt = startedAt
+
+    this.incrementVersion()
+    return { startedAt }
+  }
+
+  pauseTimer(timerId: number): { elapsedMs: number } | null {
+    const timer = this.getTimer(timerId)
+    if (!timer) return null
+    if (timer.status !== 'running') return null
+
+    // Calculate elapsed time
+    const now = Date.now()
+    const additionalElapsed = timer.startedAt ? now - timer.startedAt : 0
+    timer.elapsedMs += additionalElapsed
+    timer.status = 'paused'
+    timer.startedAt = null
+
+    this.incrementVersion()
+    return { elapsedMs: timer.elapsedMs }
+  }
+
+  resetTimer(timerId: number): boolean {
+    const timer = this.getTimer(timerId)
+    if (!timer) return false
+
+    timer.elapsedMs = 0
+    timer.status = 'stopped'
+    timer.startedAt = null
+
+    this.incrementVersion()
+    return true
+  }
+
+  // Called periodically to check if countdown timers have finished
+  checkTimerFinished(timerId: number): boolean {
+    const timer = this.getTimer(timerId)
+    if (!timer) return false
+    if (timer.mode !== 'countdown') return false
+    if (timer.status !== 'running') return false
+
+    const now = Date.now()
+    const totalElapsed = timer.elapsedMs + (timer.startedAt ? now - timer.startedAt : 0)
+
+    if (totalElapsed >= timer.durationMs) {
+      timer.elapsedMs = timer.durationMs
+      timer.status = 'finished'
+      timer.startedAt = null
+      this.incrementVersion()
+      return true
+    }
+
+    return false
+  }
+
+  updateTimer(
+    timerId: number,
+    updates: Partial<Pick<TimerState, 'x' | 'y' | 'mode' | 'durationMs' | 'label'>>,
+  ): TimerState | null {
+    const timer = this.getTimer(timerId)
+    if (!timer) return null
+
+    if (updates.x !== undefined) timer.x = updates.x
+    if (updates.y !== undefined) timer.y = updates.y
+    if (updates.mode !== undefined) timer.mode = updates.mode
+    if (updates.durationMs !== undefined) timer.durationMs = updates.durationMs
+    if (updates.label !== undefined) timer.label = updates.label
+
+    this.incrementVersion()
+    return timer
+  }
+
+  deleteTimer(timerId: number): boolean {
+    const index = this.state.timers.findIndex((t) => t.id === timerId)
+    if (index === -1) return false
+
+    this.state.timers.splice(index, 1)
+    this.incrementVersion()
+    return true
+  }
+
+  setTimerLock(timerId: number, playerId: string | null): boolean {
+    const timer = this.getTimer(timerId)
+    if (!timer) return false
+
+    timer.lockedBy = playerId
+    return true
   }
 }

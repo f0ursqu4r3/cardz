@@ -9,6 +9,10 @@ export type RadialMenuTarget =
   | { type: 'hand-card'; cardId: number; isFaceUp: boolean }
   | { type: 'hand-selection'; cardIds: number[] }
   | { type: 'canvas'; worldX: number; worldY: number }
+  | { type: 'counter'; counterId: number; value: number }
+  | { type: 'token'; tokenId: number; kind: 'color' | 'sprite' }
+  | { type: 'die'; dieId: number; value: number }
+  | { type: 'timer'; timerId: number; status: 'stopped' | 'running' | 'paused' | 'finished'; mode: 'countdown' | 'stopwatch' }
 
 export function useRadialMenu() {
   const visible = ref(false)
@@ -34,6 +38,14 @@ export function useRadialMenu() {
         return getHandSelectionMenuItems(target.value)
       case 'canvas':
         return getCanvasMenuItems()
+      case 'counter':
+        return getCounterMenuItems(target.value)
+      case 'token':
+        return getTokenMenuItems(target.value)
+      case 'die':
+        return getDieMenuItems(target.value)
+      case 'timer':
+        return getTimerMenuItems(target.value)
       default:
         return []
     }
@@ -231,6 +243,117 @@ export function useRadialMenu() {
         icon: 'search',
       },
     ]
+  }
+
+  function getCounterMenuItems(
+    _t: Extract<RadialMenuTarget, { type: 'counter' }>,
+  ): RadialMenuItem[] {
+    return [
+      {
+        id: 'counter-reset',
+        label: 'Reset to zero',
+        icon: 'rotate-ccw',
+      },
+      {
+        id: 'counter-settings',
+        label: 'Edit counter',
+        icon: 'settings',
+      },
+      {
+        id: 'counter-delete',
+        label: 'Delete counter',
+        icon: 'trash',
+        danger: true,
+      },
+    ]
+  }
+
+  function getTokenMenuItems(
+    _t: Extract<RadialMenuTarget, { type: 'token' }>,
+  ): RadialMenuItem[] {
+    return [
+      {
+        id: 'token-duplicate',
+        label: 'Duplicate',
+        icon: 'copy',
+      },
+      {
+        id: 'token-settings',
+        label: 'Edit token',
+        icon: 'settings',
+      },
+      {
+        id: 'token-delete',
+        label: 'Delete token',
+        icon: 'trash',
+        danger: true,
+      },
+    ]
+  }
+
+  function getDieMenuItems(
+    _t: Extract<RadialMenuTarget, { type: 'die' }>,
+  ): RadialMenuItem[] {
+    return [
+      {
+        id: 'die-roll',
+        label: 'Roll die',
+        icon: 'dices',
+      },
+      {
+        id: 'die-settings',
+        label: 'Edit die',
+        icon: 'settings',
+      },
+      {
+        id: 'die-delete',
+        label: 'Delete die',
+        icon: 'trash',
+        danger: true,
+      },
+    ]
+  }
+
+  function getTimerMenuItems(
+    t: Extract<RadialMenuTarget, { type: 'timer' }>,
+  ): RadialMenuItem[] {
+    const items: RadialMenuItem[] = []
+
+    // Play/pause based on current status
+    if (t.status === 'running') {
+      items.push({
+        id: 'timer-pause',
+        label: 'Pause',
+        icon: 'pause',
+      })
+    } else if (t.status !== 'finished') {
+      items.push({
+        id: 'timer-start',
+        label: 'Start',
+        icon: 'play',
+      })
+    }
+
+    items.push(
+      {
+        id: 'timer-reset',
+        label: 'Reset',
+        icon: 'rotate-ccw',
+      },
+      {
+        id: 'timer-settings',
+        label: 'Edit timer',
+        icon: 'settings',
+      },
+      {
+        id: 'timer-delete',
+        label: 'Delete timer',
+        icon: 'trash',
+        danger: true,
+      },
+    )
+
+    return items
   }
 
   function open(x: number, y: number, menuTarget: RadialMenuTarget) {

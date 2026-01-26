@@ -52,6 +52,39 @@ import {
   handleTableUpdateVisibility,
   handleTableUpdateName,
 } from './handlers/table'
+import {
+  handleCounterCreate,
+  handleCounterUpdate,
+  handleCounterIncrement,
+  handleCounterDelete,
+  handleCounterLock,
+  handleCounterUnlock,
+} from './handlers/counter'
+import {
+  handleTokenCreate,
+  handleTokenUpdate,
+  handleTokenDelete,
+  handleTokenLock,
+  handleTokenUnlock,
+} from './handlers/token'
+import {
+  handleDieCreate,
+  handleDieRoll,
+  handleDieUpdate,
+  handleDieDelete,
+  handleDieLock,
+  handleDieUnlock,
+} from './handlers/die'
+import {
+  handleTimerCreate,
+  handleTimerStart,
+  handleTimerPause,
+  handleTimerReset,
+  handleTimerUpdate,
+  handleTimerDelete,
+  handleTimerLock,
+  handleTimerUnlock,
+} from './handlers/timer'
 
 const roomManager = new RoomManager()
 
@@ -438,6 +471,106 @@ const server = Bun.serve<ClientData>({
           case 'zone:add_cards':
             handleZoneAddCards(socket, msg, room, clients)
             roomManager.markDirty(room.code)
+            break
+
+          // Counter actions
+          case 'counter:create':
+            handleCounterCreate(socket, msg, room, clients)
+            roomManager.markDirtyImmediate(room.code)
+            break
+          case 'counter:update':
+            handleCounterUpdate(socket, msg, room, clients)
+            roomManager.markDirty(room.code)
+            break
+          case 'counter:increment':
+            handleCounterIncrement(socket, msg, room, clients)
+            roomManager.markDirty(room.code)
+            break
+          case 'counter:delete':
+            handleCounterDelete(socket, msg, room, clients)
+            roomManager.markDirtyImmediate(room.code)
+            break
+          case 'counter:lock':
+            handleCounterLock(socket, msg, room, clients)
+            break
+          case 'counter:unlock':
+            handleCounterUnlock(socket, msg, room, clients)
+            break
+
+          // Token actions
+          case 'token:create':
+            handleTokenCreate(socket, msg, room, clients)
+            roomManager.markDirtyImmediate(room.code)
+            break
+          case 'token:update':
+            handleTokenUpdate(socket, msg, room, clients)
+            roomManager.markDirty(room.code)
+            break
+          case 'token:delete':
+            handleTokenDelete(socket, msg, room, clients)
+            roomManager.markDirtyImmediate(room.code)
+            break
+          case 'token:lock':
+            handleTokenLock(socket, msg, room, clients)
+            break
+          case 'token:unlock':
+            handleTokenUnlock(socket, msg, room, clients)
+            break
+
+          // Die actions
+          case 'die:create':
+            handleDieCreate(socket, msg, room, clients)
+            roomManager.markDirtyImmediate(room.code)
+            break
+          case 'die:roll':
+            handleDieRoll(socket, msg, room, clients)
+            roomManager.markDirty(room.code)
+            break
+          case 'die:update':
+            handleDieUpdate(socket, msg, room, clients)
+            roomManager.markDirty(room.code)
+            break
+          case 'die:delete':
+            handleDieDelete(socket, msg, room, clients)
+            roomManager.markDirtyImmediate(room.code)
+            break
+          case 'die:lock':
+            handleDieLock(socket, msg, room, clients)
+            break
+          case 'die:unlock':
+            handleDieUnlock(socket, msg, room, clients)
+            break
+
+          // Timer actions
+          case 'timer:create':
+            handleTimerCreate(socket, msg, room, clients)
+            roomManager.markDirtyImmediate(room.code)
+            break
+          case 'timer:start':
+            handleTimerStart(socket, msg, room, clients)
+            roomManager.markDirty(room.code)
+            break
+          case 'timer:pause':
+            handleTimerPause(socket, msg, room, clients)
+            roomManager.markDirty(room.code)
+            break
+          case 'timer:reset':
+            handleTimerReset(socket, msg, room, clients)
+            roomManager.markDirty(room.code)
+            break
+          case 'timer:update':
+            handleTimerUpdate(socket, msg, room, clients)
+            roomManager.markDirty(room.code)
+            break
+          case 'timer:delete':
+            handleTimerDelete(socket, msg, room, clients)
+            roomManager.markDirtyImmediate(room.code)
+            break
+          case 'timer:lock':
+            handleTimerLock(socket, msg, room, clients)
+            break
+          case 'timer:unlock':
+            handleTimerUnlock(socket, msg, room, clients)
             break
 
           // Hand actions

@@ -1,7 +1,7 @@
 import { STACK_MAX_VISUAL_DEPTH } from './../types/index'
 import { computed, ref, type Ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { CardData, Stack, Zone } from '@/types'
+import type { CardData, Stack, Zone, Counter, Token, Die, DieValue, Timer, TimerMode, TimerStatus } from '@/types'
 import {
   CARD_W,
   CARD_H,
@@ -12,19 +12,27 @@ import {
   ZONE_MIN_WIDTH,
   ZONE_MIN_HEIGHT,
 } from '@/types'
-import type { GameState, CardState, StackState, ZoneState } from '../../shared/types'
+import type { GameState, CardState, StackState, ZoneState, CounterState, TokenState, DieState, TimerState } from '../../shared/types'
 import { getCardPositionInZone } from '@/utils/zoneLayouts'
 
 export const useCardStore = defineStore('cards', () => {
   const cards = ref<CardData[]>([])
   const stacks = ref<Stack[]>([])
   const zones = ref<Zone[]>([])
+  const counters = ref<Counter[]>([])
+  const tokens = ref<Token[]>([])
+  const dice = ref<Die[]>([])
+  const timers = ref<Timer[]>([])
   const selectedIds = ref<Set<number>>(new Set())
   const handCardIds = ref<number[]>([])
   const shufflingStackId = ref<number | null>(null)
 
   let nextStackId = 1
   let nextZoneId = 1
+  let nextCounterId = 1
+  let nextTokenId = 1
+  let nextDieId = 1
+  let nextTimerId = 1
   let zCounter = 100
 
   // O(1) lookup Maps - avoids O(n) array.find() calls
@@ -52,10 +60,46 @@ export const useCardStore = defineStore('cards', () => {
     return map
   })
 
+  const counterById = computed(() => {
+    const map = new Map<number, Counter>()
+    for (const counter of counters.value) {
+      map.set(counter.id, counter)
+    }
+    return map
+  })
+
+  const tokenById = computed(() => {
+    const map = new Map<number, Token>()
+    for (const token of tokens.value) {
+      map.set(token.id, token)
+    }
+    return map
+  })
+
+  const dieById = computed(() => {
+    const map = new Map<number, Die>()
+    for (const die of dice.value) {
+      map.set(die.id, die)
+    }
+    return map
+  })
+
+  const timerById = computed(() => {
+    const map = new Map<number, Timer>()
+    for (const timer of timers.value) {
+      map.set(timer.id, timer)
+    }
+    return map
+  })
+
   // Helper functions for O(1) lookups
   const getCardById = (id: number): CardData | undefined => cardById.value.get(id)
   const getStackById = (id: number): Stack | undefined => stackById.value.get(id)
   const getZoneById = (id: number): Zone | undefined => zoneById.value.get(id)
+  const getCounterById = (id: number): Counter | undefined => counterById.value.get(id)
+  const getTokenById = (id: number): Token | undefined => tokenById.value.get(id)
+  const getDieById = (id: number): Die | undefined => dieById.value.get(id)
+  const getTimerById = (id: number): Timer | undefined => timerById.value.get(id)
 
   // Hand helpers
   const handCards = computed(
@@ -897,6 +941,10 @@ export const useCardStore = defineStore('cards', () => {
     cards.value = state.cards.map(cardStateToCardData)
     stacks.value = state.stacks.map(stackStateToStack)
     zones.value = state.zones.map(zoneStateToZone)
+    counters.value = (state.counters ?? []).map(counterStateToCounter)
+    tokens.value = (state.tokens ?? []).map(tokenStateToToken)
+    dice.value = (state.dice ?? []).map(dieStateToDie)
+    timers.value = (state.timers ?? []).map(timerStateToTimer)
 
     // Preserve local hand order if the same cards exist (just reordered)
     // Only update if cards have actually been added/removed
@@ -914,6 +962,10 @@ export const useCardStore = defineStore('cards', () => {
     // Update counters to prevent ID conflicts
     nextStackId = state.nextStackId
     nextZoneId = state.nextZoneId
+    nextCounterId = state.nextCounterId ?? 1
+    nextTokenId = state.nextTokenId ?? 1
+    nextDieId = state.nextDieId ?? 1
+    nextTimerId = state.nextTimerId ?? 1
     zCounter = state.zCounter
 
     // Recalculate card positions based on zone layouts
@@ -1004,6 +1056,184 @@ export const useCardStore = defineStore('cards', () => {
     zones.value = zones.value.filter((z) => z.id !== zoneId)
   }
 
+  // Convert server CounterState to local Counter
+  const counterStateToCounter = (state: CounterState): Counter => ({
+    id: state.id,
+    x: state.x,
+    y: state.y,
+    label: state.label,
+    value: state.value,
+    min: state.min,
+    max: state.max,
+    step: state.step,
+    color: state.color,
+    lockedBy: state.lockedBy,
+  })
+
+  // Update a single counter from server
+  const updateCounterFromServer = (counterId: number, updates: Partial<CounterState>) => {
+    const counter = counterById.value.get(counterId)
+    if (!counter) return
+
+    if (updates.x !== undefined) counter.x = updates.x
+    if (updates.y !== undefined) counter.y = updates.y
+    if (updates.label !== undefined) counter.label = updates.label
+    if (updates.value !== undefined) counter.value = updates.value
+    if (updates.min !== undefined) counter.min = updates.min
+    if (updates.max !== undefined) counter.max = updates.max
+    if (updates.step !== undefined) counter.step = updates.step
+    if (updates.color !== undefined) counter.color = updates.color
+    if (updates.lockedBy !== undefined) counter.lockedBy = updates.lockedBy
+  }
+
+  // Add a counter from server
+  const addCounterFromServer = (state: CounterState) => {
+    const existing = counters.value.find((c) => c.id === state.id)
+    if (existing) {
+      Object.assign(existing, counterStateToCounter(state))
+    } else {
+      counters.value.push(counterStateToCounter(state))
+    }
+  }
+
+  // Remove a counter
+  const removeCounter = (counterId: number) => {
+    counters.value = counters.value.filter((c) => c.id !== counterId)
+  }
+
+  const tokenStateToToken = (state: TokenState): Token => ({
+    id: state.id,
+    x: state.x,
+    y: state.y,
+    kind: state.kind,
+    shape: state.shape,
+    color: state.color,
+    label: state.label,
+    sprite: state.sprite,
+    size: state.size,
+    lockedBy: state.lockedBy,
+  })
+
+  // Update a single token from server
+  const updateTokenFromServer = (tokenId: number, updates: Partial<TokenState>) => {
+    const token = tokenById.value.get(tokenId)
+    if (!token) return
+
+    if (updates.x !== undefined) token.x = updates.x
+    if (updates.y !== undefined) token.y = updates.y
+    if (updates.shape !== undefined) token.shape = updates.shape
+    if (updates.color !== undefined) token.color = updates.color
+    if (updates.label !== undefined) token.label = updates.label
+    if (updates.sprite !== undefined) token.sprite = updates.sprite
+    if (updates.size !== undefined) token.size = updates.size
+    if (updates.lockedBy !== undefined) token.lockedBy = updates.lockedBy
+  }
+
+  // Add a token from server
+  const addTokenFromServer = (state: TokenState) => {
+    const existing = tokens.value.find((t) => t.id === state.id)
+    if (existing) {
+      Object.assign(existing, tokenStateToToken(state))
+    } else {
+      tokens.value.push(tokenStateToToken(state))
+    }
+  }
+
+  // Remove a token
+  const removeToken = (tokenId: number) => {
+    tokens.value = tokens.value.filter((t) => t.id !== tokenId)
+  }
+
+  const dieStateToDie = (state: DieState): Die => ({
+    id: state.id,
+    x: state.x,
+    y: state.y,
+    value: state.value as DieValue,
+    isRolling: state.isRolling,
+    color: state.color,
+    lockedBy: state.lockedBy,
+  })
+
+  // Update a single die from server
+  const updateDieFromServer = (dieId: number, updates: Partial<DieState>) => {
+    const die = dieById.value.get(dieId)
+    if (!die) return
+
+    if (updates.x !== undefined) die.x = updates.x
+    if (updates.y !== undefined) die.y = updates.y
+    if (updates.value !== undefined) die.value = updates.value as DieValue
+    if (updates.isRolling !== undefined) die.isRolling = updates.isRolling
+    if (updates.color !== undefined) die.color = updates.color
+    if (updates.lockedBy !== undefined) die.lockedBy = updates.lockedBy
+  }
+
+  // Add a die from server
+  const addDieFromServer = (state: DieState) => {
+    const existing = dice.value.find((d) => d.id === state.id)
+    if (existing) {
+      Object.assign(existing, dieStateToDie(state))
+    } else {
+      dice.value.push(dieStateToDie(state))
+    }
+  }
+
+  // Remove a die
+  const removeDie = (dieId: number) => {
+    dice.value = dice.value.filter((d) => d.id !== dieId)
+  }
+
+  // Set die rolling state (for animation)
+  const setDieRolling = (dieId: number, isRolling: boolean) => {
+    const die = dieById.value.get(dieId)
+    if (die) {
+      die.isRolling = isRolling
+    }
+  }
+
+  const timerStateToTimer = (state: TimerState): Timer => ({
+    id: state.id,
+    x: state.x,
+    y: state.y,
+    mode: state.mode as TimerMode,
+    durationMs: state.durationMs,
+    elapsedMs: state.elapsedMs,
+    status: state.status as TimerStatus,
+    startedAt: state.startedAt,
+    label: state.label,
+    lockedBy: state.lockedBy,
+  })
+
+  // Update a single timer from server
+  const updateTimerFromServer = (timerId: number, updates: Partial<TimerState>) => {
+    const timer = timerById.value.get(timerId)
+    if (!timer) return
+
+    if (updates.x !== undefined) timer.x = updates.x
+    if (updates.y !== undefined) timer.y = updates.y
+    if (updates.mode !== undefined) timer.mode = updates.mode as TimerMode
+    if (updates.durationMs !== undefined) timer.durationMs = updates.durationMs
+    if (updates.elapsedMs !== undefined) timer.elapsedMs = updates.elapsedMs
+    if (updates.status !== undefined) timer.status = updates.status as TimerStatus
+    if (updates.startedAt !== undefined) timer.startedAt = updates.startedAt
+    if (updates.label !== undefined) timer.label = updates.label
+    if (updates.lockedBy !== undefined) timer.lockedBy = updates.lockedBy
+  }
+
+  // Add a timer from server
+  const addTimerFromServer = (state: TimerState) => {
+    const existing = timers.value.find((t) => t.id === state.id)
+    if (existing) {
+      Object.assign(existing, timerStateToTimer(state))
+    } else {
+      timers.value.push(timerStateToTimer(state))
+    }
+  }
+
+  // Remove a timer
+  const removeTimer = (timerId: number) => {
+    timers.value = timers.value.filter((t) => t.id !== timerId)
+  }
+
   // Set hand card IDs from server (only updates OUR hand, doesn't touch other players' cards)
   const setHandCardIds = (ids: number[]) => {
     const prevIds = new Set(handCardIds.value)
@@ -1026,11 +1256,19 @@ export const useCardStore = defineStore('cards', () => {
     cards,
     stacks,
     zones,
+    counters,
+    tokens,
+    dice,
+    timers,
     selectedIds,
     // O(1) lookup helpers
     getCardById,
     getStackById,
     getZoneById,
+    getCounterById,
+    getTokenById,
+    getDieById,
+    getTimerById,
     createCards,
     updateStackPositions,
     updateAllStacks,
@@ -1083,6 +1321,23 @@ export const useCardStore = defineStore('cards', () => {
     updateZoneFromServer,
     addZoneFromServer,
     removeZone,
+    // Counter sync operations
+    updateCounterFromServer,
+    addCounterFromServer,
+    removeCounter,
+    // Token sync operations
+    updateTokenFromServer,
+    addTokenFromServer,
+    removeToken,
+    // Die sync operations
+    updateDieFromServer,
+    addDieFromServer,
+    removeDie,
+    setDieRolling,
+    // Timer sync operations
+    updateTimerFromServer,
+    addTimerFromServer,
+    removeTimer,
     setHandCardIds,
   }
 })

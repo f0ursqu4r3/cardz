@@ -71,13 +71,95 @@ export interface HandState {
   cardIds: number[] // Only visible to owner; others see count only
 }
 
+// ============================================================================
+// Counter Types
+// ============================================================================
+
+export interface CounterState {
+  id: number
+  x: number
+  y: number
+  label: string // Custom text label (e.g., "Life", "Score")
+  value: number // Current counter value
+  min?: number // Optional minimum (default: no limit)
+  max?: number // Optional maximum (default: no limit)
+  step: number // Increment/decrement amount (default: 1)
+  color: string // Display color (hex)
+  lockedBy: string | null // Player currently dragging
+}
+
+// ============================================================================
+// Token Types
+// ============================================================================
+
+export type TokenShape = 'circle' | 'square' | 'star' | 'triangle'
+export type TokenSprite = 'star' | 'skull' | 'coin' | 'heart' | 'shield' | 'gem'
+export type TokenSize = 'small' | 'medium' | 'large'
+
+export interface TokenState {
+  id: number
+  x: number
+  y: number
+  kind: 'color' | 'sprite' // Color shape or sprite-based token
+  shape?: TokenShape // For color tokens (circle, square, etc.)
+  color: string // Display color (hex)
+  label?: string // Optional text label
+  sprite?: TokenSprite // For sprite tokens (star, skull, etc.)
+  size: TokenSize // small/medium/large
+  lockedBy: string | null // Player currently dragging
+}
+
+// ============================================================================
+// Die Types
+// ============================================================================
+
+export type DieValue = 1 | 2 | 3 | 4 | 5 | 6
+
+export interface DieState {
+  id: number
+  x: number
+  y: number
+  value: DieValue // Current face value (1-6)
+  isRolling: boolean // True while animation is playing
+  color: string // Die color (hex)
+  lockedBy: string | null // Player currently dragging
+}
+
+// ============================================================================
+// Timer Types
+// ============================================================================
+
+export type TimerMode = 'countdown' | 'stopwatch'
+export type TimerStatus = 'stopped' | 'running' | 'paused' | 'finished'
+
+export interface TimerState {
+  id: number
+  x: number
+  y: number
+  mode: TimerMode // 'countdown' or 'stopwatch'
+  durationMs: number // For countdown: initial duration; for stopwatch: ignored
+  elapsedMs: number // Current elapsed time (paused value)
+  status: TimerStatus // 'stopped' | 'running' | 'paused' | 'finished'
+  startedAt: number | null // Server timestamp when started/resumed (null when paused/stopped)
+  label: string // Display label
+  lockedBy: string | null // Player currently dragging
+}
+
 export interface GameState {
   cards: CardState[]
   stacks: StackState[]
   zones: ZoneState[]
   hands: HandState[]
+  counters: CounterState[]
+  tokens: TokenState[]
+  dice: DieState[]
+  timers: TimerState[]
   nextStackId: number
   nextZoneId: number
+  nextCounterId: number
+  nextTokenId: number
+  nextDieId: number
+  nextTimerId: number
   zCounter: number
   stateVersion: number // Incremented on each mutation for client/server consistency
 }
@@ -566,6 +648,374 @@ export interface ZoneCardsAdded {
 }
 
 // ============================================================================
+// Counter Messages (Client → Server)
+// ============================================================================
+
+export interface CounterCreate {
+  type: 'counter:create'
+  x: number
+  y: number
+  label: string
+  value?: number
+  min?: number
+  max?: number
+  step?: number
+  color?: string
+}
+
+export interface CounterUpdate {
+  type: 'counter:update'
+  counterId: number
+  updates: {
+    x?: number
+    y?: number
+    label?: string
+    value?: number
+    min?: number
+    max?: number
+    step?: number
+    color?: string
+  }
+}
+
+export interface CounterIncrement {
+  type: 'counter:increment'
+  counterId: number
+  delta: number // +step or -step typically
+}
+
+export interface CounterDelete {
+  type: 'counter:delete'
+  counterId: number
+}
+
+export interface CounterLock {
+  type: 'counter:lock'
+  counterId: number
+}
+
+export interface CounterUnlock {
+  type: 'counter:unlock'
+  counterId: number
+}
+
+// ============================================================================
+// Counter Messages (Server → Client)
+// ============================================================================
+
+export interface CounterCreated {
+  type: 'counter:created'
+  counter: CounterState
+  playerId: string
+}
+
+export interface CounterUpdated {
+  type: 'counter:updated'
+  counterId: number
+  counter: CounterState
+  playerId: string
+}
+
+export interface CounterIncremented {
+  type: 'counter:incremented'
+  counterId: number
+  value: number
+  playerId: string
+}
+
+export interface CounterDeleted {
+  type: 'counter:deleted'
+  counterId: number
+  playerId: string
+}
+
+export interface CounterLocked {
+  type: 'counter:locked'
+  counterId: number
+  playerId: string
+}
+
+export interface CounterUnlocked {
+  type: 'counter:unlocked'
+  counterId: number
+}
+
+// ============================================================================
+// Token Messages (Client → Server)
+// ============================================================================
+
+export interface TokenCreate {
+  type: 'token:create'
+  x: number
+  y: number
+  kind: 'color' | 'sprite'
+  shape?: TokenShape
+  color?: string
+  label?: string
+  sprite?: TokenSprite
+  size?: TokenSize
+}
+
+export interface TokenUpdate {
+  type: 'token:update'
+  tokenId: number
+  updates: {
+    x?: number
+    y?: number
+    shape?: TokenShape
+    color?: string
+    label?: string
+    sprite?: TokenSprite
+    size?: TokenSize
+  }
+}
+
+export interface TokenDelete {
+  type: 'token:delete'
+  tokenId: number
+}
+
+export interface TokenLock {
+  type: 'token:lock'
+  tokenId: number
+}
+
+export interface TokenUnlock {
+  type: 'token:unlock'
+  tokenId: number
+}
+
+// ============================================================================
+// Token Messages (Server → Client)
+// ============================================================================
+
+export interface TokenCreated {
+  type: 'token:created'
+  token: TokenState
+  playerId: string
+}
+
+export interface TokenUpdated {
+  type: 'token:updated'
+  tokenId: number
+  token: TokenState
+  playerId: string
+}
+
+export interface TokenDeleted {
+  type: 'token:deleted'
+  tokenId: number
+  playerId: string
+}
+
+export interface TokenLocked {
+  type: 'token:locked'
+  tokenId: number
+  playerId: string
+}
+
+export interface TokenUnlocked {
+  type: 'token:unlocked'
+  tokenId: number
+}
+
+// ============================================================================
+// Die Messages (Client → Server)
+// ============================================================================
+
+export interface DieCreate {
+  type: 'die:create'
+  x: number
+  y: number
+  color?: string
+}
+
+export interface DieRoll {
+  type: 'die:roll'
+  dieId: number
+}
+
+export interface DieUpdate {
+  type: 'die:update'
+  dieId: number
+  updates: {
+    x?: number
+    y?: number
+    color?: string
+  }
+}
+
+export interface DieDelete {
+  type: 'die:delete'
+  dieId: number
+}
+
+export interface DieLock {
+  type: 'die:lock'
+  dieId: number
+}
+
+export interface DieUnlock {
+  type: 'die:unlock'
+  dieId: number
+}
+
+// ============================================================================
+// Die Messages (Server → Client)
+// ============================================================================
+
+export interface DieCreated {
+  type: 'die:created'
+  die: DieState
+  playerId: string
+}
+
+export interface DieRolled {
+  type: 'die:rolled'
+  dieId: number
+  value: DieValue // Server-generated random value
+  playerId: string
+}
+
+export interface DieUpdated {
+  type: 'die:updated'
+  dieId: number
+  die: DieState
+  playerId: string
+}
+
+export interface DieDeleted {
+  type: 'die:deleted'
+  dieId: number
+  playerId: string
+}
+
+export interface DieLocked {
+  type: 'die:locked'
+  dieId: number
+  playerId: string
+}
+
+export interface DieUnlocked {
+  type: 'die:unlocked'
+  dieId: number
+}
+
+// ============================================================================
+// Timer Messages (Client → Server)
+// ============================================================================
+
+export interface TimerCreate {
+  type: 'timer:create'
+  x: number
+  y: number
+  mode: TimerMode
+  durationMs?: number // For countdown mode
+  label?: string
+}
+
+export interface TimerStart {
+  type: 'timer:start'
+  timerId: number
+}
+
+export interface TimerPause {
+  type: 'timer:pause'
+  timerId: number
+}
+
+export interface TimerReset {
+  type: 'timer:reset'
+  timerId: number
+}
+
+export interface TimerUpdate {
+  type: 'timer:update'
+  timerId: number
+  updates: {
+    x?: number
+    y?: number
+    mode?: TimerMode
+    durationMs?: number
+    label?: string
+  }
+}
+
+export interface TimerDelete {
+  type: 'timer:delete'
+  timerId: number
+}
+
+export interface TimerLock {
+  type: 'timer:lock'
+  timerId: number
+}
+
+export interface TimerUnlock {
+  type: 'timer:unlock'
+  timerId: number
+}
+
+// ============================================================================
+// Timer Messages (Server → Client)
+// ============================================================================
+
+export interface TimerCreated {
+  type: 'timer:created'
+  timer: TimerState
+  playerId: string
+}
+
+export interface TimerStarted {
+  type: 'timer:started'
+  timerId: number
+  startedAt: number // Server timestamp
+  playerId: string
+}
+
+export interface TimerPaused {
+  type: 'timer:paused'
+  timerId: number
+  elapsedMs: number // Elapsed time when paused
+  playerId: string
+}
+
+export interface TimerResetDone {
+  type: 'timer:reset'
+  timerId: number
+  playerId: string
+}
+
+export interface TimerFinished {
+  type: 'timer:finished'
+  timerId: number
+}
+
+export interface TimerUpdated {
+  type: 'timer:updated'
+  timerId: number
+  timer: TimerState
+  playerId: string
+}
+
+export interface TimerDeleted {
+  type: 'timer:deleted'
+  timerId: number
+  playerId: string
+}
+
+export interface TimerLocked {
+  type: 'timer:locked'
+  timerId: number
+  playerId: string
+}
+
+export interface TimerUnlocked {
+  type: 'timer:unlocked'
+  timerId: number
+}
+
+// ============================================================================
 // Hand Messages (Client → Server)
 // ============================================================================
 
@@ -827,6 +1277,31 @@ type ClientMessageBase =
   | ZoneDelete
   | ZoneAddCard
   | ZoneAddCards
+  | CounterCreate
+  | CounterUpdate
+  | CounterIncrement
+  | CounterDelete
+  | CounterLock
+  | CounterUnlock
+  | TokenCreate
+  | TokenUpdate
+  | TokenDelete
+  | TokenLock
+  | TokenUnlock
+  | DieCreate
+  | DieRoll
+  | DieUpdate
+  | DieDelete
+  | DieLock
+  | DieUnlock
+  | TimerCreate
+  | TimerStart
+  | TimerPause
+  | TimerReset
+  | TimerUpdate
+  | TimerDelete
+  | TimerLock
+  | TimerUnlock
   | HandAdd
   | HandRemove
   | HandReorder
@@ -876,6 +1351,32 @@ type ServerMessageBase =
   | ZoneDeleted
   | ZoneCardAdded
   | ZoneCardsAdded
+  | CounterCreated
+  | CounterUpdated
+  | CounterIncremented
+  | CounterDeleted
+  | CounterLocked
+  | CounterUnlocked
+  | TokenCreated
+  | TokenUpdated
+  | TokenDeleted
+  | TokenLocked
+  | TokenUnlocked
+  | DieCreated
+  | DieRolled
+  | DieUpdated
+  | DieDeleted
+  | DieLocked
+  | DieUnlocked
+  | TimerCreated
+  | TimerStarted
+  | TimerPaused
+  | TimerResetDone
+  | TimerFinished
+  | TimerUpdated
+  | TimerDeleted
+  | TimerLocked
+  | TimerUnlocked
   | HandCardAdded
   | HandCardAddedOther
   | HandCardRemoved

@@ -192,7 +192,7 @@ const toggleCollapsed = () => {
     </TablePanel>
 
     <!-- Expanded state -->
-    <TablePanel v-else no-padding>
+    <TablePanel v-else no-padding column>
       <!-- Controls bar -->
       <TableToolbar border-bottom>
         <TableButton size="sm" title="Zoom Out" @click="handleZoomOut">

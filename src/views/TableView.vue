@@ -3,6 +3,10 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Card from '@/components/CardComp.vue'
 import ZoneComp from '@/components/ZoneComp.vue'
+import CounterComp from '@/components/CounterComp.vue'
+import TokenComp from '@/components/TokenComp.vue'
+import DieComp from '@/components/DieComp.vue'
+import TimerComp from '@/components/TimerComp.vue'
 import HandComp from '@/components/HandComp.vue'
 import MinimapComp from '@/components/MinimapComp.vue'
 import RemoteCursors from '@/components/RemoteCursors.vue'
@@ -21,7 +25,20 @@ import { useWebSocket } from '@/composables/useWebSocket'
 import { useCursor } from '@/composables/useCursor'
 import { useRemoteThrow } from '@/composables/useRemoteThrow'
 import { useRadialMenu } from '@/composables/useRadialMenu'
-import { SquarePlus, Copy, Check, DoorOpen, Users, Wifi, WifiOff, Settings } from 'lucide-vue-next'
+import {
+  SquarePlus,
+  Copy,
+  Check,
+  DoorOpen,
+  Users,
+  Wifi,
+  WifiOff,
+  Settings,
+  Hash,
+  CircleDot,
+  Dices,
+  Timer,
+} from 'lucide-vue-next'
 import {
   CARD_BACK_COL,
   CARD_BACK_ROW,
@@ -227,6 +244,12 @@ useCursor(playerColor)
 const canvasRef = ref<HTMLElement | null>(null)
 const handRef = ref<HTMLElement | null>(null)
 const handCompRef = ref<InstanceType<typeof HandComp> | null>(null)
+
+// Refs for entity components (to access openModal)
+const counterRefs = ref(new Map<number, InstanceType<typeof CounterComp>>())
+const tokenRefs = ref(new Map<number, InstanceType<typeof TokenComp>>())
+const dieRefs = ref(new Map<number, InstanceType<typeof DieComp>>())
+const timerRefs = ref(new Map<number, InstanceType<typeof TimerComp>>())
 
 // Viewport for pan/zoom
 const viewport = useViewport(canvasRef)
@@ -645,6 +668,141 @@ ws.onMessage((message: ServerMessage) => {
       }
       break
 
+    // Counter messages
+    case 'counter:created':
+      cardStore.addCounterFromServer(message.counter)
+      break
+
+    case 'counter:updated':
+      if (message.playerId !== ws.playerId.value) {
+        cardStore.updateCounterFromServer(message.counterId, message.counter)
+      }
+      break
+
+    case 'counter:incremented':
+      // Always update value (even for own increments to ensure sync)
+      cardStore.updateCounterFromServer(message.counterId, { value: message.value })
+      break
+
+    case 'counter:deleted':
+      cardStore.removeCounter(message.counterId)
+      break
+
+    case 'counter:locked':
+      cardStore.updateCounterFromServer(message.counterId, { lockedBy: message.playerId })
+      break
+
+    case 'counter:unlocked':
+      cardStore.updateCounterFromServer(message.counterId, { lockedBy: null })
+      break
+
+    // Token messages
+    case 'token:created':
+      cardStore.addTokenFromServer(message.token)
+      break
+
+    case 'token:updated':
+      if (message.playerId !== ws.playerId.value) {
+        cardStore.updateTokenFromServer(message.tokenId, message.token)
+      }
+      break
+
+    case 'token:deleted':
+      cardStore.removeToken(message.tokenId)
+      break
+
+    case 'token:locked':
+      cardStore.updateTokenFromServer(message.tokenId, { lockedBy: message.playerId })
+      break
+
+    case 'token:unlocked':
+      cardStore.updateTokenFromServer(message.tokenId, { lockedBy: null })
+      break
+
+    // Die messages
+    case 'die:created':
+      cardStore.addDieFromServer(message.die)
+      break
+
+    case 'die:rolled':
+      // Trigger roll animation, then update value
+      cardStore.setDieRolling(message.dieId, true)
+      setTimeout(() => {
+        cardStore.updateDieFromServer(message.dieId, { value: message.value, isRolling: false })
+      }, 500)
+      break
+
+    case 'die:updated':
+      if (message.playerId !== ws.playerId.value) {
+        cardStore.updateDieFromServer(message.dieId, message.die)
+      }
+      break
+
+    case 'die:deleted':
+      cardStore.removeDie(message.dieId)
+      break
+
+    case 'die:locked':
+      cardStore.updateDieFromServer(message.dieId, { lockedBy: message.playerId })
+      break
+
+    case 'die:unlocked':
+      cardStore.updateDieFromServer(message.dieId, { lockedBy: null })
+      break
+
+    // Timer messages
+    case 'timer:created':
+      cardStore.addTimerFromServer(message.timer)
+      break
+
+    case 'timer:started':
+      cardStore.updateTimerFromServer(message.timerId, {
+        status: 'running',
+        startedAt: message.startedAt,
+      })
+      break
+
+    case 'timer:paused':
+      cardStore.updateTimerFromServer(message.timerId, {
+        status: 'paused',
+        elapsedMs: message.elapsedMs,
+        startedAt: null,
+      })
+      break
+
+    case 'timer:reset':
+      cardStore.updateTimerFromServer(message.timerId, {
+        status: 'stopped',
+        elapsedMs: 0,
+        startedAt: null,
+      })
+      break
+
+    case 'timer:finished':
+      cardStore.updateTimerFromServer(message.timerId, {
+        status: 'finished',
+        startedAt: null,
+      })
+      break
+
+    case 'timer:updated':
+      if (message.playerId !== ws.playerId.value) {
+        cardStore.updateTimerFromServer(message.timerId, message.timer)
+      }
+      break
+
+    case 'timer:deleted':
+      cardStore.removeTimer(message.timerId)
+      break
+
+    case 'timer:locked':
+      cardStore.updateTimerFromServer(message.timerId, { lockedBy: message.playerId })
+      break
+
+    case 'timer:unlocked':
+      cardStore.updateTimerFromServer(message.timerId, { lockedBy: null })
+      break
+
     case 'table:reset':
       // Table was reset - sync the new state (hands are cleared)
       cardStore.syncFromServer(message.state, [])
@@ -856,6 +1014,586 @@ const onZoneDelete = (zoneId: number) => {
   })
 }
 
+// ============================================================================
+// Counter Handling
+// ============================================================================
+
+// Counter drag state
+const draggingCounterId = ref<number | null>(null)
+const counterDragOffset = ref({ x: 0, y: 0 })
+
+// Create new counter at center of viewport
+const addCounter = () => {
+  const bounds = viewport.getVisibleBounds()
+  const centerX = bounds.x + bounds.width / 2 - 40
+  const centerY = bounds.y + bounds.height / 2 - 30
+
+  trackActivity()
+  ws.send({
+    type: 'counter:create',
+    x: centerX,
+    y: centerY,
+    label: 'Counter',
+    value: 0,
+    step: 1,
+    color: '#3b82f6',
+  })
+}
+
+// Handle counter increment from CounterComp
+const onCounterIncrement = (counterId: number, delta: number) => {
+  trackActivity()
+  ws.send({
+    type: 'counter:increment',
+    counterId,
+    delta,
+  })
+}
+
+// Handle counter update from CounterComp
+const onCounterUpdate = (counterId: number, updates: Record<string, unknown>) => {
+  trackActivity()
+  // Update local state immediately for responsiveness
+  cardStore.updateCounterFromServer(
+    counterId,
+    updates as Parameters<typeof cardStore.updateCounterFromServer>[1],
+  )
+  ws.send({
+    type: 'counter:update',
+    counterId,
+    updates,
+  })
+}
+
+// Handle counter delete from CounterComp
+const onCounterDelete = (counterId: number) => {
+  trackActivity()
+  ws.send({
+    type: 'counter:delete',
+    counterId,
+  })
+}
+
+// Counter pointer handlers
+const onCounterPointerDown = (event: PointerEvent, counterId: number) => {
+  const counter = cardStore.getCounterById(counterId)
+  if (!counter) return
+
+  // Don't start drag if locked by another player
+  if (counter.lockedBy && counter.lockedBy !== ws.playerId.value) return
+
+  event.stopPropagation()
+  ;(event.target as HTMLElement).setPointerCapture(event.pointerId)
+
+  // Calculate offset from counter origin to pointer
+  const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
+  counterDragOffset.value = {
+    x: worldPos.x - counter.x,
+    y: worldPos.y - counter.y,
+  }
+
+  draggingCounterId.value = counterId
+
+  // Lock the counter
+  trackActivity()
+  ws.send({
+    type: 'counter:lock',
+    counterId,
+  })
+}
+
+const onCounterPointerMove = (event: PointerEvent) => {
+  if (draggingCounterId.value === null) return
+
+  const counter = cardStore.getCounterById(draggingCounterId.value)
+  if (!counter) return
+
+  const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
+  const newX = worldPos.x - counterDragOffset.value.x
+  const newY = worldPos.y - counterDragOffset.value.y
+
+  // Update local position immediately for smooth dragging
+  counter.x = newX
+  counter.y = newY
+
+  // Send position update to server (throttled via the normal message flow)
+  trackActivity()
+  ws.send({
+    type: 'counter:update',
+    counterId: draggingCounterId.value,
+    updates: { x: newX, y: newY },
+  })
+}
+
+const onCounterPointerUp = (event: PointerEvent) => {
+  if (draggingCounterId.value === null) return
+  ;(event.target as HTMLElement).releasePointerCapture(event.pointerId)
+
+  // Unlock the counter
+  ws.send({
+    type: 'counter:unlock',
+    counterId: draggingCounterId.value,
+  })
+
+  draggingCounterId.value = null
+}
+
+// Check if a counter is being dragged
+const isCounterDragging = (counterId: number): boolean => {
+  return draggingCounterId.value === counterId
+}
+
+// Check if a counter is locked by another player
+const isCounterLockedByOther = (counter: { lockedBy: string | null }): boolean => {
+  return counter.lockedBy !== null && counter.lockedBy !== ws.playerId.value
+}
+
+// Get counter lock color
+const getCounterLockColor = (counter: { lockedBy: string | null }): string | undefined => {
+  if (!counter.lockedBy || counter.lockedBy === ws.playerId.value) return undefined
+  return getPlayerColor(counter.lockedBy) || '#888'
+}
+
+// ============================================================================
+// Token Handlers
+// ============================================================================
+
+// Token drag state
+const draggingTokenId = ref<number | null>(null)
+const tokenDragOffset = ref({ x: 0, y: 0 })
+
+// Create new token at center of viewport
+const addColorToken = () => {
+  const bounds = viewport.getVisibleBounds()
+  const centerX = bounds.x + bounds.width / 2
+  const centerY = bounds.y + bounds.height / 2
+
+  trackActivity()
+  ws.send({
+    type: 'token:create',
+    x: centerX,
+    y: centerY,
+    kind: 'color',
+    shape: 'circle',
+    color: '#ef4444',
+    size: 'medium',
+  })
+}
+
+const addSpriteToken = () => {
+  const bounds = viewport.getVisibleBounds()
+  const centerX = bounds.x + bounds.width / 2
+  const centerY = bounds.y + bounds.height / 2
+
+  trackActivity()
+  ws.send({
+    type: 'token:create',
+    x: centerX,
+    y: centerY,
+    kind: 'sprite',
+    sprite: 'star',
+    color: '#f59e0b',
+    size: 'medium',
+  })
+}
+
+// Handle token update from TokenComp
+const onTokenUpdate = (tokenId: number, updates: Record<string, unknown>) => {
+  trackActivity()
+  // Update local state immediately for responsiveness
+  cardStore.updateTokenFromServer(
+    tokenId,
+    updates as Parameters<typeof cardStore.updateTokenFromServer>[1],
+  )
+  ws.send({
+    type: 'token:update',
+    tokenId,
+    updates,
+  })
+}
+
+// Handle token delete from TokenComp
+const onTokenDelete = (tokenId: number) => {
+  trackActivity()
+  ws.send({
+    type: 'token:delete',
+    tokenId,
+  })
+}
+
+// Token pointer handlers
+const onTokenPointerDown = (event: PointerEvent, tokenId: number) => {
+  const token = cardStore.getTokenById(tokenId)
+  if (!token) return
+
+  // Don't start drag if locked by another player
+  if (token.lockedBy && token.lockedBy !== ws.playerId.value) return
+
+  event.stopPropagation()
+  ;(event.target as HTMLElement).setPointerCapture(event.pointerId)
+
+  // Calculate offset from token origin to pointer
+  const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
+  tokenDragOffset.value = {
+    x: worldPos.x - token.x,
+    y: worldPos.y - token.y,
+  }
+
+  draggingTokenId.value = tokenId
+
+  // Lock the token
+  trackActivity()
+  ws.send({
+    type: 'token:lock',
+    tokenId,
+  })
+}
+
+const onTokenPointerMove = (event: PointerEvent) => {
+  if (draggingTokenId.value === null) return
+
+  const token = cardStore.getTokenById(draggingTokenId.value)
+  if (!token) return
+
+  const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
+  const newX = worldPos.x - tokenDragOffset.value.x
+  const newY = worldPos.y - tokenDragOffset.value.y
+
+  // Update local position immediately for smooth dragging
+  token.x = newX
+  token.y = newY
+
+  // Send position update to server
+  trackActivity()
+  ws.send({
+    type: 'token:update',
+    tokenId: draggingTokenId.value,
+    updates: { x: newX, y: newY },
+  })
+}
+
+const onTokenPointerUp = (event: PointerEvent) => {
+  if (draggingTokenId.value === null) return
+  ;(event.target as HTMLElement).releasePointerCapture(event.pointerId)
+
+  // Unlock the token
+  ws.send({
+    type: 'token:unlock',
+    tokenId: draggingTokenId.value,
+  })
+
+  draggingTokenId.value = null
+}
+
+// Check if a token is being dragged
+const isTokenDragging = (tokenId: number): boolean => {
+  return draggingTokenId.value === tokenId
+}
+
+// Check if a token is locked by another player
+const isTokenLockedByOther = (token: { lockedBy: string | null }): boolean => {
+  return token.lockedBy !== null && token.lockedBy !== ws.playerId.value
+}
+
+// Get token lock color
+const getTokenLockColor = (token: { lockedBy: string | null }): string | undefined => {
+  if (!token.lockedBy || token.lockedBy === ws.playerId.value) return undefined
+  return getPlayerColor(token.lockedBy) || '#888'
+}
+
+// ============================================================================
+// Die Handlers
+// ============================================================================
+
+// Die drag state
+const draggingDieId = ref<number | null>(null)
+const dieDragOffset = ref({ x: 0, y: 0 })
+
+// Create new die at center of viewport
+const addDie = () => {
+  const bounds = viewport.getVisibleBounds()
+  const centerX = bounds.x + bounds.width / 2
+  const centerY = bounds.y + bounds.height / 2
+
+  trackActivity()
+  ws.send({
+    type: 'die:create',
+    x: centerX,
+    y: centerY,
+    color: '#ef4444',
+  })
+}
+
+// Handle die roll from DieComp
+const onDieRoll = (dieId: number) => {
+  trackActivity()
+  // Trigger local animation immediately
+  cardStore.setDieRolling(dieId, true)
+  ws.send({
+    type: 'die:roll',
+    dieId,
+  })
+}
+
+// Handle die update from DieComp
+const onDieUpdate = (dieId: number, updates: Record<string, unknown>) => {
+  trackActivity()
+  // Update local state immediately for responsiveness
+  cardStore.updateDieFromServer(
+    dieId,
+    updates as Parameters<typeof cardStore.updateDieFromServer>[1],
+  )
+  ws.send({
+    type: 'die:update',
+    dieId,
+    updates,
+  })
+}
+
+// Handle die delete from DieComp
+const onDieDelete = (dieId: number) => {
+  trackActivity()
+  ws.send({
+    type: 'die:delete',
+    dieId,
+  })
+}
+
+// Die pointer handlers
+const onDiePointerDown = (event: PointerEvent, dieId: number) => {
+  const die = cardStore.getDieById(dieId)
+  if (!die) return
+
+  // Don't start drag if locked by another player
+  if (die.lockedBy && die.lockedBy !== ws.playerId.value) return
+
+  event.stopPropagation()
+  ;(event.target as HTMLElement).setPointerCapture(event.pointerId)
+
+  // Calculate offset from die origin to pointer
+  const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
+  dieDragOffset.value = {
+    x: worldPos.x - die.x,
+    y: worldPos.y - die.y,
+  }
+
+  draggingDieId.value = dieId
+
+  // Lock the die
+  trackActivity()
+  ws.send({
+    type: 'die:lock',
+    dieId,
+  })
+}
+
+const onDiePointerMove = (event: PointerEvent) => {
+  if (draggingDieId.value === null) return
+
+  const die = cardStore.getDieById(draggingDieId.value)
+  if (!die) return
+
+  const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
+  const newX = worldPos.x - dieDragOffset.value.x
+  const newY = worldPos.y - dieDragOffset.value.y
+
+  // Update local position immediately for smooth dragging
+  die.x = newX
+  die.y = newY
+
+  // Send position update to server
+  trackActivity()
+  ws.send({
+    type: 'die:update',
+    dieId: draggingDieId.value,
+    updates: { x: newX, y: newY },
+  })
+}
+
+const onDiePointerUp = (event: PointerEvent) => {
+  if (draggingDieId.value === null) return
+  ;(event.target as HTMLElement).releasePointerCapture(event.pointerId)
+
+  // Unlock the die
+  ws.send({
+    type: 'die:unlock',
+    dieId: draggingDieId.value,
+  })
+
+  draggingDieId.value = null
+}
+
+// Check if a die is being dragged
+const isDieDragging = (dieId: number): boolean => {
+  return draggingDieId.value === dieId
+}
+
+// Check if a die is locked by another player
+const isDieLockedByOther = (die: { lockedBy: string | null }): boolean => {
+  return die.lockedBy !== null && die.lockedBy !== ws.playerId.value
+}
+
+// Get die lock color
+const getDieLockColor = (die: { lockedBy: string | null }): string | undefined => {
+  if (!die.lockedBy || die.lockedBy === ws.playerId.value) return undefined
+  return getPlayerColor(die.lockedBy) || '#888'
+}
+
+// ============================================================================
+// Timer Handlers
+// ============================================================================
+
+// Timer drag state
+const draggingTimerId = ref<number | null>(null)
+const timerDragOffset = ref({ x: 0, y: 0 })
+
+// Create new timer at center of viewport
+const addTimer = (mode: 'countdown' | 'stopwatch' = 'countdown') => {
+  const bounds = viewport.getVisibleBounds()
+  const centerX = bounds.x + bounds.width / 2
+  const centerY = bounds.y + bounds.height / 2
+
+  trackActivity()
+  ws.send({
+    type: 'timer:create',
+    x: centerX,
+    y: centerY,
+    mode,
+    durationMs: mode === 'countdown' ? 60000 : undefined,
+  })
+}
+
+// Handle timer start from TimerComp
+const onTimerStart = (timerId: number) => {
+  trackActivity()
+  ws.send({
+    type: 'timer:start',
+    timerId,
+  })
+}
+
+// Handle timer pause from TimerComp
+const onTimerPause = (timerId: number) => {
+  trackActivity()
+  ws.send({
+    type: 'timer:pause',
+    timerId,
+  })
+}
+
+// Handle timer reset from TimerComp
+const onTimerReset = (timerId: number) => {
+  trackActivity()
+  ws.send({
+    type: 'timer:reset',
+    timerId,
+  })
+}
+
+// Handle timer update from TimerComp
+const onTimerUpdate = (timerId: number, updates: Record<string, unknown>) => {
+  trackActivity()
+  // Update local state immediately for responsiveness
+  cardStore.updateTimerFromServer(
+    timerId,
+    updates as Parameters<typeof cardStore.updateTimerFromServer>[1],
+  )
+  ws.send({
+    type: 'timer:update',
+    timerId,
+    updates,
+  })
+}
+
+// Handle timer delete from TimerComp
+const onTimerDelete = (timerId: number) => {
+  trackActivity()
+  ws.send({
+    type: 'timer:delete',
+    timerId,
+  })
+}
+
+// Timer pointer handlers
+const onTimerPointerDown = (event: PointerEvent, timerId: number) => {
+  const timer = cardStore.getTimerById(timerId)
+  if (!timer) return
+
+  // Don't start drag if locked by another player
+  if (timer.lockedBy && timer.lockedBy !== ws.playerId.value) return
+
+  event.stopPropagation()
+  ;(event.target as HTMLElement).setPointerCapture(event.pointerId)
+
+  // Calculate offset from timer origin to pointer
+  const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
+  timerDragOffset.value = {
+    x: worldPos.x - timer.x,
+    y: worldPos.y - timer.y,
+  }
+
+  draggingTimerId.value = timerId
+
+  // Lock the timer
+  trackActivity()
+  ws.send({
+    type: 'timer:lock',
+    timerId,
+  })
+}
+
+const onTimerPointerMove = (event: PointerEvent) => {
+  if (draggingTimerId.value === null) return
+
+  const timer = cardStore.getTimerById(draggingTimerId.value)
+  if (!timer) return
+
+  const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
+  const newX = worldPos.x - timerDragOffset.value.x
+  const newY = worldPos.y - timerDragOffset.value.y
+
+  // Update local position immediately for smooth dragging
+  timer.x = newX
+  timer.y = newY
+
+  // Send position update to server
+  trackActivity()
+  ws.send({
+    type: 'timer:update',
+    timerId: draggingTimerId.value,
+    updates: { x: newX, y: newY },
+  })
+}
+
+const onTimerPointerUp = (event: PointerEvent) => {
+  if (draggingTimerId.value === null) return
+  ;(event.target as HTMLElement).releasePointerCapture(event.pointerId)
+
+  // Unlock the timer
+  ws.send({
+    type: 'timer:unlock',
+    timerId: draggingTimerId.value,
+  })
+
+  draggingTimerId.value = null
+}
+
+// Check if a timer is being dragged
+const isTimerDragging = (timerId: number): boolean => {
+  return draggingTimerId.value === timerId
+}
+
+// Check if a timer is locked by another player
+const isTimerLockedByOther = (timer: { lockedBy: string | null }): boolean => {
+  return timer.lockedBy !== null && timer.lockedBy !== ws.playerId.value
+}
+
+// Get timer lock color
+const getTimerLockColor = (timer: { lockedBy: string | null }): string | undefined => {
+  if (!timer.lockedBy || timer.lockedBy === ws.playerId.value) return undefined
+  return getPlayerColor(timer.lockedBy) || '#888'
+}
+
 // Right-click handler for cards to open radial menu
 const onCardRightClick = (event: MouseEvent, index: number) => {
   event.preventDefault()
@@ -966,6 +1704,67 @@ const onHandCardRightClick = (event: MouseEvent, cardId: number) => {
   })
 }
 
+// Right-click handler for counters
+const onCounterRightClick = (event: MouseEvent, counterId: number) => {
+  event.preventDefault()
+  event.stopPropagation()
+
+  const counter = cardStore.getCounterById(counterId)
+  if (!counter) return
+
+  radialMenu.open(event.clientX, event.clientY, {
+    type: 'counter',
+    counterId,
+    value: counter.value,
+  })
+}
+
+// Right-click handler for tokens
+const onTokenRightClick = (event: MouseEvent, tokenId: number) => {
+  event.preventDefault()
+  event.stopPropagation()
+
+  const token = cardStore.getTokenById(tokenId)
+  if (!token) return
+
+  radialMenu.open(event.clientX, event.clientY, {
+    type: 'token',
+    tokenId,
+    kind: token.kind,
+  })
+}
+
+// Right-click handler for dice
+const onDieRightClick = (event: MouseEvent, dieId: number) => {
+  event.preventDefault()
+  event.stopPropagation()
+
+  const die = cardStore.getDieById(dieId)
+  if (!die) return
+
+  radialMenu.open(event.clientX, event.clientY, {
+    type: 'die',
+    dieId,
+    value: die.value,
+  })
+}
+
+// Right-click handler for timers
+const onTimerRightClick = (event: MouseEvent, timerId: number) => {
+  event.preventDefault()
+  event.stopPropagation()
+
+  const timer = cardStore.getTimerById(timerId)
+  if (!timer) return
+
+  radialMenu.open(event.clientX, event.clientY, {
+    type: 'timer',
+    timerId,
+    status: timer.status,
+    mode: timer.mode,
+  })
+}
+
 // Handle radial menu item selection
 const onRadialMenuSelect = (item: RadialMenuItem) => {
   const target = radialMenu.target.value
@@ -994,6 +1793,18 @@ const onRadialMenuSelect = (item: RadialMenuItem) => {
       break
     case 'canvas':
       handleCanvasAction(item.id, target.worldX, target.worldY)
+      break
+    case 'counter':
+      handleCounterAction(item.id, target.counterId)
+      break
+    case 'token':
+      handleTokenAction(item.id, target.tokenId)
+      break
+    case 'die':
+      handleDieAction(item.id, target.dieId)
+      break
+    case 'timer':
+      handleTimerAction(item.id, target.timerId)
       break
   }
 }
@@ -1284,6 +2095,102 @@ const handleHandSelectionAction = (action: string, cardIds: number[]) => {
       break
     case 'deselect':
       handCompRef.value?.clearHandSelection()
+      break
+  }
+}
+
+const handleCounterAction = (action: string, counterId: number) => {
+  const counter = cardStore.getCounterById(counterId)
+  if (!counter) return
+
+  switch (action) {
+    case 'counter-reset':
+      // Reset counter to zero (or min if set)
+      const resetValue = counter.min !== undefined ? counter.min : 0
+      ws.send({
+        type: 'counter:update',
+        counterId,
+        updates: { value: resetValue },
+      })
+      break
+    case 'counter-settings':
+      // Open the counter's modal - find the component ref
+      // For now we trigger the double-click behavior by emitting update
+      // The component exposes openModal via defineExpose
+      counterRefs.value.get(counterId)?.openModal()
+      break
+    case 'counter-delete':
+      ws.send({ type: 'counter:delete', counterId })
+      break
+  }
+}
+
+const handleTokenAction = (action: string, tokenId: number) => {
+  const token = cardStore.getTokenById(tokenId)
+  if (!token) return
+
+  switch (action) {
+    case 'token-duplicate': {
+      // Create a copy of the token slightly offset
+      ws.send({
+        type: 'token:create',
+        x: token.x + 20,
+        y: token.y + 20,
+        kind: token.kind,
+        shape: token.shape,
+        color: token.color,
+        label: token.label,
+        sprite: token.sprite,
+        size: token.size,
+      })
+      break
+    }
+    case 'token-settings':
+      tokenRefs.value.get(tokenId)?.openModal()
+      break
+    case 'token-delete':
+      ws.send({ type: 'token:delete', tokenId })
+      break
+  }
+}
+
+const handleDieAction = (action: string, dieId: number) => {
+  const die = cardStore.getDieById(dieId)
+  if (!die) return
+
+  switch (action) {
+    case 'die-roll':
+      cardStore.setDieRolling(dieId, true)
+      ws.send({ type: 'die:roll', dieId })
+      break
+    case 'die-settings':
+      dieRefs.value.get(dieId)?.openModal()
+      break
+    case 'die-delete':
+      ws.send({ type: 'die:delete', dieId })
+      break
+  }
+}
+
+const handleTimerAction = (action: string, timerId: number) => {
+  const timer = cardStore.getTimerById(timerId)
+  if (!timer) return
+
+  switch (action) {
+    case 'timer-start':
+      ws.send({ type: 'timer:start', timerId })
+      break
+    case 'timer-pause':
+      ws.send({ type: 'timer:pause', timerId })
+      break
+    case 'timer-reset':
+      ws.send({ type: 'timer:reset', timerId })
+      break
+    case 'timer-settings':
+      timerRefs.value.get(timerId)?.openModal()
+      break
+    case 'timer-delete':
+      ws.send({ type: 'timer:delete', timerId })
       break
   }
 }
@@ -1613,9 +2520,21 @@ onBeforeUnmount(() => {
           :canvas-height="canvasDimensions.height"
         />
 
-        <TablePanel>
+        <TablePanel class="table-ui__add-panel" title="Add Item" column>
           <TableButton title="Add Zone" @click="addZone">
             <SquarePlus />
+          </TableButton>
+          <TableButton title="Add Counter" @click="addCounter">
+            <Hash />
+          </TableButton>
+          <TableButton title="Add Token" @click="addColorToken">
+            <CircleDot />
+          </TableButton>
+          <TableButton title="Add Die" @click="addDie">
+            <Dices />
+          </TableButton>
+          <TableButton title="Add Timer" @click="addTimer('countdown')">
+            <Timer />
           </TableButton>
         </TablePanel>
       </div>
@@ -1637,6 +2556,79 @@ onBeforeUnmount(() => {
           @zone:update="onZoneUpdate"
           @zone:delete="onZoneDelete"
           @settings:close="editingZoneId = null"
+        />
+
+        <!-- Counters -->
+        <CounterComp
+          v-for="counter in cardStore.counters"
+          :key="counter.id"
+          :ref="(el: any) => el && counterRefs.set(counter.id, el)"
+          :counter="counter"
+          :is-dragging="isCounterDragging(counter.id)"
+          :is-locked-by-other="isCounterLockedByOther(counter)"
+          :lock-color="getCounterLockColor(counter)"
+          @pointerdown="onCounterPointerDown($event, counter.id)"
+          @pointermove="onCounterPointerMove"
+          @pointerup="onCounterPointerUp"
+          @contextmenu="onCounterRightClick($event, counter.id)"
+          @counter:increment="onCounterIncrement"
+          @counter:update="onCounterUpdate"
+          @counter:delete="onCounterDelete"
+        />
+
+        <!-- Tokens -->
+        <TokenComp
+          v-for="token in cardStore.tokens"
+          :key="token.id"
+          :ref="(el: any) => el && tokenRefs.set(token.id, el)"
+          :token="token"
+          :is-dragging="isTokenDragging(token.id)"
+          :is-locked-by-other="isTokenLockedByOther(token)"
+          :lock-color="getTokenLockColor(token)"
+          @pointerdown="onTokenPointerDown($event, token.id)"
+          @pointermove="onTokenPointerMove"
+          @pointerup="onTokenPointerUp"
+          @contextmenu="onTokenRightClick($event, token.id)"
+          @token:update="onTokenUpdate"
+          @token:delete="onTokenDelete"
+        />
+
+        <!-- Dice -->
+        <DieComp
+          v-for="die in cardStore.dice"
+          :key="die.id"
+          :ref="(el: any) => el && dieRefs.set(die.id, el)"
+          :die="die"
+          :is-dragging="isDieDragging(die.id)"
+          :is-locked-by-other="isDieLockedByOther(die)"
+          :lock-color="getDieLockColor(die)"
+          @pointerdown="onDiePointerDown($event, die.id)"
+          @pointermove="onDiePointerMove"
+          @pointerup="onDiePointerUp"
+          @contextmenu="onDieRightClick($event, die.id)"
+          @die:roll="onDieRoll"
+          @die:update="onDieUpdate"
+          @die:delete="onDieDelete"
+        />
+
+        <!-- Timers -->
+        <TimerComp
+          v-for="timer in cardStore.timers"
+          :key="timer.id"
+          :ref="(el: any) => el && timerRefs.set(timer.id, el)"
+          :timer="timer"
+          :is-dragging="isTimerDragging(timer.id)"
+          :is-locked-by-other="isTimerLockedByOther(timer)"
+          :lock-color="getTimerLockColor(timer)"
+          @pointerdown="onTimerPointerDown($event, timer.id)"
+          @pointermove="onTimerPointerMove"
+          @pointerup="onTimerPointerUp"
+          @contextmenu="onTimerRightClick($event, timer.id)"
+          @timer:start="onTimerStart"
+          @timer:pause="onTimerPause"
+          @timer:reset="onTimerReset"
+          @timer:update="onTimerUpdate"
+          @timer:delete="onTimerDelete"
         />
 
         <Card

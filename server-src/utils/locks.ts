@@ -11,6 +11,10 @@ interface Lock {
 export class LockManager {
   private cardLocks = new Map<number, Lock>()
   private stackLocks = new Map<number, Lock>()
+  private counterLocks = new Map<number, Lock>()
+  private tokenLocks = new Map<number, Lock>()
+  private dieLocks = new Map<number, Lock>()
+  private timerLocks = new Map<number, Lock>()
   private cleanupInterval: ReturnType<typeof setInterval> | null = null
 
   constructor() {
@@ -104,10 +108,233 @@ export class LockManager {
   }
 
   /**
+   * Try to acquire a lock on a counter
+   */
+  lockCounter(counterId: number, playerId: string): boolean {
+    const existing = this.counterLocks.get(counterId)
+    const now = Date.now()
+
+    if (existing && existing.playerId !== playerId && existing.expiresAt > now) {
+      return false
+    }
+
+    this.counterLocks.set(counterId, {
+      playerId,
+      expiresAt: now + LOCK_TTL_MS,
+    })
+    return true
+  }
+
+  /**
+   * Release a lock on a counter
+   */
+  unlockCounter(counterId: number, playerId: string): boolean {
+    const existing = this.counterLocks.get(counterId)
+    if (!existing || existing.playerId !== playerId) {
+      return false
+    }
+    this.counterLocks.delete(counterId)
+    return true
+  }
+
+  /**
+   * Check if a counter is locked
+   */
+  isCounterLocked(counterId: number): string | null {
+    const lock = this.counterLocks.get(counterId)
+    if (!lock || lock.expiresAt <= Date.now()) {
+      this.counterLocks.delete(counterId)
+      return null
+    }
+    return lock.playerId
+  }
+
+  /**
+   * Refresh the expiration time for a counter lock
+   */
+  refreshCounterLock(counterId: number, playerId: string): boolean {
+    const lock = this.counterLocks.get(counterId)
+    if (!lock || lock.playerId !== playerId) {
+      return false
+    }
+    lock.expiresAt = Date.now() + LOCK_TTL_MS
+    return true
+  }
+
+  /**
+   * Try to acquire a lock on a token
+   */
+  lockToken(tokenId: number, playerId: string): boolean {
+    const existing = this.tokenLocks.get(tokenId)
+    const now = Date.now()
+
+    if (existing && existing.playerId !== playerId && existing.expiresAt > now) {
+      return false
+    }
+
+    this.tokenLocks.set(tokenId, {
+      playerId,
+      expiresAt: now + LOCK_TTL_MS,
+    })
+    return true
+  }
+
+  /**
+   * Release a lock on a token
+   */
+  unlockToken(tokenId: number, playerId: string): boolean {
+    const existing = this.tokenLocks.get(tokenId)
+    if (!existing || existing.playerId !== playerId) {
+      return false
+    }
+    this.tokenLocks.delete(tokenId)
+    return true
+  }
+
+  /**
+   * Check if a token is locked
+   */
+  isTokenLocked(tokenId: number): string | null {
+    const lock = this.tokenLocks.get(tokenId)
+    if (!lock || lock.expiresAt <= Date.now()) {
+      this.tokenLocks.delete(tokenId)
+      return null
+    }
+    return lock.playerId
+  }
+
+  /**
+   * Refresh the expiration time for a token lock
+   */
+  refreshTokenLock(tokenId: number, playerId: string): boolean {
+    const lock = this.tokenLocks.get(tokenId)
+    if (!lock || lock.playerId !== playerId) {
+      return false
+    }
+    lock.expiresAt = Date.now() + LOCK_TTL_MS
+    return true
+  }
+
+  /**
+   * Try to acquire a lock on a die
+   */
+  lockDie(dieId: number, playerId: string): boolean {
+    const existing = this.dieLocks.get(dieId)
+    const now = Date.now()
+
+    if (existing && existing.playerId !== playerId && existing.expiresAt > now) {
+      return false
+    }
+
+    this.dieLocks.set(dieId, {
+      playerId,
+      expiresAt: now + LOCK_TTL_MS,
+    })
+    return true
+  }
+
+  /**
+   * Release a lock on a die
+   */
+  unlockDie(dieId: number, playerId: string): boolean {
+    const existing = this.dieLocks.get(dieId)
+    if (!existing || existing.playerId !== playerId) {
+      return false
+    }
+    this.dieLocks.delete(dieId)
+    return true
+  }
+
+  /**
+   * Check if a die is locked
+   */
+  isDieLocked(dieId: number): string | null {
+    const lock = this.dieLocks.get(dieId)
+    if (!lock || lock.expiresAt <= Date.now()) {
+      this.dieLocks.delete(dieId)
+      return null
+    }
+    return lock.playerId
+  }
+
+  /**
+   * Refresh the expiration time for a die lock
+   */
+  refreshDieLock(dieId: number, playerId: string): boolean {
+    const lock = this.dieLocks.get(dieId)
+    if (!lock || lock.playerId !== playerId) {
+      return false
+    }
+    lock.expiresAt = Date.now() + LOCK_TTL_MS
+    return true
+  }
+
+  /**
+   * Try to acquire a lock on a timer
+   */
+  lockTimer(timerId: number, playerId: string): boolean {
+    const existing = this.timerLocks.get(timerId)
+    const now = Date.now()
+
+    if (existing && existing.playerId !== playerId && existing.expiresAt > now) {
+      return false
+    }
+
+    this.timerLocks.set(timerId, {
+      playerId,
+      expiresAt: now + LOCK_TTL_MS,
+    })
+    return true
+  }
+
+  /**
+   * Release a lock on a timer
+   */
+  unlockTimer(timerId: number, playerId: string): boolean {
+    const existing = this.timerLocks.get(timerId)
+    if (!existing || existing.playerId !== playerId) {
+      return false
+    }
+    this.timerLocks.delete(timerId)
+    return true
+  }
+
+  /**
+   * Check if a timer is locked
+   */
+  isTimerLocked(timerId: number): string | null {
+    const lock = this.timerLocks.get(timerId)
+    if (!lock || lock.expiresAt <= Date.now()) {
+      this.timerLocks.delete(timerId)
+      return null
+    }
+    return lock.playerId
+  }
+
+  /**
+   * Refresh the expiration time for a timer lock
+   */
+  refreshTimerLock(timerId: number, playerId: string): boolean {
+    const lock = this.timerLocks.get(timerId)
+    if (!lock || lock.playerId !== playerId) {
+      return false
+    }
+    lock.expiresAt = Date.now() + LOCK_TTL_MS
+    return true
+  }
+
+  /**
    * Release all locks held by a player (e.g., on disconnect)
    */
-  releaseAllForPlayer(playerId: string): { cards: number[]; stacks: number[] } {
-    const released = { cards: [] as number[], stacks: [] as number[] }
+  releaseAllForPlayer(playerId: string): { cards: number[]; stacks: number[]; counters: number[]; tokens: number[]; dice: number[]; timers: number[] } {
+    const released = {
+      cards: [] as number[],
+      stacks: [] as number[],
+      counters: [] as number[],
+      tokens: [] as number[],
+      dice: [] as number[],
+      timers: [] as number[],
+    }
 
     for (const [cardId, lock] of this.cardLocks) {
       if (lock.playerId === playerId) {
@@ -123,6 +350,34 @@ export class LockManager {
       }
     }
 
+    for (const [counterId, lock] of this.counterLocks) {
+      if (lock.playerId === playerId) {
+        this.counterLocks.delete(counterId)
+        released.counters.push(counterId)
+      }
+    }
+
+    for (const [tokenId, lock] of this.tokenLocks) {
+      if (lock.playerId === playerId) {
+        this.tokenLocks.delete(tokenId)
+        released.tokens.push(tokenId)
+      }
+    }
+
+    for (const [dieId, lock] of this.dieLocks) {
+      if (lock.playerId === playerId) {
+        this.dieLocks.delete(dieId)
+        released.dice.push(dieId)
+      }
+    }
+
+    for (const [timerId, lock] of this.timerLocks) {
+      if (lock.playerId === playerId) {
+        this.timerLocks.delete(timerId)
+        released.timers.push(timerId)
+      }
+    }
+
     return released
   }
 
@@ -132,6 +387,10 @@ export class LockManager {
   releaseAll(): void {
     this.cardLocks.clear()
     this.stackLocks.clear()
+    this.counterLocks.clear()
+    this.tokenLocks.clear()
+    this.dieLocks.clear()
+    this.timerLocks.clear()
   }
 
   /**
@@ -170,6 +429,30 @@ export class LockManager {
     for (const [stackId, lock] of this.stackLocks) {
       if (lock.expiresAt <= now) {
         this.stackLocks.delete(stackId)
+      }
+    }
+
+    for (const [counterId, lock] of this.counterLocks) {
+      if (lock.expiresAt <= now) {
+        this.counterLocks.delete(counterId)
+      }
+    }
+
+    for (const [tokenId, lock] of this.tokenLocks) {
+      if (lock.expiresAt <= now) {
+        this.tokenLocks.delete(tokenId)
+      }
+    }
+
+    for (const [dieId, lock] of this.dieLocks) {
+      if (lock.expiresAt <= now) {
+        this.dieLocks.delete(dieId)
+      }
+    }
+
+    for (const [timerId, lock] of this.timerLocks) {
+      if (lock.expiresAt <= now) {
+        this.timerLocks.delete(timerId)
       }
     }
   }

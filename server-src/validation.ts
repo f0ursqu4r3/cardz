@@ -54,13 +54,86 @@ export const HandStateSchema = z.object({
   cardIds: z.array(z.number().int()),
 })
 
+export const CounterStateSchema = z.object({
+  id: z.number().int(),
+  x: z.number(),
+  y: z.number(),
+  label: z.string(),
+  value: z.number(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  step: z.number(),
+  color: z.string(),
+  lockedBy: z.string().nullable(),
+})
+
+export const TokenShapeSchema = z.enum(['circle', 'square', 'star', 'triangle'])
+export const TokenSpriteSchema = z.enum(['star', 'skull', 'coin', 'heart', 'shield', 'gem'])
+export const TokenSizeSchema = z.enum(['small', 'medium', 'large'])
+
+export const TokenStateSchema = z.object({
+  id: z.number().int(),
+  x: z.number(),
+  y: z.number(),
+  kind: z.enum(['color', 'sprite']),
+  shape: TokenShapeSchema.optional(),
+  color: z.string(),
+  label: z.string().optional(),
+  sprite: TokenSpriteSchema.optional(),
+  size: TokenSizeSchema,
+  lockedBy: z.string().nullable(),
+})
+
+export const DieValueSchema = z.union([
+  z.literal(1),
+  z.literal(2),
+  z.literal(3),
+  z.literal(4),
+  z.literal(5),
+  z.literal(6),
+])
+
+export const DieStateSchema = z.object({
+  id: z.number().int(),
+  x: z.number(),
+  y: z.number(),
+  value: DieValueSchema,
+  isRolling: z.boolean(),
+  color: z.string(),
+  lockedBy: z.string().nullable(),
+})
+
+export const TimerModeSchema = z.enum(['countdown', 'stopwatch'])
+export const TimerStatusSchema = z.enum(['stopped', 'running', 'paused', 'finished'])
+
+export const TimerStateSchema = z.object({
+  id: z.number().int(),
+  x: z.number(),
+  y: z.number(),
+  mode: TimerModeSchema,
+  durationMs: z.number().int().min(0),
+  elapsedMs: z.number().int().min(0),
+  status: TimerStatusSchema,
+  startedAt: z.number().nullable(),
+  label: z.string(),
+  lockedBy: z.string().nullable(),
+})
+
 export const GameStateSchema = z.object({
   cards: z.array(CardStateSchema),
   stacks: z.array(StackStateSchema),
   zones: z.array(ZoneStateSchema),
   hands: z.array(HandStateSchema),
+  counters: z.array(CounterStateSchema),
+  tokens: z.array(TokenStateSchema),
+  dice: z.array(DieStateSchema),
+  timers: z.array(TimerStateSchema),
   nextStackId: z.number().int(),
   nextZoneId: z.number().int(),
+  nextCounterId: z.number().int(),
+  nextTokenId: z.number().int(),
+  nextDieId: z.number().int(),
+  nextTimerId: z.number().int(),
   zCounter: z.number().int(),
 })
 
@@ -250,6 +323,199 @@ export const ZoneAddCardsSchema = z.object({
 })
 
 // ============================================================================
+// Counter Message Schemas (Client → Server)
+// ============================================================================
+
+export const CounterCreateSchema = z.object({
+  type: z.literal('counter:create'),
+  x: z.number(),
+  y: z.number(),
+  label: z.string().min(1).max(32),
+  value: z.number().optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  step: z.number().positive().optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+})
+
+export const CounterUpdateSchema = z.object({
+  type: z.literal('counter:update'),
+  counterId: z.number().int(),
+  updates: z.object({
+    x: z.number().optional(),
+    y: z.number().optional(),
+    label: z.string().min(1).max(32).optional(),
+    value: z.number().optional(),
+    min: z.number().optional(),
+    max: z.number().optional(),
+    step: z.number().positive().optional(),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  }),
+})
+
+export const CounterIncrementSchema = z.object({
+  type: z.literal('counter:increment'),
+  counterId: z.number().int(),
+  delta: z.number(),
+})
+
+export const CounterDeleteSchema = z.object({
+  type: z.literal('counter:delete'),
+  counterId: z.number().int(),
+})
+
+export const CounterLockSchema = z.object({
+  type: z.literal('counter:lock'),
+  counterId: z.number().int(),
+})
+
+export const CounterUnlockSchema = z.object({
+  type: z.literal('counter:unlock'),
+  counterId: z.number().int(),
+})
+
+// ============================================================================
+// Token Message Schemas (Client → Server)
+// ============================================================================
+
+export const TokenCreateSchema = z.object({
+  type: z.literal('token:create'),
+  x: z.number(),
+  y: z.number(),
+  kind: z.enum(['color', 'sprite']),
+  shape: TokenShapeSchema.optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  label: z.string().max(16).optional(),
+  sprite: TokenSpriteSchema.optional(),
+  size: TokenSizeSchema.optional(),
+})
+
+export const TokenUpdateSchema = z.object({
+  type: z.literal('token:update'),
+  tokenId: z.number().int(),
+  updates: z.object({
+    x: z.number().optional(),
+    y: z.number().optional(),
+    shape: TokenShapeSchema.optional(),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    label: z.string().max(16).optional(),
+    sprite: TokenSpriteSchema.optional(),
+    size: TokenSizeSchema.optional(),
+  }),
+})
+
+export const TokenDeleteSchema = z.object({
+  type: z.literal('token:delete'),
+  tokenId: z.number().int(),
+})
+
+export const TokenLockSchema = z.object({
+  type: z.literal('token:lock'),
+  tokenId: z.number().int(),
+})
+
+export const TokenUnlockSchema = z.object({
+  type: z.literal('token:unlock'),
+  tokenId: z.number().int(),
+})
+
+// ============================================================================
+// Die Message Schemas (Client → Server)
+// ============================================================================
+
+export const DieCreateSchema = z.object({
+  type: z.literal('die:create'),
+  x: z.number(),
+  y: z.number(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+})
+
+export const DieRollSchema = z.object({
+  type: z.literal('die:roll'),
+  dieId: z.number().int(),
+})
+
+export const DieUpdateSchema = z.object({
+  type: z.literal('die:update'),
+  dieId: z.number().int(),
+  updates: z.object({
+    x: z.number().optional(),
+    y: z.number().optional(),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  }),
+})
+
+export const DieDeleteSchema = z.object({
+  type: z.literal('die:delete'),
+  dieId: z.number().int(),
+})
+
+export const DieLockSchema = z.object({
+  type: z.literal('die:lock'),
+  dieId: z.number().int(),
+})
+
+export const DieUnlockSchema = z.object({
+  type: z.literal('die:unlock'),
+  dieId: z.number().int(),
+})
+
+// ============================================================================
+// Timer Message Schemas (Client → Server)
+// ============================================================================
+
+export const TimerCreateSchema = z.object({
+  type: z.literal('timer:create'),
+  x: z.number(),
+  y: z.number(),
+  mode: TimerModeSchema,
+  durationMs: z.number().int().min(1000).max(86400000).optional(), // 1 second to 24 hours
+  label: z.string().max(32).optional(),
+})
+
+export const TimerStartSchema = z.object({
+  type: z.literal('timer:start'),
+  timerId: z.number().int(),
+})
+
+export const TimerPauseSchema = z.object({
+  type: z.literal('timer:pause'),
+  timerId: z.number().int(),
+})
+
+export const TimerResetSchema = z.object({
+  type: z.literal('timer:reset'),
+  timerId: z.number().int(),
+})
+
+export const TimerUpdateSchema = z.object({
+  type: z.literal('timer:update'),
+  timerId: z.number().int(),
+  updates: z.object({
+    x: z.number().optional(),
+    y: z.number().optional(),
+    mode: TimerModeSchema.optional(),
+    durationMs: z.number().int().min(1000).max(86400000).optional(),
+    label: z.string().max(32).optional(),
+  }),
+})
+
+export const TimerDeleteSchema = z.object({
+  type: z.literal('timer:delete'),
+  timerId: z.number().int(),
+})
+
+export const TimerLockSchema = z.object({
+  type: z.literal('timer:lock'),
+  timerId: z.number().int(),
+})
+
+export const TimerUnlockSchema = z.object({
+  type: z.literal('timer:unlock'),
+  timerId: z.number().int(),
+})
+
+// ============================================================================
 // Hand Message Schemas (Client → Server)
 // ============================================================================
 
@@ -413,6 +679,31 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   ZoneDeleteSchema,
   ZoneAddCardSchema,
   ZoneAddCardsSchema,
+  CounterCreateSchema,
+  CounterUpdateSchema,
+  CounterIncrementSchema,
+  CounterDeleteSchema,
+  CounterLockSchema,
+  CounterUnlockSchema,
+  TokenCreateSchema,
+  TokenUpdateSchema,
+  TokenDeleteSchema,
+  TokenLockSchema,
+  TokenUnlockSchema,
+  DieCreateSchema,
+  DieRollSchema,
+  DieUpdateSchema,
+  DieDeleteSchema,
+  DieLockSchema,
+  DieUnlockSchema,
+  TimerCreateSchema,
+  TimerStartSchema,
+  TimerPauseSchema,
+  TimerResetSchema,
+  TimerUpdateSchema,
+  TimerDeleteSchema,
+  TimerLockSchema,
+  TimerUnlockSchema,
   HandAddSchema,
   HandRemoveSchema,
   HandReorderSchema,
