@@ -521,6 +521,7 @@ const server = Bun.serve<ClientData>({
           'chat:send',
           'chat:typing',
           'cursor:update',
+          'selection:update',
           'viewport:update',
           'state:request',
         ]
@@ -786,6 +787,28 @@ const server = Bun.serve<ClientData>({
               },
               { x: msg.x, y: msg.y },
               clientData.id, // Exclude sender (uses socket ID for routing)
+            )
+            break
+          }
+
+          // Selection updates (broadcast to all players)
+          case 'selection:update': {
+            if (!clientData.playerId) break
+
+            const player = room.players.get(clientData.playerId)
+            if (!player) break
+
+            // Broadcast selection to all other players in the room
+            broadcastToRoom(
+              clients,
+              room.code,
+              {
+                type: 'selection:updated',
+                playerId: clientData.playerId,
+                playerColor: player.color,
+                cardIds: msg.cardIds,
+              },
+              clientData.id, // Exclude sender
             )
             break
           }

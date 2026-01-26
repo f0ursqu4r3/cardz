@@ -1170,6 +1170,22 @@ export interface ViewportUpdate {
 }
 
 // ============================================================================
+// Selection Messages (for showing other players' card selections)
+// ============================================================================
+
+export interface SelectionUpdate {
+  type: 'selection:update'
+  cardIds: number[] // List of selected card IDs (empty to clear)
+}
+
+export interface SelectionUpdated {
+  type: 'selection:updated'
+  playerId: string
+  playerColor: string
+  cardIds: number[]
+}
+
+// ============================================================================
 // State Sync Messages
 // ============================================================================
 
@@ -1388,6 +1404,7 @@ type ClientMessageBase =
   | HandAddStack
   | SelectionStack
   | CursorUpdate
+  | SelectionUpdate
   | ViewportUpdate
   | StateRequest
   | TableReset
@@ -1467,6 +1484,7 @@ type ServerMessageBase =
   | HandStackAddedOther
   | SelectionStacked
   | CursorUpdated
+  | SelectionUpdated
   | StateSync
   | StateDelta
   | ActionError

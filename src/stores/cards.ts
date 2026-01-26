@@ -24,6 +24,8 @@ export const useCardStore = defineStore('cards', () => {
   const dice = ref<Die[]>([])
   const timers = ref<Timer[]>([])
   const selectedIds = ref<Set<number>>(new Set())
+  // Remote player selections: Map<playerId, { cardIds: Set<number>, color: string }>
+  const remoteSelections = ref<Map<string, { cardIds: Set<number>; color: string }>>(new Map())
   const handCardIds = ref<number[]>([])
   const shufflingStackId = ref<number | null>(null)
 
@@ -738,6 +740,31 @@ export const useCardStore = defineStore('cards', () => {
     selectedIds.value.clear()
   }
 
+  // Remote selection management
+  const updateRemoteSelection = (playerId: string, playerColor: string, cardIds: number[]) => {
+    if (cardIds.length === 0) {
+      remoteSelections.value.delete(playerId)
+    } else {
+      remoteSelections.value.set(playerId, {
+        cardIds: new Set(cardIds),
+        color: playerColor,
+      })
+    }
+  }
+
+  const getRemoteSelectionColor = (cardId: number): string | null => {
+    for (const [, selection] of remoteSelections.value) {
+      if (selection.cardIds.has(cardId)) {
+        return selection.color
+      }
+    }
+    return null
+  }
+
+  const clearRemoteSelection = (playerId: string) => {
+    remoteSelections.value.delete(playerId)
+  }
+
   const hasSelection = computed(() => selectedIds.value.size > 0)
 
   const selectionCount = computed(() => selectedIds.value.size)
@@ -1322,6 +1349,9 @@ export const useCardStore = defineStore('cards', () => {
     isSelected,
     toggleSelect,
     clearSelection,
+    updateRemoteSelection,
+    getRemoteSelectionColor,
+    clearRemoteSelection,
     hasSelection,
     selectionCount,
     moveSelection,

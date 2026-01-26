@@ -156,6 +156,17 @@ watch(
   },
 )
 
+// Broadcast selection changes to other players
+watch(
+  () => [...cardStore.selectedIds],
+  (cardIds) => {
+    if (ws.isConnected.value) {
+      ws.send({ type: 'selection:update', cardIds })
+    }
+  },
+  { deep: true },
+)
+
 // Toast notifications
 const toast = useToast()
 
@@ -1154,12 +1165,14 @@ onBeforeUnmount(() => {
               cardStore.shufflingStackId !== null && card.stackId === cardStore.shufflingStackId,
             'locked-by-other': shouldShowLockGlow(card),
             'zone-reorder-shift': zoneReorderPositions.get(card.id) !== undefined,
+            'remote-selected': cardStore.getRemoteSelectionColor(card.id) !== null,
           }"
           :style="{
             '--col': shouldShowFaceDown(card) ? CARD_BACK_COL : card.col,
             '--row': shouldShowFaceDown(card) ? CARD_BACK_ROW : card.row,
             '--shuffle-seed': card.id % 10,
             '--lock-color': getCardLockColor(card),
+            '--remote-selection-color': cardStore.getRemoteSelectionColor(card.id) ?? undefined,
             '--stack-size': isStackBottom(card) ? getStackSize(card) : 1,
             left: `${getZoneReorderPosition(card)?.x ?? getLockedCardPosition(card)?.x ?? card.x}px`,
             top: `${getZoneReorderPosition(card)?.y ?? getLockedCardPosition(card)?.y ?? card.y}px`,
@@ -1520,6 +1533,12 @@ onBeforeUnmount(() => {
   box-shadow:
     0 0 0 2px #3b82f6,
     0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+:deep(.card.remote-selected) {
+  box-shadow:
+    0 0 0 2px var(--remote-selection-color, #888),
+    0 4px 12px color-mix(in srgb, var(--remote-selection-color, #888) 30%, transparent);
 }
 
 :deep(.card.shuffling) {

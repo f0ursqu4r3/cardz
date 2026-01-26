@@ -521,6 +521,17 @@ export function useGameStateSync(config: GameStateSyncConfig) {
         cardStore.updateTimerFromServer(message.timerId, { lockedBy: null })
         break
 
+      // Selection messages
+      case 'selection:updated':
+        // Update remote player's selection in card store
+        cardStore.updateRemoteSelection(message.playerId, message.playerColor, message.cardIds)
+        break
+
+      // Player left - clear their remote selection
+      case 'room:player_left':
+        cardStore.clearRemoteSelection(message.playerId)
+        break
+
       case 'table:reset':
         // Table was reset - sync the new state (hands are cleared)
         cardStore.syncFromServer(message.state, [])

@@ -577,6 +577,15 @@ export const CursorUpdateSchema = z.object({
 })
 
 // ============================================================================
+// Selection Message Schemas (Client → Server)
+// ============================================================================
+
+export const SelectionUpdateSchema = z.object({
+  type: z.literal('selection:update'),
+  cardIds: z.array(z.number().int().nonnegative()),
+})
+
+// ============================================================================
 // Viewport Message Schemas (Client → Server)
 // ============================================================================
 
@@ -723,6 +732,7 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   HandAddStackSchema,
   SelectionStackSchema,
   CursorUpdateSchema,
+  SelectionUpdateSchema,
   ViewportUpdateSchema,
   StateRequestSchema,
   TableResetSchema,
