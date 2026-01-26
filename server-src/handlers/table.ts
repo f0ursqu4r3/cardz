@@ -31,7 +31,8 @@ export function handleTableReset(
   }
 
   // Permission check - only creator can reset table
-  if (!roomManager.isCreator(clientData.roomCode, clientData.id)) {
+  // Use playerId (stable ID) not id (socket ID) for permission checks
+  if (!clientData.playerId || !roomManager.isCreator(clientData.roomCode, clientData.playerId)) {
     send(ws, {
       type: 'error',
       originalAction: 'table:reset',
@@ -88,7 +89,8 @@ export function handleTableUpdateSettings(
   }
 
   // Permission check - only creator can change settings
-  if (!roomManager.isCreator(clientData.roomCode, clientData.id)) {
+  // Use playerId (stable ID) not id (socket ID) for permission checks
+  if (!clientData.playerId || !roomManager.isCreator(clientData.roomCode, clientData.playerId)) {
     send(ws, {
       type: 'error',
       originalAction: 'table:update_settings',
@@ -145,7 +147,8 @@ export function handleTableUpdateVisibility(
   }
 
   // Permission check - only creator can change visibility
-  if (!roomManager.isCreator(clientData.roomCode, clientData.id)) {
+  // Use playerId (stable ID) not id (socket ID) for permission checks
+  if (!clientData.playerId || !roomManager.isCreator(clientData.roomCode, clientData.playerId)) {
     send(ws, {
       type: 'error',
       originalAction: 'table:update_visibility',
@@ -202,7 +205,8 @@ export function handleTableUpdateName(
   }
 
   // Permission check - only creator can change table name
-  if (!roomManager.isCreator(clientData.roomCode, clientData.id)) {
+  // Use playerId (stable ID) not id (socket ID) for permission checks
+  if (!clientData.playerId || !roomManager.isCreator(clientData.roomCode, clientData.playerId)) {
     send(ws, {
       type: 'error',
       originalAction: 'table:update_name',
