@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cardz Admin Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #333;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      color: #888;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+    }
+
+    .status-dot.error {
+      background: #ef4444;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 1.25rem;
+      border: 1px solid #1f4068;
+    }
+
+    .card-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      margin-bottom: 0.5rem;
+    }
+
+    .card-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .card-value.highlight {
+      color: #60a5fa;
+    }
+
+    .section {
+      margin-bottom: 2rem;
+    }
+
+    .section-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: #aaa;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #333;
+    }
+
+    th {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      font-weight: 500;
+    }
+
+    td {
+      font-size: 0.875rem;
+    }
+
+    .timestamp {
+      font-size: 0.75rem;
+      color: #666;
+    }
+
+    .error-message {
+      background: #7f1d1d;
+      color: #fca5a5;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Cardz Admin Dashboard</h1>
+      <div class="status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Connecting...</span>
+      </div>
+    </header>
+
+    <div id="error" class="error-message" style="display: none;"></div>
+
+    <div id="content" class="loading">Loading...</div>
+  </div>
+
+  <script>
+    const API_URL = '/api/admin/stats';
+    const REFRESH_INTERVAL = 5000;
+
+    let lastUpdate = null;
+
+    function formatNumber(n) {
+      return n.toLocaleString();
+    }
+
+    function formatDuration(ms) {
+      const seconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
+
+      if (days > 0) return `${days}d ${hours % 24}h`;
+      if (hours > 0) return `${hours}h ${minutes % 60}m`;
+      if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+      return `${seconds}s`;
+    }
+
+    function formatTime(timestamp) {
+      return new Date(timestamp).toLocaleString();
+    }
+
+    function renderStats(stats) {
+      const uptime = Date.now() - stats.serverStartedAt;
+
+      return `
+        <div class="section">
+          <div class="section-title">Real-Time</div>
+          <div class="grid">
+            <div class="card">
+              <div class="card-label">Active Tables</div>
+              <div class="card-value highlight">${formatNumber(stats.activeTables)}</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Active Players</div>
+              <div class="card-value highlight">${formatNumber(stats.activePlayers)}</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Connections</div>
+              <div class="card-value">${formatNumber(stats.activeConnections)}</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Peak Players Today</div>
+              <div class="card-value">${formatNumber(stats.peakPlayersToday)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Today</div>
+          <div class="grid">
+            <div class="card">
+              <div class="card-label">Tables Created</div>
+              <div class="card-value">${formatNumber(stats.tablesCreatedToday)}</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Chat Messages</div>
+              <div class="card-value">${formatNumber(stats.chatMessagesToday)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">All Time</div>
+          <div class="grid">
+            <div class="card">
+              <div class="card-label">Total Tables</div>
+              <div class="card-value">${formatNumber(stats.tablesCreatedTotal)}</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Total Chat Messages</div>
+              <div class="card-value">${formatNumber(stats.chatMessagesTotal)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Server Info</div>
+          <table>
+            <tr>
+              <th>Metric</th>
+              <th>Value</th>
+            </tr>
+            <tr>
+              <td>Uptime</td>
+              <td>${formatDuration(uptime)}</td>
+            </tr>
+            <tr>
+              <td>Started At</td>
+              <td>${formatTime(stats.serverStartedAt)}</td>
+            </tr>
+            <tr>
+              <td>Last Updated</td>
+              <td class="timestamp">${formatTime(stats.statsGeneratedAt)}</td>
+            </tr>
+          </table>
+        </div>
+      `;
+    }
+
+    async function fetchStats() {
+      try {
+        const response = await fetch(API_URL);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const stats = await response.json();
+        lastUpdate = Date.now();
+
+        document.getElementById('content').innerHTML = renderStats(stats);
+        document.getElementById('statusDot').classList.remove('error');
+        document.getElementById('statusText').textContent = 'Live';
+        document.getElementById('error').style.display = 'none';
+
+      } catch (err) {
+        document.getElementById('statusDot').classList.add('error');
+        document.getElementById('statusText').textContent = 'Error';
+        document.getElementById('error').textContent = `Failed to fetch stats: ${err.message}`;
+        document.getElementById('error').style.display = 'block';
+      }
+    }
+
+    // Initial fetch
+    fetchStats();
+
+    // Auto-refresh
+    setInterval(fetchStats, REFRESH_INTERVAL);
+  </script>
+</body>
+</html>

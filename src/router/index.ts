@@ -27,6 +27,11 @@ const router = createRouter({
       name: 'table',
       component: TableView,
     },
+    // wildcard redirect to landing
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: '/',
+    },
   ],
 })
 

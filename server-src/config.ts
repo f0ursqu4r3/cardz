@@ -1,6 +1,61 @@
 import { z } from 'zod'
-import { join } from 'path'
+import { join, dirname } from 'path'
 import { randomBytes } from 'crypto'
+import { existsSync, readFileSync } from 'fs'
+
+/**
+ * Load environment variables from .env files
+ * Loads in order (later files override earlier):
+ * 1. .env
+ * 2. .env.local
+ * 3. .env.[NODE_ENV] (e.g., .env.development)
+ * 4. .env.[NODE_ENV].local
+ */
+function loadEnvFiles(): void {
+  // Find project root (parent of server-src)
+  const projectRoot = dirname(import.meta.dir)
+
+  const nodeEnv = process.env.NODE_ENV || 'development'
+
+  const envFiles = [
+    '.env',
+    '.env.local',
+    `.env.${nodeEnv}`,
+    `.env.${nodeEnv}.local`,
+  ]
+
+  for (const file of envFiles) {
+    const filePath = join(projectRoot, file)
+    if (existsSync(filePath)) {
+      const content = readFileSync(filePath, 'utf-8')
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim()
+        // Skip comments and empty lines
+        if (!trimmed || trimmed.startsWith('#')) continue
+
+        const eqIndex = trimmed.indexOf('=')
+        if (eqIndex === -1) continue
+
+        const key = trimmed.slice(0, eqIndex).trim()
+        let value = trimmed.slice(eqIndex + 1).trim()
+
+        // Remove surrounding quotes if present
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1)
+        }
+
+        // Only set if not already defined (allows real env vars to override)
+        if (process.env[key] === undefined) {
+          process.env[key] = value
+        }
+      }
+      console.log(`[config] Loaded ${file}`)
+    }
+  }
+}
+
+// Load env files before parsing config
+loadEnvFiles()
 
 /**
  * Server configuration schema with validation
@@ -46,6 +101,13 @@ const configSchema = z.object({
 
   // Environment
   nodeEnv: z.enum(['development', 'production', 'test']).default('development'),
+
+  // Admin password for dashboard access
+  adminPassword: z
+    .string()
+    .min(8, 'Admin password must be at least 8 characters')
+    .optional()
+    .describe('Password for admin dashboard access'),
 })
 
 export type Config = z.infer<typeof configSchema>
@@ -61,6 +123,7 @@ function loadConfig(): Config {
     dataDir: process.env.DATA_DIR,
     sessionSecret: process.env.SESSION_SECRET,
     nodeEnv: process.env.NODE_ENV,
+    adminPassword: process.env.ADMIN_PASSWORD,
   }
 
   const result = configSchema.safeParse(raw)
@@ -88,4 +151,5 @@ export function logConfigSummary(): void {
   console.log(`  Data dir: ${config.dataDir}`)
   console.log(`  Allowed origins: ${config.allowedOrigins?.join(', ') ?? '(development mode - all origins)'}`)
   console.log(`  Session secret: ${config.sessionSecret ? '[configured]' : '[auto-generated]'}`)
+  console.log(`  Admin dashboard: ${config.adminPassword ? '[enabled]' : '[disabled - set ADMIN_PASSWORD to enable]'}`)
 }

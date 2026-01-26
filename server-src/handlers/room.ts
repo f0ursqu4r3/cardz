@@ -5,6 +5,7 @@ import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
 import { loadChatMessages } from '../persistence'
 import { sanitizePlayerName, sanitizeTableName } from '../utils/sanitize'
 import { createSessionToken, verifySessionToken } from '../utils/session'
+import { trackTableCreated } from '../analytics'
 
 export function handleRoomCreate(
   ws: GenericWebSocket,
@@ -39,6 +40,9 @@ export function handleRoomCreate(
   clientData.roomCode = room.code
   clientData.playerId = playerId // Store stable player ID
   clientData.name = playerName
+
+  // Track table creation for analytics
+  trackTableCreated()
 
   const state = room.gameState.getState()
   console.log(

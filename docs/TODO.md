@@ -35,25 +35,47 @@
 - [x] Auto-rejoin room after connection drop
 - [x] Spaces work in chat messages
 
+### Game Entities
+
+- [x] Dice with rolling animation and pip visualization
+- [x] Counters with increment/decrement and configurable min/max/step
+- [x] Tokens (color shapes: circle, square, star, triangle; sprite icons: star, skull, coin, heart, shield, gem)
+- [x] Timers with countdown and stopwatch modes
+- [x] Card face-up/face-down flipping
+
+### Host Controls
+
+- [x] Creator/member role system
+- [x] Creator-only permissions (reset table, update settings, change visibility, rename table)
+
+### UI/UX
+
+- [x] Toast notification system (error, success, info)
+- [x] Radial menu for context actions
+
+### Server
+
+- [x] Persistent chat history (database storage)
+- [x] Analytics dashboard (active tables, players, usage stats)
+- [x] Admin panel for server monitoring (`/admin` route)
+
 ---
 
 ## Future Features 🚀
 
-### Table Management
+### Table Enhancements
 
-- [ ] Table settings (ambient music/sounds)
-- [ ] Table templates (save/load table configurations)
+- [ ] Ambient music/sounds
+- [ ] Table templates (save/load configurations)
 - [ ] Undo/redo action history
 
-### Game Entities
+### Custom Content
 
-- [ ] Additional entities (counters, tokens, dice, timers)
-- [ ] Custom card decks (upload images) (future future)
+- [ ] Custom card decks (upload images)
 - [ ] Card annotations/markers
 
-### Social Features
+### Social Enhancements
 
-- [ ] Spectator mode (read-only observers)
 - [ ] Turn system (optional turn-based mode)
 - [ ] Voice/video chat (WebRTC)
 - [ ] Private messaging between players
@@ -61,21 +83,18 @@
 ### Advanced Card Mechanics
 
 - [ ] Card reveal (show card to specific players)
-- [ ] Card flipping animation (front/back sides)
+- [ ] Card flipping animation (3D rotation effect)
 - [ ] Deal animation (distribute cards from deck)
 - [ ] Fan spread (view all cards in stack)
 - [ ] Peek at cards without revealing
 
-### Host Controls
+### Moderation
 
 - [ ] Kick/ban players
 - [ ] Lock table (prevent new joins)
-- [ ] Permission system (who can move cards, create zones, etc.)
+- [ ] Granular permission system (who can manage the table, move cards, create zones, etc.)
 
 ### Server Enhancements
 
 - [ ] Horizontal scaling (multiple server instances)
-- [ ] Persistent chat history (database storage)
-- [ ] Analytics/dashboard (active tables, players, usage stats)
 - [ ] Automated backups of game state
-- [ ] Admin panel for server monitoring and management

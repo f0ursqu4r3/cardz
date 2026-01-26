@@ -10,6 +10,7 @@ import { RateLimiter } from './utils/rate-limit'
 import { sanitizeChatMessage } from './utils/sanitize'
 import { heartbeatManager } from './utils/heartbeat'
 import { config, logConfigSummary } from './config'
+import { initAnalytics, trackConnection, trackChatMessage, getStats } from './analytics'
 
 // Handlers
 import {
@@ -87,6 +88,9 @@ import {
 } from './handlers/timer'
 
 const roomManager = new RoomManager()
+
+// Initialize analytics with room manager reference
+initAnalytics(roomManager)
 
 // Track cursor update timestamps for throttling
 const lastCursorUpdate = new Map<string, number>()
@@ -207,6 +211,108 @@ const server = Bun.serve<ClientData>({
       })
     }
 
+    // Admin API endpoints (password protected)
+    if (url.pathname === '/api/admin/stats') {
+      // Check if admin password is configured
+      if (!config.adminPassword) {
+        return new Response(JSON.stringify({ error: 'Admin dashboard not enabled' }), {
+          status: 503,
+          headers: {
+            'Content-Type': 'application/json',
+            ...getSecurityHeaders(),
+          },
+        })
+      }
+
+      // Check basic auth
+      const authHeader = req.headers.get('authorization')
+      if (!authHeader || !authHeader.startsWith('Basic ')) {
+        return new Response('Unauthorized', {
+          status: 401,
+          headers: {
+            'WWW-Authenticate': 'Basic realm="Admin Dashboard"',
+            ...getSecurityHeaders(),
+          },
+        })
+      }
+
+      const base64Credentials = authHeader.slice(6)
+      const credentials = atob(base64Credentials)
+      const [username, password] = credentials.split(':')
+
+      if (username !== 'admin' || password !== config.adminPassword) {
+        return new Response('Unauthorized', {
+          status: 401,
+          headers: {
+            'WWW-Authenticate': 'Basic realm="Admin Dashboard"',
+            ...getSecurityHeaders(),
+          },
+        })
+      }
+
+      // Return server stats
+      const stats = getStats()
+      return new Response(JSON.stringify(stats), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...getSecurityHeaders(),
+        },
+      })
+    }
+
+    // Admin dashboard page
+    if (url.pathname === '/admin') {
+      // Check if admin password is configured
+      if (!config.adminPassword) {
+        return new Response('Admin dashboard not enabled. Set ADMIN_PASSWORD environment variable.', {
+          status: 503,
+          headers: getSecurityHeaders(),
+        })
+      }
+
+      // Check basic auth
+      const authHeader = req.headers.get('authorization')
+      if (!authHeader || !authHeader.startsWith('Basic ')) {
+        return new Response('Unauthorized', {
+          status: 401,
+          headers: {
+            'WWW-Authenticate': 'Basic realm="Admin Dashboard"',
+            ...getSecurityHeaders(),
+          },
+        })
+      }
+
+      const base64Credentials = authHeader.slice(6)
+      const credentials = atob(base64Credentials)
+      const [username, password] = credentials.split(':')
+
+      if (username !== 'admin' || password !== config.adminPassword) {
+        return new Response('Unauthorized', {
+          status: 401,
+          headers: {
+            'WWW-Authenticate': 'Basic realm="Admin Dashboard"',
+            ...getSecurityHeaders(),
+          },
+        })
+      }
+
+      // Serve admin dashboard (use import.meta.dir for reliable path resolution)
+      const adminFile = Bun.file(`${import.meta.dir}/admin.html`)
+      if (await adminFile.exists()) {
+        return new Response(adminFile, {
+          headers: {
+            'Content-Type': 'text/html',
+            ...getSecurityHeaders(),
+          },
+        })
+      }
+
+      return new Response('Admin dashboard not found', {
+        status: 404,
+        headers: getSecurityHeaders(),
+      })
+    }
+
     // Check if this is a WebSocket upgrade request
     const upgradeHeader = req.headers.get('upgrade')
     if (upgradeHeader?.toLowerCase() === 'websocket') {
@@ -282,6 +388,7 @@ const server = Bun.serve<ClientData>({
       const socket = ws as GenericWebSocket
       roomManager.addClient(clientData.id, socket)
       heartbeatManager.startHeartbeat(clientData.id, socket)
+      trackConnection(1)
       console.log(`[connect] ${clientData.id}`)
     },
 
@@ -682,8 +789,9 @@ const server = Bun.serve<ClientData>({
               timestamp: Date.now(),
             }
 
-            // Save to database
+            // Save to database and track metric
             saveChatMessage(chatMessage)
+            trackChatMessage()
 
             // Broadcast to all players in the room
             broadcastToRoom(clients, room.code, {
@@ -742,6 +850,7 @@ const server = Bun.serve<ClientData>({
       const clientData = ws.data
       console.log(`[disconnect] ${clientData.id} (code: ${code})`)
 
+      trackConnection(-1)
       lastCursorUpdate.delete(clientData.id)
       rateLimiter.removeClient(clientData.id)
       heartbeatManager.stopHeartbeat(clientData.id)

@@ -112,6 +112,21 @@ function getDb(): Database {
     CREATE INDEX IF NOT EXISTS idx_chat_room_timestamp ON chat_messages (room_code, timestamp DESC)
   `)
 
+  // Create analytics table for tracking server metrics
+  db.run(`
+    CREATE TABLE IF NOT EXISTS analytics (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      metric_name TEXT NOT NULL,
+      metric_value INTEGER NOT NULL,
+      recorded_at INTEGER NOT NULL
+    )
+  `)
+
+  // Create index for querying metrics by name and time
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_analytics_name_time ON analytics (metric_name, recorded_at DESC)
+  `)
+
   console.log(`[persistence] SQLite database initialized at ${DB_PATH}`)
 
   return db
@@ -628,4 +643,137 @@ export function deleteChatMessages(roomCode: string): void {
   const database = getDb()
   const stmt = database.prepare('DELETE FROM chat_messages WHERE room_code = ?')
   stmt.run(roomCode)
+}
+
+// ============================================================================
+// Analytics Persistence
+// ============================================================================
+
+/**
+ * Record a metric value to the database
+ */
+export function recordMetric(name: string, value: number): boolean {
+  try {
+    const database = getDb()
+
+    const stmt = database.prepare(`
+      INSERT INTO analytics (metric_name, metric_value, recorded_at)
+      VALUES ($name, $value, $recorded_at)
+    `)
+
+    stmt.run({
+      $name: name,
+      $value: value,
+      $recorded_at: Date.now(),
+    })
+    return true
+  } catch (err) {
+    console.error(`[persistence] Failed to record metric ${name}:`, err)
+    return false
+  }
+}
+
+/**
+ * Get recent metric values
+ */
+export function getMetricHistory(
+  name: string,
+  since: number,
+  limit: number = 100,
+): { value: number; recordedAt: number }[] {
+  const database = getDb()
+
+  const stmt = database.prepare(`
+    SELECT metric_value, recorded_at
+    FROM analytics
+    WHERE metric_name = $name AND recorded_at >= $since
+    ORDER BY recorded_at DESC
+    LIMIT $limit
+  `)
+
+  const rows = stmt.all({ $name: name, $since: since, $limit: limit }) as {
+    metric_value: number
+    recorded_at: number
+  }[]
+
+  return rows.map((row) => ({
+    value: row.metric_value,
+    recordedAt: row.recorded_at,
+  }))
+}
+
+/**
+ * Get the sum of a metric since a given time
+ */
+export function getMetricSum(name: string, since: number): number {
+  const database = getDb()
+
+  const stmt = database.prepare(`
+    SELECT COALESCE(SUM(metric_value), 0) as total
+    FROM analytics
+    WHERE metric_name = $name AND recorded_at >= $since
+  `)
+
+  const row = stmt.get({ $name: name, $since: since }) as { total: number }
+  return row.total
+}
+
+/**
+ * Get the count of a metric since a given time
+ */
+export function getMetricCount(name: string, since: number): number {
+  const database = getDb()
+
+  const stmt = database.prepare(`
+    SELECT COUNT(*) as count
+    FROM analytics
+    WHERE metric_name = $name AND recorded_at >= $since
+  `)
+
+  const row = stmt.get({ $name: name, $since: since }) as { count: number }
+  return row.count
+}
+
+/**
+ * Get the total count of tables ever created
+ */
+export function getTotalTablesCreated(): number {
+  const database = getDb()
+
+  const stmt = database.prepare(`SELECT COUNT(*) as count FROM tables`)
+  const row = stmt.get() as { count: number }
+  return row.count
+}
+
+/**
+ * Get total chat messages count
+ */
+export function getTotalChatMessages(): number {
+  const database = getDb()
+
+  const stmt = database.prepare(`SELECT COUNT(*) as count FROM chat_messages`)
+  const row = stmt.get() as { count: number }
+  return row.count
+}
+
+/**
+ * Clean up old analytics data (older than maxAge)
+ */
+export function cleanupOldAnalytics(maxAgeMs: number = 30 * 24 * 60 * 60 * 1000): number {
+  try {
+    const database = getDb()
+    const cutoff = Date.now() - maxAgeMs
+
+    const stmt = database.prepare('DELETE FROM analytics WHERE recorded_at < ?')
+    const result = stmt.run(cutoff)
+
+    if (result.changes > 0) {
+      console.log(`[persistence] Cleaned up ${result.changes} old analytics records`)
+    }
+
+    return result.changes
+  } catch (err) {
+    console.error(`[persistence] Failed to cleanup old analytics:`, err)
+    return 0
+  }
 }
