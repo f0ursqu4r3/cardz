@@ -97,6 +97,7 @@ function getDefaultWsUrl(): string {
 
 const DEFAULT_WS_URL = getDefaultWsUrl()
 const SESSION_ID_KEY = 'cardz_session_id'
+const DEVICE_ID_KEY = 'cardz_device_id'
 
 /**
  * Generate a UUID-like string (fallback for non-secure contexts)
@@ -134,6 +135,19 @@ function storeSessionToken(token: string): void {
  */
 function clearSessionToken(): void {
   localStorage.removeItem(SESSION_ID_KEY)
+}
+
+/**
+ * Get or create a persistent device identifier
+ * This persists across sessions and rooms to identify the same browser/device
+ */
+function getOrCreateDeviceId(): string {
+  let deviceId = localStorage.getItem(DEVICE_ID_KEY)
+  if (!deviceId) {
+    deviceId = generateUUID()
+    localStorage.setItem(DEVICE_ID_KEY, deviceId)
+  }
+  return deviceId
 }
 
 export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn {
@@ -204,6 +218,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
             roomCode: pendingRoomCode,
             playerName: pendingPlayerName,
             sessionId,
+            deviceId: getOrCreateDeviceId(),
           })
         }
       }
@@ -286,13 +301,20 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
       playerName,
       tableName: options?.tableName,
       isPublic: options?.isPublic,
+      deviceId: getOrCreateDeviceId(),
     })
   }
 
   const joinRoom = (code: string, playerName: string) => {
     const sessionId = getSessionToken() // Use stored HMAC token if available
     console.log('[ws] joining room:', code, sessionId ? '(with session)' : '(new session)')
-    send({ type: 'room:join', roomCode: code.toUpperCase(), playerName, sessionId })
+    send({
+      type: 'room:join',
+      roomCode: code.toUpperCase(),
+      playerName,
+      sessionId,
+      deviceId: getOrCreateDeviceId(),
+    })
   }
 
   const leaveRoom = () => {

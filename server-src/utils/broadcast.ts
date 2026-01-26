@@ -1,7 +1,8 @@
 import type { ServerMessage, Viewport } from '../../shared/types'
 
 export interface ClientData {
-  id: string
+  id: string // Socket ID (for connection routing)
+  playerId: string | null // Stable player ID (for game identity)
   roomCode: string | null
   name: string
   viewport?: Viewport
@@ -17,7 +18,7 @@ export interface GenericWebSocket {
 
 export function getClientData(ws: GenericWebSocket): ClientData {
   // Bun uses ws.data, uWebSockets.js uses ws.getUserData()
-  return ws.data ?? ws.getUserData?.() ?? { id: '', roomCode: null, name: '' }
+  return ws.data ?? ws.getUserData?.() ?? { id: '', playerId: null, roomCode: null, name: '' }
 }
 
 /**

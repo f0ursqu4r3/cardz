@@ -92,6 +92,7 @@ export interface RoomCreate {
   tableName?: string
   isPublic?: boolean
   sessionId?: string // For reconnection after refresh
+  deviceId?: string // Persistent device identifier
 }
 
 export interface RoomJoin {
@@ -99,6 +100,7 @@ export interface RoomJoin {
   roomCode: string
   playerName: string
   sessionId?: string // For reconnection after refresh
+  deviceId?: string // Persistent device identifier
 }
 
 export interface RoomLeave {
@@ -139,6 +141,11 @@ export interface PlayerJoined {
 export interface PlayerLeft {
   type: 'room:player_left'
   playerId: string
+}
+
+export interface PlayerReconnected {
+  type: 'room:player_reconnected'
+  player: Player
 }
 
 export interface RoomError {
@@ -845,6 +852,7 @@ type ServerMessageBase =
   | RoomJoined
   | PlayerJoined
   | PlayerLeft
+  | PlayerReconnected
   | RoomError
   | RoomListResponse
   | CardMoved

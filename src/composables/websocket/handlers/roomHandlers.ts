@@ -93,6 +93,22 @@ export function handleRoomMessage(
       console.log('[ws] player joined:', message.player.name)
       return true
 
+    case 'room:player_reconnected': {
+      // Update existing player instead of add/remove
+      const existingIdx = players.value.findIndex((p) => p.id === message.player.id)
+      if (existingIdx >= 0) {
+        // Update existing player entry
+        const newPlayers = [...players.value]
+        newPlayers[existingIdx] = message.player
+        players.value = newPlayers
+      } else {
+        // Player not found (shouldn't happen), add them
+        players.value = [...players.value, message.player]
+      }
+      console.log('[ws] player reconnected:', message.player.name)
+      return true
+    }
+
     case 'room:player_left': {
       players.value = players.value.filter((p) => p.id !== message.playerId)
       const newCursors = new Map(cursors.value)

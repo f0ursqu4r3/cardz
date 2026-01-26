@@ -18,24 +18,26 @@ export function handleRoomCreate(
   const tableName = msg.tableName ? sanitizeTableName(msg.tableName) : undefined
 
   // Leave current room if in one
-  if (clientData.roomCode) {
-    const oldRoom = roomManager.leaveRoom(clientData.id, clientData.roomCode)
+  if (clientData.roomCode && clientData.playerId) {
+    const oldRoom = roomManager.leaveRoom(clientData.playerId, clientData.roomCode)
     if (oldRoom) {
       broadcastToRoom(roomManager.getClients(), oldRoom.code, {
         type: 'room:player_left',
-        playerId: clientData.id,
+        playerId: clientData.playerId,
       })
     }
   }
 
-  const room = roomManager.createRoom(
-    clientData.id,
+  // Create room - returns the room and a new stable player ID
+  const { room, playerId } = roomManager.createRoom(
+    clientData.id, // socket ID for routing
     playerName,
     msg.sessionId,
     tableName,
     msg.isPublic,
   )
   clientData.roomCode = room.code
+  clientData.playerId = playerId // Store stable player ID
   clientData.name = playerName
 
   const state = room.gameState.getState()
@@ -43,13 +45,13 @@ export function handleRoomCreate(
     `[room:create] ${room.code} (${room.isPublic ? 'public' : 'private'}) - cards: ${state.cards.length}, stacks: ${state.stacks.length}`,
   )
 
-  // Generate HMAC-signed session token for secure reconnection
-  const sessionToken = createSessionToken(clientData.id, room.code)
+  // Generate HMAC-signed session token with stable playerId for reconnection
+  const sessionToken = createSessionToken(playerId, room.code)
 
   send(ws, {
     type: 'room:created',
     roomCode: room.code,
-    playerId: clientData.id,
+    playerId, // Send stable player ID to client
     state,
     sessionToken,
   })
@@ -60,6 +62,8 @@ export function handleRoomCreate(
     name: room.name,
     isPublic: room.isPublic,
     settings: room.settings,
+    createdAt: room.createdAt,
+    createdBy: room.createdBy,
   })
 
   // Send chat history (room might have persisted messages from previous session)
@@ -90,18 +94,18 @@ export function handleRoomJoin(
   const playerName = sanitizePlayerName(msg.playerName) || 'Player'
 
   // Leave current room if in one
-  if (clientData.roomCode) {
-    const oldRoom = roomManager.leaveRoom(clientData.id, clientData.roomCode)
+  if (clientData.roomCode && clientData.playerId) {
+    const oldRoom = roomManager.leaveRoom(clientData.playerId, clientData.roomCode)
     if (oldRoom) {
       broadcastToRoom(roomManager.getClients(), oldRoom.code, {
         type: 'room:player_left',
-        playerId: clientData.id,
+        playerId: clientData.playerId,
       })
     }
   }
 
   // Verify session token if provided (for reconnection)
-  // The sessionId field now contains an HMAC-signed token
+  // The sessionId field contains an HMAC-signed token with the stable playerId
   let verifiedPlayerId: string | undefined
   if (msg.sessionId) {
     const tokenPayload = verifySessionToken(msg.sessionId, msg.roomCode)
@@ -114,12 +118,13 @@ export function handleRoomJoin(
   }
 
   // Use loadOrCreateRoom to support loading persisted rooms after server restart
-  // Pass the verified player ID if token was valid, otherwise use new session
+  // Pass the verified stable player ID if token was valid
   const result = roomManager.loadOrCreateRoom(
     msg.roomCode,
-    clientData.id,
+    clientData.id, // socket ID for routing
     playerName,
-    verifiedPlayerId ? msg.sessionId : undefined, // Only use session if token was valid
+    verifiedPlayerId ? msg.sessionId : undefined, // session token
+    verifiedPlayerId, // stable player ID from verified token
   )
 
   if ('error' in result) {
@@ -131,8 +136,9 @@ export function handleRoomJoin(
     return
   }
 
-  const { room, player, isReconnect } = result
+  const { room, player, isReconnect, playerId } = result
   clientData.roomCode = room.code
+  clientData.playerId = playerId // Store stable player ID
   clientData.name = playerName
 
   // Build cursors array for joining player (exclude their own cursor)
@@ -143,19 +149,19 @@ export function handleRoomJoin(
     state: 'default' | 'grab' | 'grabbing'
   }[] = []
   for (const [pid, cursor] of room.cursors) {
-    if (pid !== clientData.id) {
+    if (pid !== playerId) {
       cursors.push({ playerId: pid, x: cursor.x, y: cursor.y, state: cursor.state })
     }
   }
 
-  // Generate HMAC-signed session token for secure reconnection
-  const sessionToken = createSessionToken(clientData.id, room.code)
+  // Generate HMAC-signed session token with stable playerId for reconnection
+  const sessionToken = createSessionToken(playerId, room.code)
 
   // Send full state to joining player
   send(ws, {
     type: 'room:joined',
     roomCode: room.code,
-    playerId: clientData.id,
+    playerId, // Send stable player ID to client
     players: [...room.players.values()],
     state: room.gameState.getState(),
     cursors,
@@ -168,6 +174,8 @@ export function handleRoomJoin(
     name: room.name,
     isPublic: room.isPublic,
     settings: room.settings,
+    createdAt: room.createdAt,
+    createdBy: room.createdBy,
   })
 
   // Send chat history
@@ -186,48 +194,60 @@ export function handleRoomJoin(
     })
   }
 
-  // Always notify others when a player joins (even on reconnect)
-  // because when they disconnected, others received player_left
-  broadcastToRoom(
-    roomManager.getClients(),
-    room.code,
-    {
-      type: 'room:player_joined',
-      player,
-    },
-    clientData.id,
-  )
+  // Notify others: use player_reconnected for reconnections, player_joined for new joins
+  if (isReconnect) {
+    broadcastToRoom(
+      roomManager.getClients(),
+      room.code,
+      {
+        type: 'room:player_reconnected',
+        player,
+      },
+      clientData.id, // Exclude by socket ID
+    )
+  } else {
+    broadcastToRoom(
+      roomManager.getClients(),
+      room.code,
+      {
+        type: 'room:player_joined',
+        player,
+      },
+      clientData.id, // Exclude by socket ID
+    )
+  }
 }
 
 export function handleRoomLeave(ws: GenericWebSocket, roomManager: RoomManager): void {
   const clientData = getClientData(ws)
 
-  if (!clientData.roomCode) return
+  if (!clientData.roomCode || !clientData.playerId) return
 
-  const room = roomManager.leaveRoom(clientData.id, clientData.roomCode)
+  const room = roomManager.leaveRoom(clientData.playerId, clientData.roomCode)
 
   if (room) {
     broadcastToRoom(roomManager.getClients(), room.code, {
       type: 'room:player_left',
-      playerId: clientData.id,
+      playerId: clientData.playerId,
     })
   }
 
   clientData.roomCode = null
+  clientData.playerId = null
 }
 
 /**
  * Handle player disconnect (keep room data for potential reconnection)
  */
 export function handleDisconnect(clientData: ClientData, roomManager: RoomManager): void {
-  if (!clientData.roomCode) return
+  if (!clientData.roomCode || !clientData.playerId) return
 
-  const room = roomManager.disconnectPlayer(clientData.id, clientData.roomCode)
+  const room = roomManager.disconnectPlayer(clientData.playerId, clientData.roomCode)
 
   if (room) {
     broadcastToRoom(roomManager.getClients(), room.code, {
       type: 'room:player_left',
-      playerId: clientData.id,
+      playerId: clientData.playerId,
     })
   }
 

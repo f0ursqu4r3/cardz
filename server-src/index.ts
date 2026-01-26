@@ -190,6 +190,7 @@ const server = Bun.serve<ClientData>({
       const success = server.upgrade(req, {
         data: {
           id: nanoid(),
+          playerId: null,
           roomCode: null,
           name: '',
         } as ClientData,

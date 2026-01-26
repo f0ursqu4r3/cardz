@@ -1,3 +1,4 @@
+import { nanoid } from 'nanoid'
 import type { Player, TableSettings, TableBackground } from '../shared/types'
 import { PLAYER_COLORS } from '../shared/types'
 import { GameStateManager, createInitialGameState } from './game-state'
@@ -59,7 +60,9 @@ export interface Room {
  */
 export class RoomManager {
   private rooms = new Map<string, Room>()
-  private clients = new Map<string, GenericWebSocket>()
+  private clients = new Map<string, GenericWebSocket>() // socketId -> WebSocket
+  private socketToPlayer = new Map<string, string>() // socketId -> playerId
+  private playerToSocket = new Map<string, string>() // playerId -> socketId
   private sessionToPlayer = new Map<string, { roomCode: string; playerId: string }>()
   private cleanupInterval: ReturnType<typeof setInterval> | null = null
   private persistenceCleanupInterval: ReturnType<typeof setInterval> | null = null
@@ -78,15 +81,42 @@ export class RoomManager {
   /**
    * Register a client connection
    */
-  addClient(id: string, ws: GenericWebSocket): void {
-    this.clients.set(id, ws)
+  addClient(socketId: string, ws: GenericWebSocket): void {
+    this.clients.set(socketId, ws)
   }
 
   /**
-   * Remove a client connection
+   * Remove a client connection and clean up socket/player mappings
    */
-  removeClient(id: string): void {
-    this.clients.delete(id)
+  removeClient(socketId: string): void {
+    const playerId = this.socketToPlayer.get(socketId)
+    if (playerId) {
+      this.socketToPlayer.delete(socketId)
+      this.playerToSocket.delete(playerId)
+    }
+    this.clients.delete(socketId)
+  }
+
+  /**
+   * Update the socket <-> player ID mapping
+   * Call this when a player joins or reconnects
+   */
+  updateSocketMapping(socketId: string, playerId: string): void {
+    // Remove old socket mapping for this player if exists
+    const oldSocketId = this.playerToSocket.get(playerId)
+    if (oldSocketId && oldSocketId !== socketId) {
+      this.socketToPlayer.delete(oldSocketId)
+    }
+    this.socketToPlayer.set(socketId, playerId)
+    this.playerToSocket.set(playerId, socketId)
+  }
+
+  /**
+   * Get the WebSocket for a player by their stable player ID
+   */
+  getSocketByPlayerId(playerId: string): GenericWebSocket | undefined {
+    const socketId = this.playerToSocket.get(playerId)
+    return socketId ? this.clients.get(socketId) : undefined
   }
 
   /**
@@ -169,19 +199,28 @@ export class RoomManager {
 
   /**
    * Create a new room
+   * @param socketId - The WebSocket connection ID (for routing)
+   * @param playerName - The player's display name
+   * @param sessionId - Optional session token (not used for create, but stored)
+   * @param tableName - Optional custom table name
+   * @param isPublic - Whether the room is publicly listed
+   * @returns The created room and the stable player ID
    */
   createRoom(
-    playerId: string,
+    socketId: string,
     playerName: string,
     sessionId?: string,
     tableName?: string,
     isPublic?: boolean,
-  ): Room {
-    // Generate unique code
+  ): { room: Room; playerId: string } {
+    // Generate unique room code
     let code: string
     do {
       code = generateRoomCode()
     } while (this.rooms.has(code))
+
+    // Generate a stable player ID (separate from socket ID)
+    const playerId = nanoid()
 
     const player: Player = {
       id: playerId,
@@ -209,6 +248,9 @@ export class RoomManager {
     }
 
     this.rooms.set(code, room)
+
+    // Update socket mapping
+    this.updateSocketMapping(socketId, playerId)
 
     // Track session for reconnection
     if (sessionId) {
@@ -250,25 +292,31 @@ export class RoomManager {
       }
     })
 
-    return room
+    return { room, playerId }
   }
 
   /**
    * Load a persisted room or create a new one if not found
+   * @param roomCode - The room code to join/load
+   * @param socketId - The WebSocket connection ID (for routing)
+   * @param playerName - The player's display name
+   * @param sessionId - Optional session token for reconnection
+   * @param stablePlayerId - Optional verified player ID from session token
    */
   loadOrCreateRoom(
     roomCode: string,
-    playerId: string,
+    socketId: string,
     playerName: string,
     sessionId?: string,
+    stablePlayerId?: string,
   ):
-    | { room: Room; player: Player; isReconnect: boolean; loaded: boolean }
+    | { room: Room; player: Player; isReconnect: boolean; loaded: boolean; playerId: string }
     | { error: 'NOT_FOUND' | 'FULL' } {
     // Check if room is already in memory
     const existingRoom = this.rooms.get(roomCode)
     if (existingRoom) {
       // Use normal join flow
-      const result = this.joinRoom(roomCode, playerId, playerName, sessionId)
+      const result = this.joinRoom(roomCode, socketId, playerName, sessionId, stablePlayerId)
       if ('error' in result) return result
       return { ...result, loaded: false }
     }
@@ -278,6 +326,9 @@ export class RoomManager {
     if (!persisted) {
       return { error: 'NOT_FOUND' }
     }
+
+    // Generate a stable player ID for the first person to load this persisted room
+    const playerId = stablePlayerId || nanoid()
 
     // Recreate the room from persisted data
     // First person to rejoin a persisted table becomes the creator for this session
@@ -305,6 +356,9 @@ export class RoomManager {
     }
 
     this.rooms.set(roomCode, room)
+
+    // Update socket mapping
+    this.updateSocketMapping(socketId, playerId)
 
     // Create hand for the player
     room.gameState.getOrCreateHand(playerId)
@@ -334,18 +388,24 @@ export class RoomManager {
     })
 
     console.log(`[room:load] Loaded persisted table ${roomCode}`)
-    return { room, player, isReconnect: false, loaded: true }
+    return { room, player, isReconnect: false, loaded: true, playerId }
   }
 
   /**
    * Join an existing room
+   * @param roomCode - The room code to join
+   * @param socketId - The WebSocket connection ID (for routing)
+   * @param playerName - The player's display name
+   * @param sessionId - Optional session token for reconnection
+   * @param stablePlayerId - Optional verified player ID from session token (for reconnection)
    */
   joinRoom(
     roomCode: string,
-    playerId: string,
+    socketId: string,
     playerName: string,
     sessionId?: string,
-  ): { room: Room; player: Player; isReconnect: boolean } | { error: 'NOT_FOUND' | 'FULL' } {
+    stablePlayerId?: string,
+  ): { room: Room; player: Player; isReconnect: boolean; playerId: string } | { error: 'NOT_FOUND' | 'FULL' } {
     const room = this.rooms.get(roomCode)
     if (!room) {
       return { error: 'NOT_FOUND' }
@@ -354,27 +414,24 @@ export class RoomManager {
     // Cancel any pending cleanup since someone is joining
     this.cancelEmptyRoomCleanup(roomCode)
 
-    // Check if this is a reconnection via sessionId
-    if (sessionId) {
-      const existingPlayer = [...room.players.values()].find((p) => p.sessionId === sessionId)
+    // Check if this is a reconnection via verified stablePlayerId
+    if (stablePlayerId) {
+      const existingPlayer = room.players.get(stablePlayerId)
       if (existingPlayer) {
-        // Reconnect existing player with new socket ID
-        const oldId = existingPlayer.id
-        existingPlayer.id = playerId
+        // Reconnect existing player - keep stable Player.id, just update connection state
         existingPlayer.connected = true
         existingPlayer.name = playerName
 
-        // Update the players map with new ID
-        room.players.delete(oldId)
-        room.players.set(playerId, existingPlayer)
+        // Update socket mapping (old socket is gone, new socket maps to same playerId)
+        this.updateSocketMapping(socketId, stablePlayerId)
 
         // Update session mapping
-        this.sessionToPlayer.set(sessionId, { roomCode, playerId })
+        if (sessionId) {
+          this.sessionToPlayer.set(sessionId, { roomCode, playerId: stablePlayerId })
+        }
 
-        // Transfer hand ownership
-        room.gameState.transferHandOwnership(oldId, playerId)
-
-        return { room, player: existingPlayer, isReconnect: true }
+        // No need to transfer hand ownership - Player.id stays the same!
+        return { room, player: existingPlayer, isReconnect: true, playerId: stablePlayerId }
       }
     }
 
@@ -383,12 +440,15 @@ export class RoomManager {
       return { error: 'FULL' }
     }
 
+    // Generate a new stable playerId for new players
+    const newPlayerId = stablePlayerId || nanoid()
+
     // Assign next available color
     const usedColors = new Set([...room.players.values()].map((p) => p.color))
     const availableColor = PLAYER_COLORS.find((c) => !usedColors.has(c)) ?? PLAYER_COLORS[0]
 
     const player: Player = {
-      id: playerId,
+      id: newPlayerId,
       name: playerName,
       connected: true,
       color: availableColor,
@@ -396,17 +456,20 @@ export class RoomManager {
       role: 'member',
     }
 
-    room.players.set(playerId, player)
+    room.players.set(newPlayerId, player)
+
+    // Update socket mapping
+    this.updateSocketMapping(socketId, newPlayerId)
 
     // Create hand for new player
-    room.gameState.getOrCreateHand(playerId)
+    room.gameState.getOrCreateHand(newPlayerId)
 
     // Track session for reconnection
     if (sessionId) {
-      this.sessionToPlayer.set(sessionId, { roomCode, playerId })
+      this.sessionToPlayer.set(sessionId, { roomCode, playerId: newPlayerId })
     }
 
-    return { room, player, isReconnect: false }
+    return { room, player, isReconnect: false, playerId: newPlayerId }
   }
 
   /**
