@@ -43,7 +43,7 @@ export function handleZoneCreate(
     {
       type: 'zone:created',
       zone,
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
     },
     { x: msg.x, y: msg.y, width: msg.width, height: msg.height },
   )
@@ -106,7 +106,7 @@ export function handleZoneUpdate(
       zone: result.zone,
       stackUpdate: result.stackUpdate,
       cardUpdates: result.cardUpdates,
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
     },
     { x: result.zone.x, y: result.zone.y, width: result.zone.width, height: result.zone.height },
   )
@@ -159,7 +159,7 @@ export function handleZoneDelete(
       type: 'zone:deleted',
       zoneId: msg.zoneId,
       convertedStack: result.convertedStack,
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
     },
     zonePos,
   )
@@ -238,7 +238,7 @@ export function handleZoneAddCard(
       stackId: result.stackId,
       stackCreated: result.stackCreated,
       cardState: result.cardState,
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
     },
     { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
   )
@@ -316,7 +316,7 @@ export function handleZoneAddCards(
       stackId: result.stackId,
       stackCreated: result.stackCreated,
       cardStates: result.cardStates,
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
     },
     { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
   )

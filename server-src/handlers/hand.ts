@@ -40,7 +40,7 @@ export function handleHandAdd(
         },
         {
           type: 'hand:card_added_other',
-          playerId: clientData.id,
+          playerId: clientData.playerId ?? clientData.id,
           cardId: msg.cardId,
           handCount,
         },
@@ -90,7 +90,7 @@ export function handleHandAdd(
     },
     {
       type: 'hand:card_added_other',
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
       cardId: msg.cardId,
       handCount,
     },
@@ -124,7 +124,7 @@ export function handleHandRemove(
   // Card is now visible to everyone
   broadcastToRoom(clients, room.code, {
     type: 'hand:card_removed',
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
     cardState: result,
   })
 }
@@ -206,7 +206,7 @@ export function handleHandAddStack(
     },
     {
       type: 'hand:stack_added_other',
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
       cardIds: result.cardIds,
       stackDeleted: msg.stackId,
       handCount,

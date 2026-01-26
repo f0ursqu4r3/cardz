@@ -22,14 +22,14 @@ export function handleTimerCreate(
   broadcastToRoom(clients, room.code, {
     type: 'timer:created',
     timer,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the creator
   send(ws, {
     type: 'timer:created',
     timer,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 
@@ -71,7 +71,7 @@ export function handleTimerStart(
     type: 'timer:started',
     timerId: msg.timerId,
     startedAt: result.startedAt,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the starter
@@ -79,7 +79,7 @@ export function handleTimerStart(
     type: 'timer:started',
     timerId: msg.timerId,
     startedAt: result.startedAt,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 
   // Log activity
@@ -124,7 +124,7 @@ export function handleTimerPause(
     type: 'timer:paused',
     timerId: msg.timerId,
     elapsedMs: result.elapsedMs,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the pauser
@@ -132,7 +132,7 @@ export function handleTimerPause(
     type: 'timer:paused',
     timerId: msg.timerId,
     elapsedMs: result.elapsedMs,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 
   // Log activity (timer stopped/paused)
@@ -167,14 +167,14 @@ export function handleTimerReset(
   broadcastToRoom(clients, room.code, {
     type: 'timer:reset',
     timerId: msg.timerId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the resetter
   send(ws, {
     type: 'timer:reset',
     timerId: msg.timerId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 
@@ -222,7 +222,7 @@ export function handleTimerUpdate(
     type: 'timer:updated',
     timerId: msg.timerId,
     timer: result,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the updater
@@ -230,7 +230,7 @@ export function handleTimerUpdate(
     type: 'timer:updated',
     timerId: msg.timerId,
     timer: result,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 
@@ -278,14 +278,14 @@ export function handleTimerDelete(
   broadcastToRoom(clients, room.code, {
     type: 'timer:deleted',
     timerId: msg.timerId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the deleter
   send(ws, {
     type: 'timer:deleted',
     timerId: msg.timerId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 
@@ -327,14 +327,14 @@ export function handleTimerLock(
   broadcastToRoom(clients, room.code, {
     type: 'timer:locked',
     timerId: msg.timerId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the locker
   send(ws, {
     type: 'timer:locked',
     timerId: msg.timerId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 

@@ -121,7 +121,7 @@ export function handleTableUpdateSettings(
   broadcastToRoom(roomManager.getClients(), clientData.roomCode, {
     type: 'table:settings_updated',
     settings,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 
   // Log activity - describe what setting changed
@@ -183,7 +183,7 @@ export function handleTableUpdateVisibility(
   broadcastToRoom(roomManager.getClients(), clientData.roomCode, {
     type: 'table:visibility_updated',
     isPublic: msg.isPublic,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 
   console.log(
@@ -244,7 +244,7 @@ export function handleTableUpdateName(
   broadcastToRoom(roomManager.getClients(), clientData.roomCode, {
     type: 'table:name_updated',
     name: sanitizedName,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 
   console.log(`[table:name] Table ${clientData.roomCode} renamed to "${sanitizedName}"`)

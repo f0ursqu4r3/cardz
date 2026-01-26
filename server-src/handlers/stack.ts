@@ -87,7 +87,7 @@ export function handleStackCreate(
       type: 'stack:created',
       stack: result.stack,
       cardUpdates: result.cardUpdates,
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
     },
     { x: msg.anchorX, y: msg.anchorY },
   )
@@ -147,7 +147,7 @@ export function handleStackMove(
       anchorY: msg.anchorY,
       cardUpdates: result.cardUpdates,
       zoneDetached: result.zoneDetached,
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
     },
     { x: msg.anchorX, y: msg.anchorY },
   )
@@ -190,7 +190,7 @@ export function handleStackLock(
   broadcastToRoom(clients, room.code, {
     type: 'stack:locked',
     stackId: msg.stackId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 
@@ -315,7 +315,7 @@ export function handleStackAddCard(
       stackId: msg.stackId,
       cardId: msg.cardId,
       cardState: result,
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
     },
     { x: stack.anchorX, y: stack.anchorY },
   )
@@ -371,7 +371,7 @@ export function handleStackRemoveCard(
       stackId: result.stackId,
       cardId: msg.cardId,
       stackDeleted: result.stackDeleted,
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
     },
     stackPos,
   )
@@ -440,7 +440,7 @@ export function handleStackMerge(
       targetStackId: msg.targetStackId,
       targetStack: result.targetStack,
       cardUpdates: result.cardUpdates,
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
     },
     targetPos,
   )
@@ -494,7 +494,7 @@ export function handleStackShuffle(
       stackId: msg.stackId,
       newOrder: result.newOrder,
       cardUpdates: result.cardUpdates,
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
     },
     { x: stack.anchorX, y: stack.anchorY },
   )
@@ -550,7 +550,7 @@ export function handleStackFlip(
       type: 'stack:flipped',
       stackId: msg.stackId,
       cardUpdates: result.cardUpdates,
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
     },
     { x: stack.anchorX, y: stack.anchorY },
   )
@@ -607,7 +607,7 @@ export function handleStackSetFaces(
       stackId: msg.stackId,
       faceUp: msg.faceUp,
       cardIds: result.cardIds,
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
     },
     { x: stack.anchorX, y: stack.anchorY },
   )
@@ -668,7 +668,7 @@ export function handleStackReorder(
       stackId: msg.stackId,
       newOrder: result.newOrder,
       cardUpdates: result.cardUpdates,
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
     },
     { x: stack.anchorX, y: stack.anchorY },
   )

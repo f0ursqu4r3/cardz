@@ -35,14 +35,14 @@ export function handleCounterCreate(
   broadcastToRoom(clients, room.code, {
     type: 'counter:created',
     counter,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the creator
   send(ws, {
     type: 'counter:created',
     counter,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 
@@ -96,7 +96,7 @@ export function handleCounterUpdate(
     type: 'counter:updated',
     counterId: msg.counterId,
     counter: result,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the updater
@@ -104,7 +104,7 @@ export function handleCounterUpdate(
     type: 'counter:updated',
     counterId: msg.counterId,
     counter: result,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 
@@ -141,7 +141,7 @@ export function handleCounterIncrement(
     type: 'counter:incremented',
     counterId: msg.counterId,
     value: result.value,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the incrementer
@@ -149,7 +149,7 @@ export function handleCounterIncrement(
     type: 'counter:incremented',
     counterId: msg.counterId,
     value: result.value,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 
   // Log activity
@@ -200,14 +200,14 @@ export function handleCounterDelete(
   broadcastToRoom(clients, room.code, {
     type: 'counter:deleted',
     counterId: msg.counterId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the deleter
   send(ws, {
     type: 'counter:deleted',
     counterId: msg.counterId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 
@@ -249,14 +249,14 @@ export function handleCounterLock(
   broadcastToRoom(clients, room.code, {
     type: 'counter:locked',
     counterId: msg.counterId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the locker
   send(ws, {
     type: 'counter:locked',
     counterId: msg.counterId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 

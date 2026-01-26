@@ -21,14 +21,14 @@ export function handleDieCreate(
   broadcastToRoom(clients, room.code, {
     type: 'die:created',
     die,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the creator
   send(ws, {
     type: 'die:created',
     die,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 
@@ -61,7 +61,7 @@ export function handleDieRoll(
     type: 'die:rolled',
     dieId: msg.dieId,
     value: result.value,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the roller
@@ -69,7 +69,7 @@ export function handleDieRoll(
     type: 'die:rolled',
     dieId: msg.dieId,
     value: result.value,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 
   // Log activity (sides defaults to 6 for standard dice)
@@ -120,7 +120,7 @@ export function handleDieUpdate(
     type: 'die:updated',
     dieId: msg.dieId,
     die: result,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the updater
@@ -128,7 +128,7 @@ export function handleDieUpdate(
     type: 'die:updated',
     dieId: msg.dieId,
     die: result,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 
@@ -176,14 +176,14 @@ export function handleDieDelete(
   broadcastToRoom(clients, room.code, {
     type: 'die:deleted',
     dieId: msg.dieId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the deleter
   send(ws, {
     type: 'die:deleted',
     dieId: msg.dieId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 
@@ -225,14 +225,14 @@ export function handleDieLock(
   broadcastToRoom(clients, room.code, {
     type: 'die:locked',
     dieId: msg.dieId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the locker
   send(ws, {
     type: 'die:locked',
     dieId: msg.dieId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 

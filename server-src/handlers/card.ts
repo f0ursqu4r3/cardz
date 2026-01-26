@@ -61,7 +61,7 @@ export function handleCardMove(
       x: msg.x,
       y: msg.y,
       z: result.z,
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
       vx: msg.vx,
       vy: msg.vy,
     },
@@ -97,7 +97,7 @@ export function handleCardLock(
       send(ws, {
         type: 'card:locked',
         cardId: msg.cardId,
-        playerId: clientData.id,
+        playerId: clientData.playerId ?? clientData.id,
       })
       return
     }
@@ -130,7 +130,7 @@ export function handleCardLock(
   broadcastToRoom(clients, room.code, {
     type: 'card:locked',
     cardId: msg.cardId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 
@@ -220,7 +220,7 @@ export function handleCardFlip(
       type: 'card:flipped',
       cardId: msg.cardId,
       faceUp: flipped.faceUp,
-      playerId: clientData.id,
+      playerId: clientData.playerId ?? clientData.id,
     },
     { x: card.x, y: card.y },
   )

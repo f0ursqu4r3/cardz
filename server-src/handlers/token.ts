@@ -28,14 +28,14 @@ export function handleTokenCreate(
   broadcastToRoom(clients, room.code, {
     type: 'token:created',
     token,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the creator
   send(ws, {
     type: 'token:created',
     token,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 
@@ -89,7 +89,7 @@ export function handleTokenUpdate(
     type: 'token:updated',
     tokenId: msg.tokenId,
     token: result,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the updater
@@ -97,7 +97,7 @@ export function handleTokenUpdate(
     type: 'token:updated',
     tokenId: msg.tokenId,
     token: result,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 
@@ -145,14 +145,14 @@ export function handleTokenDelete(
   broadcastToRoom(clients, room.code, {
     type: 'token:deleted',
     tokenId: msg.tokenId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the deleter
   send(ws, {
     type: 'token:deleted',
     tokenId: msg.tokenId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 
@@ -194,14 +194,14 @@ export function handleTokenLock(
   broadcastToRoom(clients, room.code, {
     type: 'token:locked',
     tokenId: msg.tokenId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   }, clientData.id)
 
   // Also send to the locker
   send(ws, {
     type: 'token:locked',
     tokenId: msg.tokenId,
-    playerId: clientData.id,
+    playerId: clientData.playerId ?? clientData.id,
   })
 }
 
