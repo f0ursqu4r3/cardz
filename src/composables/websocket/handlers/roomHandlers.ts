@@ -13,7 +13,7 @@ import type {
   ActivityLogEntry,
 } from '../../../../shared/types'
 
-interface RoomStateRefs {
+export interface RoomStateRefs {
   roomCode: Ref<string | null>
   playerId: Ref<string | null>
   players: Ref<Player[]>
@@ -28,9 +28,10 @@ interface RoomStateRefs {
   chatMessages: Ref<ChatMessage[]>
   typingPlayers: Ref<Map<string, string>>
   activityLog: Ref<ActivityLogEntry[]>
+  kickedReason: Ref<string | null> // Set when current player is kicked/banned
 }
 
-interface RoomHandlerCallbacks {
+export interface RoomHandlerCallbacks {
   storeSessionToken: (token: string) => void
 }
 
@@ -118,6 +119,40 @@ export function handleRoomMessage(
       cursors.value = newCursors
       handCounts.value.delete(message.playerId)
       console.log('[ws] player left:', message.playerId)
+      return true
+    }
+
+    case 'room:player_kicked': {
+      // Check if this is the current player being kicked
+      if (message.playerId === playerId.value) {
+        refs.kickedReason.value = `You were kicked from the table by ${message.kickedBy}`
+        console.log('[ws] you were kicked by:', message.kickedBy)
+        return true
+      }
+      // Remove the kicked player from the players list
+      players.value = players.value.filter((p) => p.id !== message.playerId)
+      const newCursors = new Map(cursors.value)
+      newCursors.delete(message.playerId)
+      cursors.value = newCursors
+      handCounts.value.delete(message.playerId)
+      console.log('[ws] player kicked:', message.playerName, 'by', message.kickedBy)
+      return true
+    }
+
+    case 'room:player_banned': {
+      // Check if this is the current player being banned
+      if (message.playerId === playerId.value) {
+        refs.kickedReason.value = `You were banned from the table by ${message.bannedBy}`
+        console.log('[ws] you were banned by:', message.bannedBy)
+        return true
+      }
+      // Remove the banned player from the players list
+      players.value = players.value.filter((p) => p.id !== message.playerId)
+      const newCursors = new Map(cursors.value)
+      newCursors.delete(message.playerId)
+      cursors.value = newCursors
+      handCounts.value.delete(message.playerId)
+      console.log('[ws] player banned:', message.playerName, 'by', message.bannedBy)
       return true
     }
 

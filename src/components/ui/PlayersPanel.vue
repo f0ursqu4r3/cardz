@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Users, Hand } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { Users, Hand, LogOut, Ban, Crown, Eye } from 'lucide-vue-next'
 import type { Player } from '../../../shared/types'
 
 const props = defineProps<{
@@ -8,11 +8,17 @@ const props = defineProps<{
   handCounts: Map<string, number>
   currentPlayerId: string | null
   ownHandCount: number
+  isCreator: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   close: []
+  kick: [playerId: string]
+  ban: [playerId: string]
 }>()
+
+// Track which player we're confirming ban for
+const confirmBanPlayerId = ref<string | null>(null)
 
 // Sort players: current player first, then others by name
 const sortedPlayers = computed(() => {
@@ -30,6 +36,31 @@ const getHandCount = (player: Player): number => {
     return props.ownHandCount
   }
   return props.handCounts.get(player.id) ?? 0
+}
+
+const handleKick = (playerId: string) => {
+  emit('kick', playerId)
+}
+
+const handleBanClick = (playerId: string) => {
+  // Show confirmation
+  confirmBanPlayerId.value = playerId
+}
+
+const confirmBan = () => {
+  if (confirmBanPlayerId.value) {
+    emit('ban', confirmBanPlayerId.value)
+    confirmBanPlayerId.value = null
+  }
+}
+
+const cancelBan = () => {
+  confirmBanPlayerId.value = null
+}
+
+// Check if we can moderate a player (not self, not creator)
+const canModerate = (player: Player): boolean => {
+  return props.isCreator && player.id !== props.currentPlayerId && player.role !== 'creator'
 }
 </script>
 
@@ -54,12 +85,53 @@ const getHandCount = (player: Player): number => {
           {{ player.name }}
           <span v-if="player.id === currentPlayerId" class="players-panel__you">(you)</span>
         </span>
-        <span class="players-panel__hand" :title="`${getHandCount(player)} cards in hand`">
+
+        <!-- Role badges -->
+        <span v-if="player.role === 'creator'" class="players-panel__badge players-panel__badge--creator" title="Table Creator">
+          <Crown :size="12" />
+        </span>
+        <span v-else-if="player.role === 'spectator'" class="players-panel__badge players-panel__badge--spectator" title="Spectator">
+          <Eye :size="12" />
+        </span>
+
+        <!-- Hand count (not for spectators) -->
+        <span v-if="player.role !== 'spectator'" class="players-panel__hand" :title="`${getHandCount(player)} cards in hand`">
           <Hand :size="14" />
           <span>{{ getHandCount(player) }}</span>
         </span>
+
+        <!-- Moderation actions (creator only, not for self or other creator) -->
+        <div v-if="canModerate(player)" class="players-panel__actions">
+          <button
+            class="players-panel__action players-panel__action--kick"
+            title="Kick player"
+            @click.stop="handleKick(player.id)"
+          >
+            <LogOut :size="14" />
+          </button>
+          <button
+            class="players-panel__action players-panel__action--ban"
+            title="Ban player"
+            @click.stop="handleBanClick(player.id)"
+          >
+            <Ban :size="14" />
+          </button>
+        </div>
       </li>
     </ul>
+
+    <!-- Ban confirmation dialog -->
+    <div v-if="confirmBanPlayerId" class="players-panel__confirm">
+      <p>Ban this player? They won't be able to rejoin.</p>
+      <div class="players-panel__confirm-actions">
+        <button class="players-panel__confirm-btn players-panel__confirm-btn--cancel" @click="cancelBan">
+          Cancel
+        </button>
+        <button class="players-panel__confirm-btn players-panel__confirm-btn--confirm" @click="confirmBan">
+          Ban
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -151,5 +223,109 @@ const getHandCount = (player: Player): number => {
   padding: 0.125rem 0.375rem;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
+}
+
+.players-panel__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem;
+  border-radius: 4px;
+}
+
+.players-panel__badge--creator {
+  color: #fbbf24;
+}
+
+.players-panel__badge--spectator {
+  color: #60a5fa;
+}
+
+.players-panel__actions {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.players-panel__player:hover .players-panel__actions {
+  opacity: 1;
+}
+
+.players-panel__action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #a0a0b0;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.players-panel__action:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.players-panel__action--kick:hover {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+}
+
+.players-panel__action--ban:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.players-panel__confirm {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.players-panel__confirm p {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.8125rem;
+  color: #e0e0e8;
+}
+
+.players-panel__confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.players-panel__confirm-btn {
+  flex: 1;
+  padding: 0.375rem 0.75rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.players-panel__confirm-btn--cancel {
+  background: rgba(255, 255, 255, 0.1);
+  color: #a0a0b0;
+}
+
+.players-panel__confirm-btn--cancel:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.players-panel__confirm-btn--confirm {
+  background: #ef4444;
+  color: #fff;
+}
+
+.players-panel__confirm-btn--confirm:hover {
+  background: #dc2626;
 }
 </style>

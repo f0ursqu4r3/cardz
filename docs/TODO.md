@@ -63,6 +63,7 @@
 
 - [x] Spectator mode (view-only access)
 - [x] Table activity log (record actions taken by players)
+- [x] Kick/ban players (creator can kick or ban players from the table)
 
 ---
 
@@ -96,7 +97,6 @@
 ### Moderation (Continued)
 
 - [ ] Player reporting system
-- [ ] Kick/ban players
 - [ ] Lock table (prevent new joins, spectators only, invite-only)
 - [ ] Granular permission system (who can manage the table, move cards, create zones, etc.)
 

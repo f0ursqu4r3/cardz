@@ -54,6 +54,7 @@ export interface Room {
   createdBy: string
   creatorPlayerId: string // Stable player ID of the creator (for role persistence)
   settings: TableSettings
+  bannedDevices: Set<string> // Device IDs that are banned from this room
 }
 
 /**
@@ -64,6 +65,7 @@ export class RoomManager {
   private clients = new Map<string, GenericWebSocket>() // socketId -> WebSocket
   private socketToPlayer = new Map<string, string>() // socketId -> playerId
   private playerToSocket = new Map<string, string>() // playerId -> socketId
+  private playerToDevice = new Map<string, string>() // playerId -> deviceId (for kick/ban)
   private sessionToPlayer = new Map<string, { roomCode: string; playerId: string }>()
   private cleanupInterval: ReturnType<typeof setInterval> | null = null
   private persistenceCleanupInterval: ReturnType<typeof setInterval> | null = null
@@ -207,6 +209,7 @@ export class RoomManager {
    * @param sessionId - Optional session token (not used for create, but stored)
    * @param tableName - Optional custom table name
    * @param isPublic - Whether the room is publicly listed
+   * @param deviceId - Optional device identifier for kick/ban tracking
    * @returns The created room and the stable player ID
    */
   createRoom(
@@ -215,6 +218,7 @@ export class RoomManager {
     sessionId?: string,
     tableName?: string,
     isPublic?: boolean,
+    deviceId?: string,
   ): { room: Room; playerId: string } {
     // Generate unique room code
     let code: string
@@ -249,12 +253,18 @@ export class RoomManager {
       createdBy: playerName,
       creatorPlayerId: playerId,
       settings,
+      bannedDevices: new Set(),
     }
 
     this.rooms.set(code, room)
 
     // Update socket mapping
     this.updateSocketMapping(socketId, playerId)
+
+    // Track device for kick/ban
+    if (deviceId) {
+      this.playerToDevice.set(playerId, deviceId)
+    }
 
     // Track session for reconnection
     if (sessionId) {
@@ -309,6 +319,7 @@ export class RoomManager {
    * @param sessionId - Optional session token for reconnection
    * @param stablePlayerId - Optional verified player ID from session token
    * @param asSpectator - Whether to join as a view-only spectator
+   * @param deviceId - Optional device identifier for kick/ban tracking
    */
   loadOrCreateRoom(
     roomCode: string,
@@ -317,14 +328,15 @@ export class RoomManager {
     sessionId?: string,
     stablePlayerId?: string,
     asSpectator?: boolean,
+    deviceId?: string,
   ):
     | { room: Room; player: Player; isReconnect: boolean; loaded: boolean; playerId: string }
-    | { error: 'NOT_FOUND' | 'FULL' } {
+    | { error: 'NOT_FOUND' | 'FULL' | 'BANNED' } {
     // Check if room is already in memory
     const existingRoom = this.rooms.get(roomCode)
     if (existingRoom) {
       // Use normal join flow
-      const result = this.joinRoom(roomCode, socketId, playerName, sessionId, stablePlayerId, asSpectator)
+      const result = this.joinRoom(roomCode, socketId, playerName, sessionId, stablePlayerId, asSpectator, deviceId)
       if ('error' in result) return result
       return { ...result, loaded: false }
     }
@@ -377,12 +389,18 @@ export class RoomManager {
       createdBy: persisted.metadata.createdBy,
       creatorPlayerId: creatorPlayerId, // Use computed value (handles legacy tables)
       settings: persisted.metadata.settings || { background: 'green-felt' },
+      bannedDevices: new Set(),
     }
 
     this.rooms.set(roomCode, room)
 
     // Update socket mapping
     this.updateSocketMapping(socketId, playerId)
+
+    // Track device for kick/ban
+    if (deviceId) {
+      this.playerToDevice.set(playerId, deviceId)
+    }
 
     // Create hand for the player (not for spectators)
     if (!asSpectator) {
@@ -436,6 +454,7 @@ export class RoomManager {
    * @param sessionId - Optional session token for reconnection
    * @param stablePlayerId - Optional verified player ID from session token (for reconnection)
    * @param asSpectator - Whether to join as a view-only spectator
+   * @param deviceId - Optional device identifier for kick/ban tracking
    */
   joinRoom(
     roomCode: string,
@@ -444,10 +463,16 @@ export class RoomManager {
     sessionId?: string,
     stablePlayerId?: string,
     asSpectator?: boolean,
-  ): { room: Room; player: Player; isReconnect: boolean; playerId: string } | { error: 'NOT_FOUND' | 'FULL' } {
+    deviceId?: string,
+  ): { room: Room; player: Player; isReconnect: boolean; playerId: string } | { error: 'NOT_FOUND' | 'FULL' | 'BANNED' } {
     const room = this.rooms.get(roomCode)
     if (!room) {
       return { error: 'NOT_FOUND' }
+    }
+
+    // Check if device is banned from this room
+    if (deviceId && room.bannedDevices.has(deviceId)) {
+      return { error: 'BANNED' }
     }
 
     // Cancel any pending cleanup since someone is joining
@@ -463,6 +488,11 @@ export class RoomManager {
 
         // Update socket mapping (old socket is gone, new socket maps to same playerId)
         this.updateSocketMapping(socketId, stablePlayerId)
+
+        // Track device for kick/ban (update in case it changed)
+        if (deviceId) {
+          this.playerToDevice.set(stablePlayerId, deviceId)
+        }
 
         // Update session mapping
         if (sessionId) {
@@ -503,6 +533,11 @@ export class RoomManager {
     // Update socket mapping
     this.updateSocketMapping(socketId, newPlayerId)
 
+    // Track device for kick/ban
+    if (deviceId) {
+      this.playerToDevice.set(newPlayerId, deviceId)
+    }
+
     // Create hand for new player (not for spectators)
     if (!asSpectator) {
       room.gameState.getOrCreateHand(newPlayerId)
@@ -514,6 +549,77 @@ export class RoomManager {
     }
 
     return { room, player, isReconnect: false, playerId: newPlayerId }
+  }
+
+  /**
+   * Get device ID for a player (for kick/ban)
+   */
+  getDeviceId(playerId: string): string | undefined {
+    return this.playerToDevice.get(playerId)
+  }
+
+  /**
+   * Kick a player from a room (they can rejoin)
+   * @returns The kicked player info or null if not found
+   */
+  kickPlayer(roomCode: string, playerId: string): Player | null {
+    const room = this.rooms.get(roomCode)
+    if (!room) return null
+
+    const player = room.players.get(playerId)
+    if (!player) return null
+
+    // Release all locks held by this player
+    room.locks.releaseAllForPlayer(playerId)
+
+    // Return cards from hand to table
+    room.gameState.removePlayer(playerId)
+
+    // Remove player and their cursor
+    room.players.delete(playerId)
+    room.cursors.delete(playerId)
+
+    // Clean up socket/player mapping
+    const socketId = this.playerToSocket.get(playerId)
+    if (socketId) {
+      this.socketToPlayer.delete(socketId)
+    }
+    this.playerToSocket.delete(playerId)
+
+    return player
+  }
+
+  /**
+   * Ban a player from a room (they cannot rejoin)
+   * @returns The banned player and their device ID, or null if not found
+   */
+  banPlayer(roomCode: string, playerId: string): { player: Player; deviceId: string | undefined } | null {
+    const room = this.rooms.get(roomCode)
+    if (!room) return null
+
+    const player = room.players.get(playerId)
+    if (!player) return null
+
+    const deviceId = this.playerToDevice.get(playerId)
+
+    // Add device to banned list (if we have it)
+    if (deviceId) {
+      room.bannedDevices.add(deviceId)
+    }
+
+    // Use kick logic to remove the player
+    this.kickPlayer(roomCode, playerId)
+
+    return { player, deviceId }
+  }
+
+  /**
+   * Check if a device is banned from a room
+   */
+  isDeviceBanned(roomCode: string, deviceId: string): boolean {
+    const room = this.rooms.get(roomCode)
+    if (!room) return false
+    return room.bannedDevices.has(deviceId)
   }
 
   /**

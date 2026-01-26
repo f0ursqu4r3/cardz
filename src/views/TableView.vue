@@ -81,6 +81,12 @@ const playerColor = computed(() => {
   return player?.color || '#ef4444' // Default to red
 })
 
+// Check if current player is the table creator
+const isCreator = computed(() => {
+  const player = ws.players.value.find((p) => p.id === ws.playerId.value)
+  return player?.role === 'creator'
+})
+
 // Custom cursor based on player color (sets up global style via side effect)
 const cursor = useCursor(playerColor)
 
@@ -159,6 +165,21 @@ watch(
       toast.error(error)
       // Clear the error after showing it
       ws.error.value = null
+    }
+  },
+)
+
+// Watch for kick/ban and redirect to landing page
+watch(
+  () => ws.kickedReason.value,
+  (reason) => {
+    if (reason) {
+      console.log('[TableView] Player kicked/banned:', reason)
+      // Store the reason to show on landing page
+      sessionStorage.setItem('cardz_kicked_reason', reason)
+      // Disconnect and redirect
+      ws.disconnect()
+      router.push({ name: 'landing' })
     }
   },
 )
@@ -737,6 +758,7 @@ const onCanvasPointerDown = (event: PointerEvent) => {
 // Throttled cursor sending
 let lastCursorSend = 0
 let lastCursorState: 'default' | 'grab' | 'grabbing' = 'default'
+let lastCursorPosition = { x: 0, y: 0 }
 
 const sendCursorUpdate = (x: number, y: number, state: 'default' | 'grab' | 'grabbing') => {
   const now = Date.now()
@@ -744,13 +766,35 @@ const sendCursorUpdate = (x: number, y: number, state: 'default' | 'grab' | 'gra
   if (state === lastCursorState && now - lastCursorSend < CURSOR_THROTTLE_MS) return
   lastCursorSend = now
   lastCursorState = state
+  lastCursorPosition = { x, y }
 
   ws.send({ type: 'cursor:update', x, y, state })
 }
 
+// Send cursor state update when any drag state changes (forces immediate broadcast)
+const sendCursorStateChange = () => {
+  const state = getCursorState()
+  if (state !== lastCursorState) {
+    lastCursorState = state
+    ws.send({ type: 'cursor:update', x: lastCursorPosition.x, y: lastCursorPosition.y, state })
+  }
+}
+
+// Watch all drag states to broadcast cursor changes
+watch(() => interaction.drag.isDragging.value, sendCursorStateChange)
+watch(() => counterDrag.draggingId.value, sendCursorStateChange)
+watch(() => tokenDrag.draggingId.value, sendCursorStateChange)
+watch(() => dieDrag.draggingId.value, sendCursorStateChange)
+watch(() => timerDrag.draggingId.value, sendCursorStateChange)
+
 // Get current cursor state for sending
 const getCursorState = (): 'default' | 'grab' | 'grabbing' => {
+  // Check all drag states
   if (interaction.drag.isDragging.value) return 'grabbing'
+  if (counterDrag.draggingId.value !== null) return 'grabbing'
+  if (tokenDrag.draggingId.value !== null) return 'grabbing'
+  if (dieDrag.draggingId.value !== null) return 'grabbing'
+  if (timerDrag.draggingId.value !== null) return 'grabbing'
   return 'default'
 }
 
@@ -759,8 +803,9 @@ const onCanvasPointerMove = (event: PointerEvent) => {
     viewport.updatePan(event)
   }
 
-  // Send cursor position in world coordinates with state
+  // Track cursor position in world coordinates (always update for state change broadcasts)
   const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
+  lastCursorPosition = { x: worldPos.x, y: worldPos.y }
   sendCursorUpdate(worldPos.x, worldPos.y, getCursorState())
 }
 
@@ -776,9 +821,47 @@ const STATE_SYNC_INTERVAL = 30_000
 const INACTIVITY_THRESHOLD = 5_000 // Only sync after 5 seconds of inactivity
 let syncInterval: ReturnType<typeof setInterval> | null = null
 
+// Handle player join/leave notifications
+const handlePlayerEvents = (message: { type: string; player?: { name: string }; playerId?: string; playerName?: string; kickedBy?: string; bannedBy?: string }) => {
+  switch (message.type) {
+    case 'room:player_joined':
+      if (message.player) {
+        toast.info(`${message.player.name} joined the table`)
+      }
+      break
+    case 'room:player_reconnected':
+      if (message.player) {
+        toast.info(`${message.player.name} reconnected`)
+      }
+      break
+    case 'room:player_left':
+      // Find the player name from current players list before they're removed
+      const leftPlayer = ws.players.value.find(p => p.id === message.playerId)
+      if (leftPlayer) {
+        toast.info(`${leftPlayer.name} left the table`)
+      }
+      break
+    case 'room:player_kicked':
+      // Only show toast for other players being kicked (not ourselves)
+      if (message.playerId !== ws.playerId.value && message.playerName) {
+        toast.info(`${message.playerName} was kicked by ${message.kickedBy}`)
+      }
+      break
+    case 'room:player_banned':
+      // Only show toast for other players being banned (not ourselves)
+      if (message.playerId !== ws.playerId.value && message.playerName) {
+        toast.info(`${message.playerName} was banned by ${message.bannedBy}`)
+      }
+      break
+  }
+}
+
 // Connect to room on mount
 onMounted(() => {
   ws.connect()
+
+  // Listen for player events to show toasts
+  ws.onMessage(handlePlayerEvents)
 
   // Wait for connection, then create or join room
   const unwatch = watch(
@@ -815,6 +898,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   interaction.drag.cancelRaf()
+  ws.offMessage(handlePlayerEvents)
   ws.disconnect()
   if (syncInterval) {
     clearInterval(syncInterval)
@@ -868,7 +952,10 @@ onBeforeUnmount(() => {
             :hand-counts="ws.handCounts.value"
             :current-player-id="ws.playerId.value"
             :own-hand-count="cardStore.handCount"
+            :is-creator="isCreator"
             @close="showPlayers = false"
+            @kick="ws.kickPlayer"
+            @ban="ws.banPlayer"
           />
         </div>
         <button
@@ -1102,7 +1189,10 @@ onBeforeUnmount(() => {
           }"
         />
 
-        <!-- Remote player cursors -->
+      </div>
+
+      <!-- Remote player cursors (separate layer for proper z-index, same transform as world) -->
+      <div class="cursors-layer" :style="{ transform: viewport.worldTransform.value }">
         <RemoteCursors
           :cursors="ws.cursors.value"
           :players="ws.players.value"
@@ -1363,6 +1453,14 @@ onBeforeUnmount(() => {
   transform-origin: 0 0;
   will-change: transform;
   z-index: 1;
+}
+
+.cursors-layer {
+  position: absolute;
+  transform-origin: 0 0;
+  pointer-events: none;
+  /* Above dragged items (2000) but below table-ui (2500) */
+  z-index: 2200;
 }
 
 /* Card states */

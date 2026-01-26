@@ -37,15 +37,24 @@ function iconToSvg(icon: IconNode, color: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${childrenStr}</svg>`
 }
 
+// Native cursor fallbacks for each type
+const CURSOR_FALLBACKS: Record<CursorType, string> = {
+  default: 'default',
+  pointer: 'pointer',
+  grab: 'grab',
+  grabbing: 'grabbing',
+}
+
 /**
  * Create a data URL for a cursor SVG with the given color
  */
 function createCursorUrl(type: CursorType, color: string): string {
   const icon = CURSOR_ICONS[type]
   const { x, y } = CURSOR_HOTSPOTS[type]
+  const fallback = CURSOR_FALLBACKS[type]
   const svg = iconToSvg(icon, color)
   const encoded = encodeURIComponent(svg)
-  return `url("data:image/svg+xml,${encoded}") ${x} ${y}, auto`
+  return `url("data:image/svg+xml,${encoded}") ${x} ${y}, ${fallback}`
 }
 
 /**
@@ -88,6 +97,7 @@ export function useCursor(playerColor: Ref<string>) {
         /* Cards and interactive elements show grab cursor on hover */
         .table-view .card:not(.dragging) { cursor: ${grabCursor}; }
         .table-view .zone:not(.zone--dragging):not(.zone--locked) { cursor: ${grabCursor}; }
+        .table-view .zone--locked { cursor: not-allowed !important; }
         .table-view .hand__card { cursor: ${grabCursor}; }
 
         /* Entity components (counters, tokens, dice, timers) */

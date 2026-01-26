@@ -33,6 +33,8 @@ export interface EntityDragConfig<T extends DraggableEntity> {
   trackActivity: () => void
   /** Function to set cursor type */
   setCursor: (type: 'default' | 'grab' | 'grabbing') => void
+  /** Optional callback to broadcast cursor position during drag */
+  onCursorMove?: (worldX: number, worldY: number) => void
 }
 
 /**
@@ -52,6 +54,7 @@ export function useEntityDrag<T extends DraggableEntity>(config: EntityDragConfi
     sendMessage,
     trackActivity,
     setCursor,
+    onCursorMove,
   } = config
 
   // Drag state

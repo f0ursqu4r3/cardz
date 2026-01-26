@@ -19,6 +19,8 @@ import {
   handleRoomLeave,
   handleRoomList,
   handleDisconnect,
+  handlePlayerKick,
+  handlePlayerBan,
 } from './handlers/room'
 import { handleCardMove, handleCardLock, handleCardUnlock, handleCardFlip } from './handlers/card'
 import {
@@ -742,6 +744,7 @@ const server = Bun.serve<ClientData>({
 
           // Cursor updates (throttled)
           case 'cursor:update': {
+            if (!clientData.playerId) break
             const now = Date.now()
             const lastUpdate = lastCursorUpdate.get(clientData.id) ?? 0
 
@@ -753,7 +756,7 @@ const server = Bun.serve<ClientData>({
             lastCursorUpdate.set(clientData.id, now)
 
             // Store cursor position in room for new players joining
-            room.cursors.set(clientData.id, { x: msg.x, y: msg.y, state: msg.state })
+            room.cursors.set(clientData.playerId, { x: msg.x, y: msg.y, state: msg.state })
 
             // Broadcast cursor to players whose viewport contains this position
             broadcastToViewport(
@@ -761,13 +764,13 @@ const server = Bun.serve<ClientData>({
               room.code,
               {
                 type: 'cursor:updated',
-                playerId: clientData.id,
+                playerId: clientData.playerId,
                 x: msg.x,
                 y: msg.y,
                 state: msg.state,
               },
               { x: msg.x, y: msg.y },
-              clientData.id,
+              clientData.id, // Exclude sender (uses socket ID for routing)
             )
             break
           }
@@ -780,8 +783,9 @@ const server = Bun.serve<ClientData>({
 
           // State sync request
           case 'state:request': {
+            if (!clientData.playerId) break
             const state = room.gameState.getState()
-            const playerHand = state.hands.find((h) => h.playerId === clientData.id)
+            const playerHand = state.hands.find((h) => h.playerId === clientData.playerId)
             const handCounts = state.hands.map((h) => ({
               playerId: h.playerId,
               count: h.cardIds.length,
@@ -798,7 +802,8 @@ const server = Bun.serve<ClientData>({
 
           // Chat messages
           case 'chat:send': {
-            const player = room.players.get(clientData.id)
+            if (!clientData.playerId) break
+            const player = room.players.get(clientData.playerId)
             if (!player) break
 
             // Sanitize message to prevent XSS
@@ -808,7 +813,7 @@ const server = Bun.serve<ClientData>({
             const chatMessage = {
               id: nanoid(),
               roomCode: room.code,
-              playerId: clientData.id,
+              playerId: clientData.playerId,
               playerName: player.name,
               playerColor: player.color,
               message: sanitizedMessage,
@@ -828,7 +833,8 @@ const server = Bun.serve<ClientData>({
           }
 
           case 'chat:typing': {
-            const player = room.players.get(clientData.id)
+            if (!clientData.playerId) break
+            const player = room.players.get(clientData.playerId)
             if (!player) break
 
             // Broadcast typing status to other players in the room
@@ -837,11 +843,11 @@ const server = Bun.serve<ClientData>({
               room.code,
               {
                 type: 'chat:typing_status',
-                playerId: clientData.id,
+                playerId: clientData.playerId,
                 playerName: player.name,
                 isTyping: msg.isTyping,
               },
-              clientData.id, // Exclude sender
+              clientData.id, // Exclude sender (uses socket ID for routing)
             )
             break
           }
@@ -858,6 +864,14 @@ const server = Bun.serve<ClientData>({
             break
           case 'table:update_name':
             handleTableUpdateName(socket, msg, roomManager)
+            break
+
+          // Player moderation
+          case 'player:kick':
+            handlePlayerKick(socket, msg, roomManager)
+            break
+          case 'player:ban':
+            handlePlayerBan(socket, msg, roomManager)
             break
         }
       } catch (err) {

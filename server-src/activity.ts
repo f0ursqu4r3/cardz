@@ -256,3 +256,29 @@ export function logSettingsChanged(
 ): void {
   logActivity(clients, roomCode, playerId, playerName, 'settings_changed', { setting })
 }
+
+/**
+ * Helper to log player kicked
+ */
+export function logPlayerKicked(
+  clients: Map<string, GenericWebSocket>,
+  roomCode: string,
+  kickerId: string,
+  kickerName: string,
+  targetName: string,
+): void {
+  logActivity(clients, roomCode, kickerId, kickerName, 'player_kicked', { target: targetName })
+}
+
+/**
+ * Helper to log player banned
+ */
+export function logPlayerBanned(
+  clients: Map<string, GenericWebSocket>,
+  roomCode: string,
+  bannerId: string,
+  bannerName: string,
+  targetName: string,
+): void {
+  logActivity(clients, roomCode, bannerId, bannerName, 'player_banned', { target: targetName })
+}

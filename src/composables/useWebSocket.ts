@@ -59,6 +59,9 @@ export interface UseWebSocketReturn {
   tableName: Ref<string>
   tableIsPublic: Ref<boolean>
 
+  // Moderation
+  kickedReason: Ref<string | null>
+
   // Actions
   connect: () => void
   disconnect: () => void
@@ -72,6 +75,10 @@ export interface UseWebSocketReturn {
   updateTableSettings: (settings: Partial<TableSettings>) => void
   updateTableVisibility: (isPublic: boolean) => void
   updateTableName: (name: string) => void
+
+  // Player moderation (creator only)
+  kickPlayer: (targetPlayerId: string) => void
+  banPlayer: (targetPlayerId: string) => void
 
   // Chat
   sendChat: (message: string) => void
@@ -188,6 +195,9 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
   const tableSettings = ref<TableSettings>({ background: 'green-felt' })
   const tableName = ref<string>('')
   const tableIsPublic = ref<boolean>(false)
+
+  // Moderation - set when current player is kicked/banned
+  const kickedReason = ref<string | null>(null)
 
   // Message handlers
   const messageHandlers = new Set<(message: ServerMessage) => void>()
@@ -368,6 +378,15 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     send({ type: 'chat:typing', isTyping })
   }
 
+  // Player moderation (creator only)
+  const kickPlayer = (targetPlayerId: string) => {
+    send({ type: 'player:kick', targetPlayerId })
+  }
+
+  const banPlayer = (targetPlayerId: string) => {
+    send({ type: 'player:ban', targetPlayerId })
+  }
+
   // Message handling
   const handleMessage = (message: ServerMessage) => {
     // Notify all registered handlers
@@ -402,6 +421,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
       chatMessages,
       typingPlayers,
       activityLog,
+      kickedReason,
     }
 
     const roomCallbacks = {
@@ -473,6 +493,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     tableSettings,
     tableName,
     tableIsPublic,
+    kickedReason,
     connect,
     disconnect,
     createRoom,
@@ -483,6 +504,8 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     updateTableSettings,
     updateTableVisibility,
     updateTableName,
+    kickPlayer,
+    banPlayer,
     sendChat,
     sendTyping,
     onMessage,

@@ -449,7 +449,7 @@ defineExpose({ openModal })
 }
 
 .zone--locked {
-  cursor: default;
+  /* Cursor handled by .table-view custom cursor styles - shows not-allowed for locked zones */
 }
 
 .zone--private {

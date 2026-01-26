@@ -198,6 +198,16 @@ export interface RoomListRequest {
   type: 'room:list'
 }
 
+export interface PlayerKick {
+  type: 'player:kick'
+  targetPlayerId: string
+}
+
+export interface PlayerBan {
+  type: 'player:ban'
+  targetPlayerId: string
+}
+
 // ============================================================================
 // Room Messages (Server → Client)
 // ============================================================================
@@ -235,9 +245,23 @@ export interface PlayerReconnected {
   player: Player
 }
 
+export interface PlayerKicked {
+  type: 'room:player_kicked'
+  playerId: string
+  playerName: string
+  kickedBy: string // Name of the player who kicked
+}
+
+export interface PlayerBanned {
+  type: 'room:player_banned'
+  playerId: string
+  playerName: string
+  bannedBy: string // Name of the player who banned
+}
+
 export interface RoomError {
   type: 'room:error'
-  code: 'NOT_FOUND' | 'FULL' | 'INVALID_CODE'
+  code: 'NOT_FOUND' | 'FULL' | 'INVALID_CODE' | 'BANNED'
   message: string
 }
 
@@ -1222,6 +1246,8 @@ export type ActivityType =
   | 'player_joined'
   | 'player_left'
   | 'player_spectating'
+  | 'player_kicked'
+  | 'player_banned'
   | 'card_placed'
   | 'stack_created'
   | 'stack_shuffled'
@@ -1296,6 +1322,8 @@ export type ErrorCode =
   | 'INTERNAL_ERROR'
   | 'PERMISSION_DENIED'
   | 'SPECTATOR_READONLY'
+  | 'KICKED'
+  | 'BANNED'
 
 // ============================================================================
 // Union Types for Message Handling
@@ -1307,6 +1335,8 @@ type ClientMessageBase =
   | RoomJoin
   | RoomLeave
   | RoomListRequest
+  | PlayerKick
+  | PlayerBan
   | CardMoveIntent
   | CardLock
   | CardUnlock
@@ -1378,6 +1408,8 @@ type ServerMessageBase =
   | PlayerJoined
   | PlayerLeft
   | PlayerReconnected
+  | PlayerKicked
+  | PlayerBanned
   | RoomError
   | RoomListResponse
   | CardMoved

@@ -1,9 +1,20 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { PlayCircle, Users, Sparkles, Globe } from 'lucide-vue-next'
+import { useToast } from '@/composables/useToast'
 
 const router = useRouter()
+const toast = useToast()
+
+// Check for kicked/banned message on mount
+onMounted(() => {
+  const kickedReason = sessionStorage.getItem('cardz_kicked_reason')
+  if (kickedReason) {
+    toast.error(kickedReason)
+    sessionStorage.removeItem('cardz_kicked_reason')
+  }
+})
 const joinCode = ref('')
 const playerName = ref('')
 const tableName = ref('')

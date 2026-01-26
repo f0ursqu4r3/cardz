@@ -99,6 +99,10 @@ const formatActivity = (entry: ActivityLogEntry): string => {
       return `${name} reset the table`
     case 'settings_changed':
       return `${name} changed settings (${data.setting || 'unknown'})`
+    case 'player_kicked':
+      return `${name} kicked ${data.target || 'a player'}`
+    case 'player_banned':
+      return `${name} banned ${data.target || 'a player'}`
     default:
       return `${name} performed an action`
   }
@@ -112,6 +116,9 @@ const getActivityColor = (actionType: string): string => {
       return '#4ade80' // green
     case 'player_left':
       return '#f87171' // red
+    case 'player_kicked':
+    case 'player_banned':
+      return '#ef4444' // bright red for moderation actions
     case 'die_rolled':
       return '#fbbf24' // yellow
     case 'stack_shuffled':

@@ -170,6 +170,16 @@ export const RoomListSchema = z.object({
   type: z.literal('room:list'),
 })
 
+export const PlayerKickSchema = z.object({
+  type: z.literal('player:kick'),
+  targetPlayerId: z.string().min(1),
+})
+
+export const PlayerBanSchema = z.object({
+  type: z.literal('player:ban'),
+  targetPlayerId: z.string().min(1),
+})
+
 // ============================================================================
 // Card Message Schemas (Client → Server)
 // ============================================================================
@@ -660,6 +670,8 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   RoomJoinSchema,
   RoomLeaveSchema,
   RoomListSchema,
+  PlayerKickSchema,
+  PlayerBanSchema,
   CardMoveIntentSchema,
   CardLockSchema,
   CardUnlockSchema,

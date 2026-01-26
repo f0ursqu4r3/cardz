@@ -1,4 +1,4 @@
-import type { RoomCreate, RoomJoin, RoomListRequest } from '../../shared/types'
+import type { RoomCreate, RoomJoin, RoomListRequest, PlayerKick, PlayerBan } from '../../shared/types'
 import type { RoomManager } from '../room'
 import type { ClientData, GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
@@ -6,7 +6,14 @@ import { loadChatMessages } from '../persistence'
 import { sanitizePlayerName, sanitizeTableName } from '../utils/sanitize'
 import { createSessionToken, verifySessionToken } from '../utils/session'
 import { trackTableCreated } from '../analytics'
-import { logPlayerJoined, logPlayerLeft, logPlayerSpectating, getActivityHistory } from '../activity'
+import {
+  logPlayerJoined,
+  logPlayerLeft,
+  logPlayerSpectating,
+  logPlayerKicked,
+  logPlayerBanned,
+  getActivityHistory,
+} from '../activity'
 
 export function handleRoomCreate(
   ws: GenericWebSocket,
@@ -37,6 +44,7 @@ export function handleRoomCreate(
     msg.sessionId,
     tableName,
     msg.isPublic,
+    msg.deviceId, // for kick/ban tracking
   )
   clientData.roomCode = room.code
   clientData.playerId = playerId // Store stable player ID
@@ -131,13 +139,28 @@ export function handleRoomJoin(
     verifiedPlayerId ? msg.sessionId : undefined, // session token
     verifiedPlayerId, // stable player ID from verified token
     msg.asSpectator, // join as spectator
+    msg.deviceId, // for kick/ban tracking
   )
 
   if ('error' in result) {
+    let message: string
+    switch (result.error) {
+      case 'NOT_FOUND':
+        message = 'Room not found'
+        break
+      case 'FULL':
+        message = 'Room is full'
+        break
+      case 'BANNED':
+        message = 'You are banned from this room'
+        break
+      default:
+        message = 'Cannot join room'
+    }
     send(ws, {
       type: 'room:error',
       code: result.error,
-      message: result.error === 'NOT_FOUND' ? 'Room not found' : 'Room is full',
+      message,
     })
     return
   }
@@ -297,4 +320,180 @@ export function handleRoomList(
     type: 'room:list',
     rooms,
   })
+}
+
+/**
+ * Handle kicking a player from the room (creator only)
+ */
+export function handlePlayerKick(
+  ws: GenericWebSocket,
+  msg: PlayerKick,
+  roomManager: RoomManager,
+): void {
+  const clientData = getClientData(ws)
+
+  if (!clientData.roomCode || !clientData.playerId) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:kick',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+    })
+    return
+  }
+
+  // Check if caller is the creator
+  if (!roomManager.isCreator(clientData.roomCode, clientData.playerId)) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:kick',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the table creator can kick players',
+    })
+    return
+  }
+
+  // Cannot kick yourself
+  if (msg.targetPlayerId === clientData.playerId) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:kick',
+      code: 'INVALID_ACTION',
+      message: 'Cannot kick yourself',
+    })
+    return
+  }
+
+  // Kick the player
+  const kickedPlayer = roomManager.kickPlayer(clientData.roomCode, msg.targetPlayerId)
+  if (!kickedPlayer) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:kick',
+      code: 'NOT_FOUND',
+      message: 'Player not found',
+    })
+    return
+  }
+
+  // Get the kicked player's socket and send them a kicked message
+  const targetWs = roomManager.getSocketByPlayerId(msg.targetPlayerId)
+  if (targetWs) {
+    send(targetWs, {
+      type: 'room:player_kicked',
+      playerId: msg.targetPlayerId,
+      playerName: kickedPlayer.name,
+      kickedBy: clientData.name || 'The host',
+    })
+    // Close their connection
+    targetWs.close(4001, 'You have been kicked from the room')
+  }
+
+  // Broadcast to remaining players
+  broadcastToRoom(roomManager.getClients(), clientData.roomCode, {
+    type: 'room:player_kicked',
+    playerId: msg.targetPlayerId,
+    playerName: kickedPlayer.name,
+    kickedBy: clientData.name || 'The host',
+  })
+
+  // Log activity
+  logPlayerKicked(
+    roomManager.getClients(),
+    clientData.roomCode,
+    clientData.playerId,
+    clientData.name || 'Host',
+    kickedPlayer.name,
+  )
+
+  console.log(`[room:kick] ${clientData.name} kicked ${kickedPlayer.name} from ${clientData.roomCode}`)
+}
+
+/**
+ * Handle banning a player from the room (creator only)
+ */
+export function handlePlayerBan(
+  ws: GenericWebSocket,
+  msg: PlayerBan,
+  roomManager: RoomManager,
+): void {
+  const clientData = getClientData(ws)
+
+  if (!clientData.roomCode || !clientData.playerId) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:ban',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+    })
+    return
+  }
+
+  // Check if caller is the creator
+  if (!roomManager.isCreator(clientData.roomCode, clientData.playerId)) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:ban',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the table creator can ban players',
+    })
+    return
+  }
+
+  // Cannot ban yourself
+  if (msg.targetPlayerId === clientData.playerId) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:ban',
+      code: 'INVALID_ACTION',
+      message: 'Cannot ban yourself',
+    })
+    return
+  }
+
+  // Ban the player
+  const result = roomManager.banPlayer(clientData.roomCode, msg.targetPlayerId)
+  if (!result) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:ban',
+      code: 'NOT_FOUND',
+      message: 'Player not found',
+    })
+    return
+  }
+
+  const { player: bannedPlayer } = result
+
+  // Get the banned player's socket and send them a banned message
+  const targetWs = roomManager.getSocketByPlayerId(msg.targetPlayerId)
+  if (targetWs) {
+    send(targetWs, {
+      type: 'room:player_banned',
+      playerId: msg.targetPlayerId,
+      playerName: bannedPlayer.name,
+      bannedBy: clientData.name || 'The host',
+    })
+    // Close their connection
+    targetWs.close(4002, 'You have been banned from the room')
+  }
+
+  // Broadcast to remaining players
+  broadcastToRoom(roomManager.getClients(), clientData.roomCode, {
+    type: 'room:player_banned',
+    playerId: msg.targetPlayerId,
+    playerName: bannedPlayer.name,
+    bannedBy: clientData.name || 'The host',
+  })
+
+  // Log activity
+  logPlayerBanned(
+    roomManager.getClients(),
+    clientData.roomCode,
+    clientData.playerId,
+    clientData.name || 'Host',
+    bannedPlayer.name,
+  )
+
+  console.log(`[room:ban] ${clientData.name} banned ${bannedPlayer.name} from ${clientData.roomCode}`)
 }

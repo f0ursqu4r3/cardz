@@ -12,7 +12,7 @@ import type {
   ZoneState,
 } from '../../../../shared/types'
 
-interface GameStateRefs {
+export interface GameStateRefs {
   gameState: Ref<GameState | null>
   handCardIds: Ref<number[]>
   handCounts: Ref<Map<string, number>>
