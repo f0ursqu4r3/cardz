@@ -114,7 +114,8 @@ defineExpose({ openModal, rollDie })
       'die--rolling': die.isRolling,
     }"
     :style="{
-      transform: `translate3d(${die.x - DIE_SIZE / 2}px, ${die.y - DIE_SIZE / 2}px, 0)`,
+      left: `${die.x - DIE_SIZE / 2}px`,
+      top: `${die.y - DIE_SIZE / 2}px`,
       '--die-color': die.color,
       '--lock-color': lockColor,
       zIndex: isDragging || isLockedByOther ? 10000 : die.z,
@@ -190,11 +191,6 @@ defineExpose({ openModal, rollDie })
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
-  transition: transform 0.05s ease;
-}
-
-.die--dragging {
-  transition: none; /* Disable transition during drag for smooth movement */
 }
 
 .die--locked::after {
@@ -212,34 +208,34 @@ defineExpose({ openModal, rollDie })
 
 @keyframes die-shake {
   0%, 100% {
-    transform: translate3d(var(--tx, 0), var(--ty, 0), 0) rotate(0deg);
+    transform: rotate(0deg) scale(1);
   }
   10% {
-    transform: translate3d(var(--tx, 0), var(--ty, 0), 0) rotate(-15deg) scale(1.1);
+    transform: rotate(-15deg) scale(1.1);
   }
   20% {
-    transform: translate3d(var(--tx, 0), var(--ty, 0), 0) rotate(15deg) scale(1.1);
+    transform: rotate(15deg) scale(1.1);
   }
   30% {
-    transform: translate3d(var(--tx, 0), var(--ty, 0), 0) rotate(-10deg) scale(1.05);
+    transform: rotate(-10deg) scale(1.05);
   }
   40% {
-    transform: translate3d(var(--tx, 0), var(--ty, 0), 0) rotate(10deg) scale(1.05);
+    transform: rotate(10deg) scale(1.05);
   }
   50% {
-    transform: translate3d(var(--tx, 0), var(--ty, 0), 0) rotate(-5deg);
+    transform: rotate(-5deg) scale(1);
   }
   60% {
-    transform: translate3d(var(--tx, 0), var(--ty, 0), 0) rotate(5deg);
+    transform: rotate(5deg) scale(1);
   }
   70% {
-    transform: translate3d(var(--tx, 0), var(--ty, 0), 0) rotate(-3deg);
+    transform: rotate(-3deg) scale(1);
   }
   80% {
-    transform: translate3d(var(--tx, 0), var(--ty, 0), 0) rotate(3deg);
+    transform: rotate(3deg) scale(1);
   }
   90% {
-    transform: translate3d(var(--tx, 0), var(--ty, 0), 0) rotate(-1deg);
+    transform: rotate(-1deg) scale(1);
   }
 }
 
