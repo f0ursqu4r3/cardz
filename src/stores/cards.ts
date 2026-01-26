@@ -650,27 +650,46 @@ export const useCardStore = defineStore('cards', () => {
     index: number,
     activeIndex: number | null,
     draggingStackId: number | null,
+    playerId: string | null = null,
   ): number => {
+    // Dragging stack cards: highest priority
     if (draggingStackId !== null && draggingStackId === card.stackId) {
       const stack = stackById.value.get(draggingStackId)
       const pos = stack ? stack.cardIds.indexOf(card.id) : 0
-      return 2000 + pos
+      return 12000 + pos
     }
 
+    // Active single card being dragged
     if (activeIndex === index) {
-      return 1900
+      return 11000
     }
 
+    // Check if card is locked by another player (card-level or stack-level lock)
+    const isLockedByOther =
+      (card.lockedBy && card.lockedBy !== playerId) ||
+      (card.stackId !== null &&
+        stackById.value.get(card.stackId)?.lockedBy !== undefined &&
+        stackById.value.get(card.stackId)?.lockedBy !== playerId)
+
+    if (isLockedByOther) {
+      const stack =
+        card.stackId !== null ? stackById.value.get(card.stackId) ?? null : null
+      const pos = stack ? stack.cardIds.indexOf(card.id) : 0
+      return 10000 + pos
+    }
+
+    // Cards in stacks: use stack id + position within stack
     const stack =
       card.stackId !== null ? stackById.value.get(card.stackId) ?? null : null
 
     if (stack) {
-      const stackIdx = stacks.value.findIndex((item) => item.id === stack.id)
       const pos = stack.cardIds.indexOf(card.id)
-      return 1000 + stackIdx * 100 + pos
+      // Stack id provides inter-stack ordering, pos for intra-stack
+      return 1000 + stack.id + pos
     }
 
-    return 10 + card.z
+    // Free cards: use card's z property
+    return 100 + card.z
   }
 
   const bumpCardZ = (cardId: number) => {

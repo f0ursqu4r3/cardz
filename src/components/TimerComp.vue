@@ -188,7 +188,7 @@ defineExpose({ openModal })
     :style="{
       transform: `translate3d(${timer.x - 70}px, ${timer.y - 30}px, 0)`,
       '--lock-color': lockColor,
-      zIndex: isDragging ? 1000 : timer.z,
+      zIndex: isDragging || isLockedByOther ? 10000 : timer.z,
     }"
     @pointerdown="emit('pointerdown', $event)"
     @pointermove="emit('pointermove', $event)"

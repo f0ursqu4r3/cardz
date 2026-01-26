@@ -100,7 +100,7 @@ defineExpose({ openModal })
       '--token-color': token.color,
       '--lock-color': lockColor,
       '--token-size': `${tokenSize}px`,
-      zIndex: isDragging ? 1000 : token.z,
+      zIndex: isDragging || isLockedByOther ? 10000 : token.z,
     }"
     @pointerdown="emit('pointerdown', $event)"
     @pointermove="emit('pointermove', $event)"
@@ -304,6 +304,7 @@ defineExpose({ openModal })
   align-items: center;
   justify-content: center;
   transition: transform 0.05s ease;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
 .token--dragging {
@@ -329,7 +330,6 @@ defineExpose({ openModal })
   width: 100%;
   height: 100%;
   background: var(--token-color);
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
 .token__shape--circle {
@@ -362,7 +362,6 @@ defineExpose({ openModal })
 /* Sprite tokens */
 .token__sprite {
   color: var(--token-color);
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
 /* Label */

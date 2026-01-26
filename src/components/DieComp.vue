@@ -117,7 +117,7 @@ defineExpose({ openModal, rollDie })
       transform: `translate3d(${die.x - DIE_SIZE / 2}px, ${die.y - DIE_SIZE / 2}px, 0)`,
       '--die-color': die.color,
       '--lock-color': lockColor,
-      zIndex: isDragging ? 1000 : die.z,
+      zIndex: isDragging || isLockedByOther ? 10000 : die.z,
     }"
     @pointerdown="emit('pointerdown', $event)"
     @pointermove="emit('pointermove', $event)"

@@ -103,6 +103,7 @@ const interaction = useCardInteraction({
   handRef,
   sendMessage: ws.send,
   spaceHeld,
+  playerId: ws.playerId,
 })
 
 // Remote throw physics
@@ -1016,8 +1017,7 @@ onBeforeUnmount(() => {
             dragging:
               interaction.drag.activeIndex.value === index ||
               (interaction.drag.target.value?.type === 'stack' &&
-                card.stackId === interaction.drag.target.value.stackId &&
-                isStackBottom(card)),
+                card.stackId === interaction.drag.target.value.stackId),
             'in-deck': card.isInDeck,
             'in-stack': card.stackId !== null,
             'stack-bottom': isStackBottom(card),
@@ -1143,7 +1143,7 @@ onBeforeUnmount(() => {
   padding: 0.5rem 1rem;
   background: rgba(0, 0, 0, 0.6);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  z-index: 1001;
+  z-index: 3000;
   flex-shrink: 0;
 }
 
@@ -1309,7 +1309,7 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 1rem;
   right: 1rem;
-  z-index: 100;
+  z-index: 2500;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -1323,19 +1323,7 @@ onBeforeUnmount(() => {
   position: absolute;
   transform-origin: 0 0;
   will-change: transform;
-}
-
-/* Cursor states */
-.cursor--grabbing {
-  cursor: grabbing !important;
-}
-
-.cursor--grabbing * {
-  cursor: grabbing !important;
-}
-
-.cursor--grab {
-  cursor: grab;
+  z-index: 1;
 }
 
 /* Card states */
@@ -1347,19 +1335,23 @@ onBeforeUnmount(() => {
 }
 
 :deep(.card.dragging) {
-  z-index: 1000 !important;
+  filter: brightness(1.1);
+  /* Optimize for position changes during drag */
+  will-change: left, top, transform;
+  transition: none !important;
+}
+
+/* Shadow only on bottom card of dragged stack (or single dragged card) */
+:deep(.card.dragging:not(.in-stack)),
+:deep(.card.dragging.stack-bottom) {
   box-shadow:
     0 15px 35px rgba(0, 0, 0, 0.4),
     0 5px 15px rgba(0, 0, 0, 0.3);
-  filter: brightness(1.1);
 }
 
-:deep(.card.in-deck) {
-  cursor: grab;
-}
-
-:deep(.card.in-stack) {
-  cursor: grab;
+/* Non-bottom cards in dragged stack: no shadow */
+:deep(.card.dragging.in-stack:not(.stack-bottom)) {
+  box-shadow: none;
 }
 
 :deep(.card.stack-bottom) {

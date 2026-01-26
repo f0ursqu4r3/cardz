@@ -15,6 +15,7 @@ interface CardInteractionOptions {
   handRef?: Ref<HTMLElement | null>
   sendMessage?: (msg: ClientMessage) => void
   spaceHeld?: Ref<boolean>
+  playerId?: Ref<string | null>
 }
 
 export function useCardInteraction(options: CardInteractionOptions = {}) {
@@ -456,7 +457,13 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
 
     const draggingStackId = drag.target.value?.type === 'stack' ? drag.target.value.stackId : null
 
-    return cardStore.cardZ(card, index, drag.activeIndex.value, draggingStackId)
+    return cardStore.cardZ(
+      card,
+      index,
+      drag.activeIndex.value,
+      draggingStackId,
+      options.playerId?.value ?? null,
+    )
   }
 
   const onCardPointerMove = (event: PointerEvent) => {

@@ -20,7 +20,6 @@
 
   /* Cursor handled by parent .table-view with custom colored cursors */
   cursor: inherit;
-  will-change: transform;
 
   box-shadow: 0px 1px 6px rgba(0, 0, 0, 0.25);
   transition: box-shadow 0.2s ease;

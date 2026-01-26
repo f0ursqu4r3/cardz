@@ -90,10 +90,28 @@ export function useCursor(playerColor: Ref<string>) {
         .table-view .zone:not(.zone--dragging):not(.zone--locked) { cursor: ${grabCursor}; }
         .table-view .hand__card { cursor: ${grabCursor}; }
 
+        /* Entity components (counters, tokens, dice, timers) */
+        .table-view .counter { cursor: ${grabCursor} !important; }
+        .table-view .counter--dragging { cursor: ${grabbingCursor} !important; }
+        .table-view .counter--locked { cursor: not-allowed !important; }
+        .table-view .token { cursor: ${grabCursor} !important; }
+        .table-view .token--dragging { cursor: ${grabbingCursor} !important; }
+        .table-view .token--locked { cursor: not-allowed !important; }
+        .table-view .die { cursor: ${grabCursor} !important; }
+        .table-view .die--dragging { cursor: ${grabbingCursor} !important; }
+        .table-view .die--locked { cursor: not-allowed !important; }
+        .table-view .timer { cursor: ${grabCursor} !important; }
+        .table-view .timer--dragging { cursor: ${grabbingCursor} !important; }
+        .table-view .timer--locked { cursor: not-allowed !important; }
+
         /* Override with grabbing when in grabbing state */
         .table-view.cursor--grabbing .card,
         .table-view.cursor--grabbing .zone,
-        .table-view.cursor--grabbing .hand__card { cursor: ${grabbingCursor} !important; }
+        .table-view.cursor--grabbing .hand__card,
+        .table-view.cursor--grabbing .counter,
+        .table-view.cursor--grabbing .token,
+        .table-view.cursor--grabbing .die,
+        .table-view.cursor--grabbing .timer { cursor: ${grabbingCursor} !important; }
       `
     },
     { immediate: true },
