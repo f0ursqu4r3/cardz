@@ -571,6 +571,11 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       )
     }
 
+    // Check if over hand zone (for all drag types)
+    if (options.handRef) {
+      isOverHand.value = drag.isInBounds(event, options.handRef)
+    }
+
     // Update hover target for card drags
     if (drag.target.value?.type === 'card') {
       const draggingId =
@@ -579,11 +584,6 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       hover.update(x, y, cardStore.cards, draggingId, (card, idx) =>
         cardStore.cardZ(card, idx, drag.activeIndex.value, null),
       )
-
-      // Check if over hand zone
-      if (options.handRef) {
-        isOverHand.value = drag.isInBounds(event, options.handRef)
-      }
 
       // Update zone drop target for reordering
       if (zoneDragSource.value) {
@@ -609,7 +609,8 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     drag.schedulePositionUpdate(applyPendingPosition)
   }
 
-  const onCardPointerUp = (event: PointerEvent, handRef?: Ref<HTMLElement | null>) => {
+  const onCardPointerUp = (event: PointerEvent) => {
+    const handRef = options.handRef
     if (!drag.isValidPointer(event.pointerId)) return
 
     const targetEl = event.currentTarget as HTMLElement | null
@@ -715,24 +716,44 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     }
     // Handle selection drop
     else if (drag.target.value?.type === 'selection') {
-      // Check if dropped on a zone
-      const zone = findZoneAtPoint(dropX, dropY)
-      if (zone) {
-        const ids = [...cardStore.getSelectedIds()]
-        // Use bulk operation for better performance
-        cardStore.addManyToZone(ids, zone.id)
-        send({ type: 'zone:add_cards', zoneId: zone.id, cardIds: ids })
+      let handled = false
+      // Use selectionStartPositions since selectedIds may have been cleared during drag
+      const draggedIds = [...selectionStartPositions.value.keys()]
+
+      // Check if dropped on hand zone
+      if (handRef && drag.isInBounds(event, handRef)) {
+        draggedIds.forEach((id) => {
+          cardStore.addToHand(id)
+          send({ type: 'hand:add', cardId: id })
+        })
         cardStore.clearSelection()
-      } else {
+        handled = true
+      }
+
+      // Check if dropped on a zone
+      if (!handled) {
+        const zone = findZoneAtPoint(dropX, dropY)
+        if (zone) {
+          // Use bulk operation for better performance
+          cardStore.addManyToZone(draggedIds, zone.id)
+          send({ type: 'zone:add_cards', zoneId: zone.id, cardIds: draggedIds })
+          cardStore.clearSelection()
+          handled = true
+        }
+      }
+
+      // If not handled, just move the cards
+      if (!handled) {
         // Bump z-index of all selected cards and send moves
         cardStore.bumpSelectionZ()
-        cardStore.getSelectedIds().forEach((id) => {
+        draggedIds.forEach((id) => {
           const card = cardStore.getCardById(id)
           if (card) {
             send({ type: 'card:move', cardId: card.id, x: card.x, y: card.y })
           }
         })
       }
+
       selectionStartPositions.value.clear()
       selectionDragStart.value = null
       shake.reset()

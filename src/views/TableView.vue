@@ -121,7 +121,10 @@ const trackActivity = () => {
 
 // Dynamic cursor class
 const cursorClass = computed(() => ({
-  'cursor--grabbing': viewport.isPanning.value || interaction.drag.isDragging.value,
+  'cursor--grabbing':
+    viewport.isPanning.value ||
+    interaction.drag.isDragging.value ||
+    cursor.cursorType.value === 'grabbing',
   'cursor--grab': spaceHeld.value && !viewport.isPanning.value,
 }))
 
