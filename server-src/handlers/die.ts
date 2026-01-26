@@ -17,12 +17,12 @@ export function handleDieCreate(
     color: msg.color,
   })
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'die:created',
     die,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the creator
   send(ws, {
@@ -56,13 +56,13 @@ export function handleDieRoll(
   const result = gameState.rollDie(msg.dieId)
   if (!result) return
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'die:rolled',
     dieId: msg.dieId,
     value: result.value,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the roller
   send(ws, {
@@ -115,13 +115,13 @@ export function handleDieUpdate(
   const result = gameState.updateDie(msg.dieId, msg.updates)
   if (!result) return
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'die:updated',
     dieId: msg.dieId,
     die: result,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the updater
   send(ws, {
@@ -172,12 +172,12 @@ export function handleDieDelete(
   // Release any lock
   locks.unlockDie(msg.dieId, clientData.id)
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'die:deleted',
     dieId: msg.dieId,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the deleter
   send(ws, {
@@ -221,12 +221,12 @@ export function handleDieLock(
 
   gameState.setDieLock(msg.dieId, clientData.id)
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'die:locked',
     dieId: msg.dieId,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the locker
   send(ws, {
@@ -273,11 +273,11 @@ export function handleDieUnlock(
   locks.unlockDie(msg.dieId, clientData.id)
   gameState.setDieLock(msg.dieId, null)
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'die:unlocked',
     dieId: msg.dieId,
-  })
+  }, clientData.id)
 
   // Also send to the unlocker
   send(ws, {

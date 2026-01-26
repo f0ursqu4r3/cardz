@@ -24,12 +24,12 @@ export function handleTokenCreate(
     size: msg.size,
   })
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'token:created',
     token,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the creator
   send(ws, {
@@ -84,13 +84,13 @@ export function handleTokenUpdate(
   const result = gameState.updateToken(msg.tokenId, sanitizedUpdates)
   if (!result) return
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'token:updated',
     tokenId: msg.tokenId,
     token: result,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the updater
   send(ws, {
@@ -141,12 +141,12 @@ export function handleTokenDelete(
   // Release any lock
   locks.unlockToken(msg.tokenId, clientData.id)
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'token:deleted',
     tokenId: msg.tokenId,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the deleter
   send(ws, {
@@ -190,12 +190,12 @@ export function handleTokenLock(
 
   gameState.setTokenLock(msg.tokenId, clientData.id)
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'token:locked',
     tokenId: msg.tokenId,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the locker
   send(ws, {
@@ -242,11 +242,11 @@ export function handleTokenUnlock(
   locks.unlockToken(msg.tokenId, clientData.id)
   gameState.setTokenLock(msg.tokenId, null)
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'token:unlocked',
     tokenId: msg.tokenId,
-  })
+  }, clientData.id)
 
   // Also send to the unlocker
   send(ws, {

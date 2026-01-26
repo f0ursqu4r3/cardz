@@ -18,12 +18,12 @@ export function handleTimerCreate(
     label: msg.label,
   })
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'timer:created',
     timer,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the creator
   send(ws, {
@@ -66,13 +66,13 @@ export function handleTimerStart(
     return
   }
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'timer:started',
     timerId: msg.timerId,
     startedAt: result.startedAt,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the starter
   send(ws, {
@@ -119,13 +119,13 @@ export function handleTimerPause(
     return
   }
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'timer:paused',
     timerId: msg.timerId,
     elapsedMs: result.elapsedMs,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the pauser
   send(ws, {
@@ -163,12 +163,12 @@ export function handleTimerReset(
   const success = gameState.resetTimer(msg.timerId)
   if (!success) return
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'timer:reset',
     timerId: msg.timerId,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the resetter
   send(ws, {
@@ -217,13 +217,13 @@ export function handleTimerUpdate(
   const result = gameState.updateTimer(msg.timerId, msg.updates)
   if (!result) return
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'timer:updated',
     timerId: msg.timerId,
     timer: result,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the updater
   send(ws, {
@@ -274,12 +274,12 @@ export function handleTimerDelete(
   // Release any lock
   locks.unlockTimer(msg.timerId, clientData.id)
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'timer:deleted',
     timerId: msg.timerId,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the deleter
   send(ws, {
@@ -323,12 +323,12 @@ export function handleTimerLock(
 
   gameState.setTimerLock(msg.timerId, clientData.id)
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'timer:locked',
     timerId: msg.timerId,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the locker
   send(ws, {
@@ -375,11 +375,11 @@ export function handleTimerUnlock(
   locks.unlockTimer(msg.timerId, clientData.id)
   gameState.setTimerLock(msg.timerId, null)
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'timer:unlocked',
     timerId: msg.timerId,
-  })
+  }, clientData.id)
 
   // Also send to the unlocker
   send(ws, {

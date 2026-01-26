@@ -31,12 +31,12 @@ export function handleCounterCreate(
     color: msg.color,
   })
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'counter:created',
     counter,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the creator
   send(ws, {
@@ -91,13 +91,13 @@ export function handleCounterUpdate(
   const result = gameState.updateCounter(msg.counterId, sanitizedUpdates)
   if (!result) return
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'counter:updated',
     counterId: msg.counterId,
     counter: result,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the updater
   send(ws, {
@@ -136,13 +136,13 @@ export function handleCounterIncrement(
   const result = gameState.incrementCounter(msg.counterId, msg.delta)
   if (!result) return
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'counter:incremented',
     counterId: msg.counterId,
     value: result.value,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the incrementer
   send(ws, {
@@ -196,12 +196,12 @@ export function handleCounterDelete(
   // Release any lock
   locks.unlockCounter(msg.counterId, clientData.id)
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'counter:deleted',
     counterId: msg.counterId,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the deleter
   send(ws, {
@@ -245,12 +245,12 @@ export function handleCounterLock(
 
   gameState.setCounterLock(msg.counterId, clientData.id)
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'counter:locked',
     counterId: msg.counterId,
     playerId: clientData.id,
-  })
+  }, clientData.id)
 
   // Also send to the locker
   send(ws, {
@@ -297,11 +297,11 @@ export function handleCounterUnlock(
   locks.unlockCounter(msg.counterId, clientData.id)
   gameState.setCounterLock(msg.counterId, null)
 
-  // Broadcast to all players in the room
-  broadcastToRoom(clients, room.code, clientData.id, {
+  // Broadcast to all players in the room (exclude sender)
+  broadcastToRoom(clients, room.code, {
     type: 'counter:unlocked',
     counterId: msg.counterId,
-  })
+  }, clientData.id)
 
   // Also send to the unlocker
   send(ws, {
