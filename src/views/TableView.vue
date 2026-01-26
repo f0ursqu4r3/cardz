@@ -29,6 +29,7 @@ import { useCardDisplayHelpers } from '@/composables/useCardDisplayHelpers'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useRadialMenuActions } from '@/composables/useRadialMenuActions'
 import { useGameStateSync } from '@/composables/useGameStateSync'
+import { useToast } from '@/composables/useToast'
 import {
   SquarePlus,
   Copy,
@@ -138,6 +139,22 @@ watch(
   () => ws.handCardIds.value,
   (ids) => {
     cardStore.setHandCardIds(ids)
+  },
+)
+
+// Toast notifications
+const toast = useToast()
+
+// Watch for WebSocket errors and display them
+watch(
+  () => ws.error.value,
+  (error) => {
+    if (error) {
+      console.error('[TableView] WebSocket error:', error)
+      toast.error(error)
+      // Clear the error after showing it
+      ws.error.value = null
+    }
   },
 )
 

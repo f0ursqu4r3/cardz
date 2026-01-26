@@ -102,6 +102,7 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     let closestDist = Infinity
     for (let i = 0; i < cardCount; i++) {
       const cardId = stack.cardIds[i]
+      if (!cardId) continue
       const card = cardStore.getCardById(cardId)
       if (card) {
         const dist = Math.hypot(dropX - card.x, dropY - card.y)

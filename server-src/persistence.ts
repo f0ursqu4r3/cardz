@@ -16,6 +16,7 @@ export interface TableMetadata {
   createdAt: number
   updatedAt: number
   createdBy: string // Player name who created the table
+  creatorPlayerId: string // Stable player ID of the creator (for role persistence)
   settings: TableSettings
 }
 
@@ -74,10 +75,18 @@ function getDb(): Database {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       created_by TEXT NOT NULL,
+      creator_player_id TEXT,
       settings TEXT NOT NULL,
       game_state TEXT NOT NULL
     )
   `)
+
+  // Migration: add creator_player_id column if it doesn't exist
+  try {
+    db.run(`ALTER TABLE tables ADD COLUMN creator_player_id TEXT`)
+  } catch {
+    // Column already exists, ignore
+  }
 
   // Create index for public tables listing
   db.run(`
@@ -117,8 +126,8 @@ export function saveTable(code: string, metadata: TableMetadata, gameState: Game
     const now = Date.now()
 
     const stmt = database.prepare(`
-      INSERT INTO tables (code, name, is_public, max_players, created_at, updated_at, created_by, settings, game_state)
-      VALUES ($code, $name, $is_public, $max_players, $created_at, $updated_at, $created_by, $settings, $game_state)
+      INSERT INTO tables (code, name, is_public, max_players, created_at, updated_at, created_by, creator_player_id, settings, game_state)
+      VALUES ($code, $name, $is_public, $max_players, $created_at, $updated_at, $created_by, $creator_player_id, $settings, $game_state)
       ON CONFLICT(code) DO UPDATE SET
         name = $name,
         is_public = $is_public,
@@ -136,6 +145,7 @@ export function saveTable(code: string, metadata: TableMetadata, gameState: Game
       $created_at: metadata.createdAt,
       $updated_at: now,
       $created_by: metadata.createdBy,
+      $creator_player_id: metadata.creatorPlayerId,
       $settings: JSON.stringify(metadata.settings),
       $game_state: JSON.stringify(gameState),
     })
@@ -155,7 +165,7 @@ export function loadTable(code: string): PersistedTable | null {
   const database = getDb()
 
   const stmt = database.prepare(`
-    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, settings, game_state
+    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, creator_player_id, settings, game_state
     FROM tables
     WHERE code = ?
   `)
@@ -168,6 +178,7 @@ export function loadTable(code: string): PersistedTable | null {
     created_at: number
     updated_at: number
     created_by: string
+    creator_player_id: string | null
     settings: string
     game_state: string
   } | null
@@ -201,6 +212,7 @@ export function loadTable(code: string): PersistedTable | null {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       createdBy: row.created_by,
+      creatorPlayerId: row.creator_player_id ?? '', // Empty string for legacy tables
       settings,
     },
     gameState,
@@ -236,7 +248,7 @@ export function listTables(): TableMetadata[] {
   const database = getDb()
 
   const stmt = database.prepare(`
-    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, settings
+    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, creator_player_id, settings
     FROM tables
     ORDER BY updated_at DESC
   `)
@@ -249,6 +261,7 @@ export function listTables(): TableMetadata[] {
     created_at: number
     updated_at: number
     created_by: string
+    creator_player_id: string | null
     settings: string
   }[]
 
@@ -269,6 +282,7 @@ export function listTables(): TableMetadata[] {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       createdBy: row.created_by,
+      creatorPlayerId: row.creator_player_id ?? '',
       settings,
     }
   })
@@ -291,6 +305,7 @@ export function createTableMetadata(
   code: string,
   name: string,
   createdBy: string,
+  creatorPlayerId: string,
   isPublic: boolean = false,
 ): TableMetadata {
   return {
@@ -301,6 +316,7 @@ export function createTableMetadata(
     createdAt: Date.now(),
     updatedAt: Date.now(),
     createdBy,
+    creatorPlayerId,
     settings: getDefaultSettings(),
   }
 }
@@ -482,7 +498,7 @@ export function searchTables(query: string, publicOnly: boolean = true): TableMe
   const database = getDb()
 
   const stmt = database.prepare(`
-    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, settings
+    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, creator_player_id, settings
     FROM tables
     WHERE name LIKE $query ${publicOnly ? 'AND is_public = 1' : ''}
     ORDER BY updated_at DESC
@@ -497,6 +513,7 @@ export function searchTables(query: string, publicOnly: boolean = true): TableMe
     created_at: number
     updated_at: number
     created_by: string
+    creator_player_id: string | null
     settings: string
   }[]
 
@@ -517,6 +534,7 @@ export function searchTables(query: string, publicOnly: boolean = true): TableMe
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       createdBy: row.created_by,
+      creatorPlayerId: row.creator_player_id ?? '',
       settings,
     }
   })

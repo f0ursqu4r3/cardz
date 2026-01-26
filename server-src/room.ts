@@ -52,6 +52,7 @@ export interface Room {
   cursors: Map<string, CursorPosition>
   createdAt: number
   createdBy: string
+  creatorPlayerId: string // Stable player ID of the creator (for role persistence)
   settings: TableSettings
 }
 
@@ -163,6 +164,7 @@ export class RoomManager {
           createdAt: r.createdAt,
           updatedAt: Date.now(),
           createdBy: r.createdBy,
+          creatorPlayerId: r.creatorPlayerId,
           settings: r.settings,
         },
         gameState: r.gameState.getState(),
@@ -190,6 +192,7 @@ export class RoomManager {
           createdAt: r.createdAt,
           updatedAt: Date.now(),
           createdBy: r.createdBy,
+          creatorPlayerId: r.creatorPlayerId,
           settings: r.settings,
         },
         gameState: r.gameState.getState(),
@@ -244,6 +247,7 @@ export class RoomManager {
       cursors: new Map(),
       createdAt: Date.now(),
       createdBy: playerName,
+      creatorPlayerId: playerId,
       settings,
     }
 
@@ -268,6 +272,7 @@ export class RoomManager {
         createdAt: room.createdAt,
         updatedAt: Date.now(),
         createdBy: room.createdBy,
+        creatorPlayerId: room.creatorPlayerId,
         settings: room.settings,
       },
       room.gameState.getState(),
@@ -286,6 +291,7 @@ export class RoomManager {
           createdAt: r.createdAt,
           updatedAt: Date.now(),
           createdBy: r.createdBy,
+          creatorPlayerId: r.creatorPlayerId,
           settings: r.settings,
         },
         gameState: r.gameState.getState(),
@@ -330,15 +336,23 @@ export class RoomManager {
     // Generate a stable player ID for the first person to load this persisted room
     const playerId = stablePlayerId || nanoid()
 
+    // Check if this player is the original creator
+    // For legacy tables without creatorPlayerId, first person to load becomes creator
+    const isLegacyTable = !persisted.metadata.creatorPlayerId
+    const isOriginalCreator = isLegacyTable || playerId === persisted.metadata.creatorPlayerId
+
+    // For legacy tables, set the creatorPlayerId to this player
+    const creatorPlayerId = isLegacyTable ? playerId : persisted.metadata.creatorPlayerId
+
     // Recreate the room from persisted data
-    // First person to rejoin a persisted table becomes the creator for this session
+    // Only the original creator gets the creator role
     const player: Player = {
       id: playerId,
       name: playerName,
       connected: true,
       color: PLAYER_COLORS[0],
       sessionId,
-      role: 'creator',
+      role: isOriginalCreator ? 'creator' : 'member',
     }
 
     const room: Room = {
@@ -352,6 +366,7 @@ export class RoomManager {
       cursors: new Map(),
       createdAt: persisted.metadata.createdAt,
       createdBy: persisted.metadata.createdBy,
+      creatorPlayerId: creatorPlayerId, // Use computed value (handles legacy tables)
       settings: persisted.metadata.settings || { background: 'green-felt' },
     }
 
@@ -381,6 +396,7 @@ export class RoomManager {
           createdAt: r.createdAt,
           updatedAt: Date.now(),
           createdBy: r.createdBy,
+          creatorPlayerId: r.creatorPlayerId,
           settings: r.settings,
         },
         gameState: r.gameState.getState(),
