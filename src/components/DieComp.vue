@@ -193,6 +193,13 @@ defineExpose({ openModal, rollDie })
   -webkit-user-select: none;
 }
 
+.die--locked {
+  /* Smooth interpolation for remote player drag movements */
+  transition:
+    left 0.05s linear,
+    top 0.05s linear;
+}
+
 .die--locked::after {
   content: '';
   position: absolute;

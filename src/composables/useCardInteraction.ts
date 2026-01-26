@@ -5,7 +5,7 @@ import { useHover } from '@/composables/useHover'
 import { useShake } from '@/composables/useShake'
 import { useCardPhysics } from '@/composables/useCardPhysics'
 import type { DragTarget, Zone } from '@/types'
-import { CARD_BACK_COL, CARD_BACK_ROW, CARD_W, CARD_H } from '@/types'
+import { CARD_BACK_COL, CARD_BACK_ROW, CARD_W, CARD_H, CURSOR_THROTTLE_MS } from '@/types'
 import type { ClientMessage } from '../../shared/types'
 import { getDropIndexInZone } from '@/utils/zoneLayouts'
 
@@ -16,6 +16,8 @@ interface CardInteractionOptions {
   sendMessage?: (msg: ClientMessage) => void
   spaceHeld?: Ref<boolean>
   playerId?: Ref<string | null>
+  /** Optional callback to broadcast cursor position during drag */
+  onCursorMove?: (worldX: number, worldY: number) => void
 }
 
 export function useCardInteraction(options: CardInteractionOptions = {}) {
@@ -45,6 +47,9 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
   // Zone card reordering state
   const zoneDragSource = ref<{ zoneId: number; stackId: number; cardIndex: number } | null>(null)
   const zoneDropTargetIndex = ref<number | null>(null)
+
+  // Throttled position updates for live drag broadcasting
+  let lastDragBroadcast = 0
 
   // Mutable handler for hand card drop (set after hand composable is created)
   let handCardDropHandler: ((event: PointerEvent) => boolean) | undefined = options.onHandCardDrop
@@ -607,6 +612,37 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
     }
 
     drag.schedulePositionUpdate(applyPendingPosition)
+
+    // Broadcast position during drag for live updates to other players
+    const now = Date.now()
+    if (now - lastDragBroadcast >= CURSOR_THROTTLE_MS) {
+      lastDragBroadcast = now
+      const { x, y } = drag.getPending()
+
+      // Broadcast cursor position during any drag
+      options.onCursorMove?.(x, y)
+
+      // Broadcast card position during card drag
+      if (drag.target.value?.type === 'card' && drag.activeIndex.value !== null) {
+        const card = cardStore.cards[drag.activeIndex.value]
+        if (card) {
+          send({ type: 'card:move', cardId: card.id, x: card.x, y: card.y })
+        }
+      }
+
+      // Broadcast stack position during stack drag
+      if (drag.target.value?.type === 'stack') {
+        const stack = cardStore.getStackById(drag.target.value.stackId)
+        if (stack) {
+          send({
+            type: 'stack:move',
+            stackId: stack.id,
+            anchorX: stack.anchorX,
+            anchorY: stack.anchorY,
+          })
+        }
+      }
+    }
   }
 
   const onCardPointerUp = (event: PointerEvent) => {

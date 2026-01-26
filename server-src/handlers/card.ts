@@ -143,9 +143,13 @@ export function handleCardUnlock(
   const clientData = getClientData(ws)
   const { locks, gameState } = room
 
-  // Release lock
-  if (!locks.unlockCard(msg.cardId, clientData.id)) {
-    // Not an error - might have already been released
+  // Try to release transient lock (may already be expired/released)
+  locks.unlockCard(msg.cardId, clientData.id)
+
+  // Check if game state has this player's lock - clear it even if transient lock expired
+  const card = gameState.getCard(msg.cardId)
+  if (!card || card.lockedBy !== clientData.id) {
+    // Card doesn't exist or wasn't locked by this player - nothing to do
     return
   }
 

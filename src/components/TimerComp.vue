@@ -283,6 +283,13 @@ defineExpose({ openModal })
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.timer--locked {
+  /* Smooth interpolation for remote player drag movements */
+  transition:
+    left 0.05s linear,
+    top 0.05s linear;
+}
+
 .timer--locked::after {
   content: '';
   position: absolute;

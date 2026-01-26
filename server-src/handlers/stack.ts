@@ -203,7 +203,13 @@ export function handleStackUnlock(
   const clientData = getClientData(ws)
   const { locks, gameState } = room
 
-  if (!locks.unlockStack(msg.stackId, clientData.id)) {
+  // Try to release transient lock (may already be expired/released)
+  locks.unlockStack(msg.stackId, clientData.id)
+
+  // Check if game state has this player's lock - clear it even if transient lock expired
+  const stack = gameState.getStack(msg.stackId)
+  if (!stack || stack.lockedBy !== clientData.id) {
+    // Stack doesn't exist or wasn't locked by this player - nothing to do
     return
   }
 

@@ -119,6 +119,9 @@ export function useEntityDrag<T extends DraggableEntity>(config: EntityDragConfi
     entity.x = newX
     entity.y = newY
 
+    // Broadcast cursor position during drag (for remote player cursors)
+    onCursorMove?.(worldPos.x, worldPos.y)
+
     // Throttle server updates to avoid rate limiting
     const now = Date.now()
     if (now - lastPositionUpdate < CURSOR_THROTTLE_MS) return

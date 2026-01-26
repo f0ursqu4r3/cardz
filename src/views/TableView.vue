@@ -113,6 +113,9 @@ const interaction = useCardInteraction({
   sendMessage: ws.send,
   spaceHeld,
   playerId: ws.playerId,
+  onCursorMove: (worldX, worldY) => {
+    ws.send({ type: 'cursor:update', x: worldX, y: worldY, state: 'grabbing' })
+  },
 })
 
 // Remote throw physics
@@ -254,6 +257,11 @@ useGameStateSync({
   playerName,
 })
 
+// Callback to broadcast cursor position during entity drags
+const onEntityCursorMove = (worldX: number, worldY: number) => {
+  ws.send({ type: 'cursor:update', x: worldX, y: worldY, state: 'grabbing' })
+}
+
 // Initialize entity drag handlers
 const counterDrag = useEntityDrag({
   entityType: 'counter',
@@ -264,6 +272,7 @@ const counterDrag = useEntityDrag({
   sendMessage: ws.send,
   trackActivity,
   setCursor: cursor.setCursor,
+  onCursorMove: onEntityCursorMove,
 })
 
 const tokenDrag = useEntityDrag({
@@ -275,6 +284,7 @@ const tokenDrag = useEntityDrag({
   sendMessage: ws.send,
   trackActivity,
   setCursor: cursor.setCursor,
+  onCursorMove: onEntityCursorMove,
 })
 
 const dieDrag = useEntityDrag({
@@ -286,6 +296,7 @@ const dieDrag = useEntityDrag({
   sendMessage: ws.send,
   trackActivity,
   setCursor: cursor.setCursor,
+  onCursorMove: onEntityCursorMove,
 })
 
 const timerDrag = useEntityDrag({
@@ -297,6 +308,7 @@ const timerDrag = useEntityDrag({
   sendMessage: ws.send,
   trackActivity,
   setCursor: cursor.setCursor,
+  onCursorMove: onEntityCursorMove,
 })
 
 // Ghost card for hand dragging
@@ -1533,6 +1545,11 @@ onBeforeUnmount(() => {
     0 0 0 2px var(--lock-color, #888),
     0 0 12px var(--lock-color, #888);
   pointer-events: none;
+  /* Smooth interpolation for remote player drag movements */
+  transition:
+    left 0.05s linear,
+    top 0.05s linear,
+    box-shadow 0.15s ease;
 }
 
 :deep(.card.zone-reorder-shift) {

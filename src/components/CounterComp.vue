@@ -256,6 +256,11 @@ defineExpose({ openModal })
   box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.3),
     0 0 12px 2px var(--lock-color, #888);
+  /* Smooth interpolation for remote player drag movements */
+  transition:
+    left 0.05s linear,
+    top 0.05s linear,
+    box-shadow 0.15s ease;
 }
 
 .counter__label {
