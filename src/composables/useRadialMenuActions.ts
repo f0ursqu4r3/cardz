@@ -66,7 +66,7 @@ export function useRadialMenuActions(config: RadialMenuActionsConfig) {
 
     switch (action) {
       case 'flip':
-        cardStore.flipCard(cardId)
+        cardStore.flipCardAnimated(cardId)
         sendMessage({ type: 'card:flip', cardId })
         break
       case 'to-hand':
@@ -90,7 +90,7 @@ export function useRadialMenuActions(config: RadialMenuActionsConfig) {
 
     switch (action) {
       case 'flip-stack':
-        cardStore.flipStack(stackId)
+        cardStore.flipStackAnimated(stackId)
         sendMessage({ type: 'stack:flip', stackId })
         break
       case 'shuffle':
@@ -163,7 +163,7 @@ export function useRadialMenuActions(config: RadialMenuActionsConfig) {
           const stack = cardStore.stacks.find((s) => s.id === zone.stackId)
           if (stack) {
             stack.cardIds.forEach((cardId) => {
-              cardStore.flipCard(cardId)
+              cardStore.flipCardAnimated(cardId)
               sendMessage({ type: 'card:flip', cardId })
             })
           }
@@ -214,7 +214,7 @@ export function useRadialMenuActions(config: RadialMenuActionsConfig) {
       }
       case 'flip-selection':
         cardIds.forEach((cardId) => {
-          cardStore.flipCard(cardId)
+          cardStore.flipCardAnimated(cardId)
           sendMessage({ type: 'card:flip', cardId })
         })
         break
@@ -359,7 +359,7 @@ export function useRadialMenuActions(config: RadialMenuActionsConfig) {
       }
       case 'flip-selection':
         cardIds.forEach((cardId) => {
-          cardStore.flipCard(cardId)
+          cardStore.flipCardAnimated(cardId)
         })
         break
       case 'deselect':

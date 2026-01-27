@@ -141,6 +141,10 @@ export const SHAKE_THRESHOLD = 15 // Minimum movement to count as direction
 export const SHAKE_REVERSALS = 4 // Number of direction changes to trigger
 export const SHAKE_WINDOW_MS = 500 // Time window for shake detection
 
+// Card flip animation timing
+export const FLIP_ANIMATION_MS = 350 // Total flip animation duration
+export const FLIP_MIDPOINT_MS = 175 // When to swap the card sprite (at 90 degrees)
+
 // Hand layout
 export const HAND_CARD_OVERLAP = 28 // Horizontal overlap between cards in hand
 export const HAND_PADDING = 16 // Padding around hand zone

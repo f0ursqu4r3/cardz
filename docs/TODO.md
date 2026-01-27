@@ -66,6 +66,7 @@
 - [x] Spectator mode (view-only access)
 - [x] Table activity log (record actions taken by players)
 - [x] Kick/ban players (creator can kick or ban players from the table)
+- [x] Moderator role (creators/moderators can promote/demote, moderators can kick members)
 
 ---
 
@@ -91,7 +92,7 @@
 ### Advanced Card Mechanics
 
 - [ ] Card reveal (show card to specific players)
-- [ ] Card flipping animation (3D rotation effect)
+- [x] Card flipping animation (3D rotation effect)
 - [ ] Deal animation (distribute cards from deck)
 - [ ] Fan spread (view all cards in stack)
 - [ ] Peek at cards without revealing

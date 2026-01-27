@@ -156,6 +156,18 @@ export function handleRoomMessage(
       return true
     }
 
+    case 'room:player_role_changed': {
+      // Update the player's role in the players list
+      const existingPlayer = players.value.find((p) => p.id === message.playerId)
+      if (existingPlayer) {
+        players.value = players.value.map((p) =>
+          p.id === message.playerId ? { ...p, role: message.newRole } : p
+        )
+      }
+      console.log('[ws] player role changed:', message.playerName, 'to', message.newRole, 'by', message.changedBy)
+      return true
+    }
+
     case 'room:error':
       error.value = message.message
       console.error('[ws] room error:', message.code, message.message)

@@ -11,6 +11,8 @@ import {
   ZONE_DEFAULT_HEIGHT,
   ZONE_MIN_WIDTH,
   ZONE_MIN_HEIGHT,
+  FLIP_ANIMATION_MS,
+  FLIP_MIDPOINT_MS,
 } from '@/types'
 import type { GameState, CardState, StackState, ZoneState, CounterState, TokenState, DieState, TimerState } from '../../shared/types'
 import { getCardPositionInZone } from '@/utils/zoneLayouts'
@@ -30,6 +32,8 @@ export const useCardStore = defineStore('cards', () => {
   const selectedDieIds = ref<Set<number>>(new Set())
   const handCardIds = ref<number[]>([])
   const shufflingStackId = ref<number | null>(null)
+  // Cards currently playing flip animation
+  const flippingCardIds = ref<Set<number>>(new Set())
 
   let nextStackId = 1
   let nextZoneId = 1
@@ -724,6 +728,75 @@ export const useCardStore = defineStore('cards', () => {
     }
   }
 
+  // Check if a card is currently playing flip animation
+  const isFlipping = (cardId: number) => flippingCardIds.value.has(cardId)
+
+  // Start flip animation for a card (swaps sprite at midpoint)
+  const startFlipAnimation = (cardId: number) => {
+    const card = cardById.value.get(cardId)
+    if (!card || flippingCardIds.value.has(cardId)) return
+
+    flippingCardIds.value.add(cardId)
+
+    // At midpoint (90 degrees), swap the faceUp state to change sprite
+    setTimeout(() => {
+      const c = cardById.value.get(cardId)
+      if (c) c.faceUp = !c.faceUp
+    }, FLIP_MIDPOINT_MS)
+
+    // After animation completes, remove from flipping set
+    setTimeout(() => {
+      flippingCardIds.value.delete(cardId)
+    }, FLIP_ANIMATION_MS)
+  }
+
+  // Flip a card with animation (for local user actions)
+  const flipCardAnimated = (cardId: number) => {
+    startFlipAnimation(cardId)
+  }
+
+  // Flip top card in stack with animation
+  const flipStackAnimated = (stackId: number) => {
+    const stack = stackById.value.get(stackId)
+    if (!stack || stack.cardIds.length === 0) return
+    const topCardId = stack.cardIds[stack.cardIds.length - 1]
+    if (topCardId !== undefined) {
+      startFlipAnimation(topCardId)
+    }
+  }
+
+  // Handle remote flip event (animate to target state)
+  const handleRemoteFlip = (cardId: number, newFaceUp: boolean) => {
+    const card = cardById.value.get(cardId)
+    if (!card) return
+
+    // If the card state is already correct, no animation needed
+    if (card.faceUp === newFaceUp) return
+
+    // If already flipping, just update the target state
+    if (flippingCardIds.value.has(cardId)) {
+      // The animation will handle it - just ensure final state is correct
+      setTimeout(() => {
+        const c = cardById.value.get(cardId)
+        if (c) c.faceUp = newFaceUp
+      }, FLIP_ANIMATION_MS)
+      return
+    }
+
+    flippingCardIds.value.add(cardId)
+
+    // At midpoint, set to target state
+    setTimeout(() => {
+      const c = cardById.value.get(cardId)
+      if (c) c.faceUp = newFaceUp
+    }, FLIP_MIDPOINT_MS)
+
+    // After animation completes, remove from flipping set
+    setTimeout(() => {
+      flippingCardIds.value.delete(cardId)
+    }, FLIP_ANIMATION_MS)
+  }
+
   // Selection management
   const isSelected = (cardId: number) => selectedIds.value.has(cardId)
 
@@ -1370,6 +1443,11 @@ export const useCardStore = defineStore('cards', () => {
     bumpCardZ,
     flipCard,
     flipStack,
+    // Animated flip operations
+    isFlipping,
+    flipCardAnimated,
+    flipStackAnimated,
+    handleRemoteFlip,
     isSelected,
     toggleSelect,
     clearSelection,

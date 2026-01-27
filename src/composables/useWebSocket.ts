@@ -76,9 +76,11 @@ export interface UseWebSocketReturn {
   updateTableVisibility: (isPublic: boolean) => void
   updateTableName: (name: string) => void
 
-  // Player moderation (creator only)
+  // Player moderation (creator or moderator)
   kickPlayer: (targetPlayerId: string) => void
   banPlayer: (targetPlayerId: string) => void
+  promotePlayer: (targetPlayerId: string) => void
+  demotePlayer: (targetPlayerId: string) => void
 
   // Chat
   sendChat: (message: string) => void
@@ -378,13 +380,21 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     send({ type: 'chat:typing', isTyping })
   }
 
-  // Player moderation (creator only)
+  // Player moderation (creator or moderator)
   const kickPlayer = (targetPlayerId: string) => {
     send({ type: 'player:kick', targetPlayerId })
   }
 
   const banPlayer = (targetPlayerId: string) => {
     send({ type: 'player:ban', targetPlayerId })
+  }
+
+  const promotePlayer = (targetPlayerId: string) => {
+    send({ type: 'player:promote', targetPlayerId })
+  }
+
+  const demotePlayer = (targetPlayerId: string) => {
+    send({ type: 'player:demote', targetPlayerId })
   }
 
   // Message handling
@@ -506,6 +516,8 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     updateTableName,
     kickPlayer,
     banPlayer,
+    promotePlayer,
+    demotePlayer,
     sendChat,
     sendTyping,
     onMessage,

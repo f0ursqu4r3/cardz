@@ -431,18 +431,18 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
         const zone = cardStore.getZoneById(stack.zoneId!)
         if (zone && zone.layout !== 'stack') {
           // Non-stack zone layout: flip the specific clicked card
-          cardStore.flipCard(card.id)
+          cardStore.flipCardAnimated(card.id)
           send({ type: 'card:flip', cardId: card.id })
           return
         }
       }
 
       // Stack layout or free stack: flip top card
-      cardStore.flipStack(card.stackId)
+      cardStore.flipStackAnimated(card.stackId)
       send({ type: 'stack:flip', stackId: card.stackId })
     } else {
       // Double-click on free card = flip single card
-      cardStore.flipCard(card.id)
+      cardStore.flipCardAnimated(card.id)
       send({ type: 'card:flip', cardId: card.id })
     }
   }

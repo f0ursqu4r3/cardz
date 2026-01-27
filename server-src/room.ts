@@ -53,6 +53,7 @@ export interface Room {
   createdAt: number
   createdBy: string
   creatorPlayerId: string // Stable player ID of the creator (for role persistence)
+  moderatorPlayerIds: Set<string> // Player IDs with moderator role (persisted across sessions)
   settings: TableSettings
   bannedDevices: Set<string> // Device IDs that are banned from this room
 }
@@ -147,6 +148,76 @@ export class RoomManager {
   }
 
   /**
+   * Check if a player is a moderator of a room
+   */
+  isModerator(roomCode: string, playerId: string): boolean {
+    const room = this.rooms.get(roomCode)
+    if (!room) return false
+    const player = room.players.get(playerId)
+    return player?.role === 'moderator'
+  }
+
+  /**
+   * Check if a player is either the creator or a moderator
+   */
+  isCreatorOrModerator(roomCode: string, playerId: string): boolean {
+    const room = this.rooms.get(roomCode)
+    if (!room) return false
+    const player = room.players.get(playerId)
+    return player?.role === 'creator' || player?.role === 'moderator'
+  }
+
+  /**
+   * Promote a player to moderator
+   * @returns The promoted player or null if failed
+   */
+  promoteToModerator(roomCode: string, playerId: string): Player | null {
+    const room = this.rooms.get(roomCode)
+    if (!room) return null
+
+    const player = room.players.get(playerId)
+    if (!player) return null
+
+    // Can't promote spectators or the creator
+    if (player.role === 'spectator' || player.role === 'creator') {
+      return null
+    }
+
+    player.role = 'moderator'
+    room.moderatorPlayerIds.add(playerId)
+
+    // Save immediately to persist the moderator list
+    this.markDirtyImmediate(roomCode)
+
+    return player
+  }
+
+  /**
+   * Demote a player from moderator to member
+   * @returns The demoted player or null if failed
+   */
+  demoteFromModerator(roomCode: string, playerId: string): Player | null {
+    const room = this.rooms.get(roomCode)
+    if (!room) return null
+
+    const player = room.players.get(playerId)
+    if (!player) return null
+
+    // Can only demote moderators
+    if (player.role !== 'moderator') {
+      return null
+    }
+
+    player.role = 'member'
+    room.moderatorPlayerIds.delete(playerId)
+
+    // Save immediately to persist the moderator list
+    this.markDirtyImmediate(roomCode)
+
+    return player
+  }
+
+  /**
    * Mark a room as dirty and schedule a save.
    * Call this after any change to the room's game state.
    */
@@ -167,6 +238,7 @@ export class RoomManager {
           updatedAt: Date.now(),
           createdBy: r.createdBy,
           creatorPlayerId: r.creatorPlayerId,
+          moderatorPlayerIds: Array.from(r.moderatorPlayerIds),
           settings: r.settings,
         },
         gameState: r.gameState.getState(),
@@ -195,6 +267,7 @@ export class RoomManager {
           updatedAt: Date.now(),
           createdBy: r.createdBy,
           creatorPlayerId: r.creatorPlayerId,
+          moderatorPlayerIds: Array.from(r.moderatorPlayerIds),
           settings: r.settings,
         },
         gameState: r.gameState.getState(),
@@ -252,6 +325,7 @@ export class RoomManager {
       createdAt: Date.now(),
       createdBy: playerName,
       creatorPlayerId: playerId,
+      moderatorPlayerIds: new Set(),
       settings,
       bannedDevices: new Set(),
     }
@@ -283,6 +357,7 @@ export class RoomManager {
         updatedAt: Date.now(),
         createdBy: room.createdBy,
         creatorPlayerId: room.creatorPlayerId,
+        moderatorPlayerIds: [],
         settings: room.settings,
       },
       room.gameState.getState(),
@@ -302,6 +377,7 @@ export class RoomManager {
           updatedAt: Date.now(),
           createdBy: r.createdBy,
           creatorPlayerId: r.creatorPlayerId,
+          moderatorPlayerIds: Array.from(r.moderatorPlayerIds),
           settings: r.settings,
         },
         gameState: r.gameState.getState(),
@@ -351,7 +427,7 @@ export class RoomManager {
     const playerId = stablePlayerId || nanoid()
 
     // Determine the role for this player
-    let role: 'creator' | 'member' | 'spectator'
+    let role: 'creator' | 'moderator' | 'member' | 'spectator'
     if (asSpectator) {
       role = 'spectator'
     } else {
@@ -359,7 +435,13 @@ export class RoomManager {
       // For legacy tables without creatorPlayerId, first person to load becomes creator
       const isLegacyTable = !persisted.metadata.creatorPlayerId
       const isOriginalCreator = isLegacyTable || playerId === persisted.metadata.creatorPlayerId
-      role = isOriginalCreator ? 'creator' : 'member'
+      if (isOriginalCreator) {
+        role = 'creator'
+      } else if (persisted.metadata.moderatorPlayerIds.includes(playerId)) {
+        role = 'moderator'
+      } else {
+        role = 'member'
+      }
     }
 
     // For legacy tables, set the creatorPlayerId to this player (only if not spectator)
@@ -388,6 +470,7 @@ export class RoomManager {
       createdAt: persisted.metadata.createdAt,
       createdBy: persisted.metadata.createdBy,
       creatorPlayerId: creatorPlayerId, // Use computed value (handles legacy tables)
+      moderatorPlayerIds: new Set(persisted.metadata.moderatorPlayerIds || []),
       settings: persisted.metadata.settings || { background: 'green-felt' },
       bannedDevices: new Set(),
     }
@@ -426,6 +509,7 @@ export class RoomManager {
           updatedAt: Date.now(),
           createdBy: r.createdBy,
           creatorPlayerId: r.creatorPlayerId,
+          moderatorPlayerIds: Array.from(r.moderatorPlayerIds),
           settings: r.settings,
         },
         gameState: r.gameState.getState(),
@@ -515,12 +599,14 @@ export class RoomManager {
     // Generate a new stable playerId for new players
     const newPlayerId = stablePlayerId || nanoid()
 
-    // Determine role - restore creator role if this player is the original creator
-    let role: 'creator' | 'member' | 'spectator'
+    // Determine role - restore creator/moderator role if this player has persisted role
+    let role: 'creator' | 'moderator' | 'member' | 'spectator'
     if (asSpectator) {
       role = 'spectator'
     } else if (newPlayerId === room.creatorPlayerId) {
       role = 'creator'
+    } else if (room.moderatorPlayerIds.has(newPlayerId)) {
+      role = 'moderator'
     } else {
       role = 'member'
     }
@@ -688,6 +774,8 @@ export class RoomManager {
             createdAt: room.createdAt,
             updatedAt: Date.now(),
             createdBy: room.createdBy,
+            creatorPlayerId: room.creatorPlayerId,
+            moderatorPlayerIds: Array.from(room.moderatorPlayerIds),
             settings: room.settings,
           },
           room.gameState.getState(),
@@ -889,6 +977,8 @@ export class RoomManager {
             createdAt: room.createdAt,
             updatedAt: Date.now(),
             createdBy: room.createdBy,
+            creatorPlayerId: room.creatorPlayerId,
+            moderatorPlayerIds: Array.from(room.moderatorPlayerIds),
             settings: room.settings,
           },
           room.gameState.getState(),
@@ -940,6 +1030,8 @@ export class RoomManager {
           createdAt: room.createdAt,
           updatedAt: Date.now(),
           createdBy: room.createdBy,
+          creatorPlayerId: room.creatorPlayerId,
+          moderatorPlayerIds: Array.from(room.moderatorPlayerIds),
           settings: room.settings,
         },
         room.gameState.getState(),

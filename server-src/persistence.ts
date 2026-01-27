@@ -17,6 +17,7 @@ export interface TableMetadata {
   updatedAt: number
   createdBy: string // Player name who created the table
   creatorPlayerId: string // Stable player ID of the creator (for role persistence)
+  moderatorPlayerIds: string[] // Player IDs with moderator role (persisted across sessions)
   settings: TableSettings
 }
 
@@ -84,6 +85,13 @@ function getDb(): Database {
   // Migration: add creator_player_id column if it doesn't exist
   try {
     db.run(`ALTER TABLE tables ADD COLUMN creator_player_id TEXT`)
+  } catch {
+    // Column already exists, ignore
+  }
+
+  // Migration: add moderator_player_ids column if it doesn't exist
+  try {
+    db.run(`ALTER TABLE tables ADD COLUMN moderator_player_ids TEXT`)
   } catch {
     // Column already exists, ignore
   }
@@ -160,13 +168,14 @@ export function saveTable(code: string, metadata: TableMetadata, gameState: Game
     const now = Date.now()
 
     const stmt = database.prepare(`
-      INSERT INTO tables (code, name, is_public, max_players, created_at, updated_at, created_by, creator_player_id, settings, game_state)
-      VALUES ($code, $name, $is_public, $max_players, $created_at, $updated_at, $created_by, $creator_player_id, $settings, $game_state)
+      INSERT INTO tables (code, name, is_public, max_players, created_at, updated_at, created_by, creator_player_id, moderator_player_ids, settings, game_state)
+      VALUES ($code, $name, $is_public, $max_players, $created_at, $updated_at, $created_by, $creator_player_id, $moderator_player_ids, $settings, $game_state)
       ON CONFLICT(code) DO UPDATE SET
         name = $name,
         is_public = $is_public,
         max_players = $max_players,
         updated_at = $updated_at,
+        moderator_player_ids = $moderator_player_ids,
         settings = $settings,
         game_state = $game_state
     `)
@@ -180,6 +189,7 @@ export function saveTable(code: string, metadata: TableMetadata, gameState: Game
       $updated_at: now,
       $created_by: metadata.createdBy,
       $creator_player_id: metadata.creatorPlayerId,
+      $moderator_player_ids: JSON.stringify(metadata.moderatorPlayerIds || []),
       $settings: JSON.stringify(metadata.settings),
       $game_state: JSON.stringify(gameState),
     })
@@ -199,7 +209,7 @@ export function loadTable(code: string): PersistedTable | null {
   const database = getDb()
 
   const stmt = database.prepare(`
-    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, creator_player_id, settings, game_state
+    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, creator_player_id, moderator_player_ids, settings, game_state
     FROM tables
     WHERE code = ?
   `)
@@ -213,6 +223,7 @@ export function loadTable(code: string): PersistedTable | null {
     updated_at: number
     created_by: string
     creator_player_id: string | null
+    moderator_player_ids: string | null
     settings: string
     game_state: string
   } | null
@@ -237,6 +248,15 @@ export function loadTable(code: string): PersistedTable | null {
     return null
   }
 
+  let moderatorPlayerIds: string[] = []
+  try {
+    if (row.moderator_player_ids) {
+      moderatorPlayerIds = JSON.parse(row.moderator_player_ids)
+    }
+  } catch {
+    // Invalid JSON, use empty array
+  }
+
   return {
     metadata: {
       code: row.code,
@@ -247,6 +267,7 @@ export function loadTable(code: string): PersistedTable | null {
       updatedAt: row.updated_at,
       createdBy: row.created_by,
       creatorPlayerId: row.creator_player_id ?? '', // Empty string for legacy tables
+      moderatorPlayerIds,
       settings,
     },
     gameState,
@@ -282,7 +303,7 @@ export function listTables(): TableMetadata[] {
   const database = getDb()
 
   const stmt = database.prepare(`
-    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, creator_player_id, settings
+    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, creator_player_id, moderator_player_ids, settings
     FROM tables
     ORDER BY updated_at DESC
   `)
@@ -296,6 +317,7 @@ export function listTables(): TableMetadata[] {
     updated_at: number
     created_by: string
     creator_player_id: string | null
+    moderator_player_ids: string | null
     settings: string
   }[]
 
@@ -308,6 +330,15 @@ export function listTables(): TableMetadata[] {
       settings = getDefaultSettings()
     }
 
+    let moderatorPlayerIds: string[] = []
+    try {
+      if (row.moderator_player_ids) {
+        moderatorPlayerIds = JSON.parse(row.moderator_player_ids)
+      }
+    } catch {
+      // Invalid JSON, use empty array
+    }
+
     return {
       code: row.code,
       name: row.name,
@@ -317,6 +348,7 @@ export function listTables(): TableMetadata[] {
       updatedAt: row.updated_at,
       createdBy: row.created_by,
       creatorPlayerId: row.creator_player_id ?? '',
+      moderatorPlayerIds,
       settings,
     }
   })
@@ -351,6 +383,7 @@ export function createTableMetadata(
     updatedAt: Date.now(),
     createdBy,
     creatorPlayerId,
+    moderatorPlayerIds: [],
     settings: getDefaultSettings(),
   }
 }
@@ -532,7 +565,7 @@ export function searchTables(query: string, publicOnly: boolean = true): TableMe
   const database = getDb()
 
   const stmt = database.prepare(`
-    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, creator_player_id, settings
+    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, creator_player_id, moderator_player_ids, settings
     FROM tables
     WHERE name LIKE $query ${publicOnly ? 'AND is_public = 1' : ''}
     ORDER BY updated_at DESC
@@ -548,6 +581,7 @@ export function searchTables(query: string, publicOnly: boolean = true): TableMe
     updated_at: number
     created_by: string
     creator_player_id: string | null
+    moderator_player_ids: string | null
     settings: string
   }[]
 
@@ -560,6 +594,15 @@ export function searchTables(query: string, publicOnly: boolean = true): TableMe
       settings = getDefaultSettings()
     }
 
+    let moderatorPlayerIds: string[] = []
+    try {
+      if (row.moderator_player_ids) {
+        moderatorPlayerIds = JSON.parse(row.moderator_player_ids)
+      }
+    } catch {
+      // Invalid JSON, use empty array
+    }
+
     return {
       code: row.code,
       name: row.name,
@@ -569,6 +612,7 @@ export function searchTables(query: string, publicOnly: boolean = true): TableMe
       updatedAt: row.updated_at,
       createdBy: row.created_by,
       creatorPlayerId: row.creator_player_id ?? '',
+      moderatorPlayerIds,
       settings,
     }
   })

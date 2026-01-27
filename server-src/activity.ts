@@ -282,3 +282,29 @@ export function logPlayerBanned(
 ): void {
   logActivity(clients, roomCode, bannerId, bannerName, 'player_banned', { target: targetName })
 }
+
+/**
+ * Helper to log player promoted to moderator
+ */
+export function logPlayerPromoted(
+  clients: Map<string, GenericWebSocket>,
+  roomCode: string,
+  promoterId: string,
+  promoterName: string,
+  targetName: string,
+): void {
+  logActivity(clients, roomCode, promoterId, promoterName, 'player_promoted', { target: targetName })
+}
+
+/**
+ * Helper to log player demoted from moderator
+ */
+export function logPlayerDemoted(
+  clients: Map<string, GenericWebSocket>,
+  roomCode: string,
+  demoterId: string,
+  demoterName: string,
+  targetName: string,
+): void {
+  logActivity(clients, roomCode, demoterId, demoterName, 'player_demoted', { target: targetName })
+}

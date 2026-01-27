@@ -201,7 +201,6 @@ const browseTables = () => {
 .landing__content {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 1.5rem;
   width: 100%;
   max-width: 400px;
@@ -271,12 +270,14 @@ const browseTables = () => {
 .landing__checkbox {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .landing__checkbox input[type='checkbox'] {
+  flex-shrink: 0;
   width: 18px;
   height: 18px;
+  margin: 0;
   accent-color: #e94560;
   cursor: pointer;
 }
@@ -289,6 +290,7 @@ const browseTables = () => {
   color: #a0a0b0;
   cursor: pointer;
   user-select: none;
+  line-height: 1;
 }
 
 .landing__checkbox input:checked + label {
@@ -359,11 +361,19 @@ const browseTables = () => {
 
 .landing__join {
   display: flex;
+  align-items: stretch;
   gap: 0.75rem;
+}
+
+.landing__join .landing__btn--secondary {
+  flex-shrink: 0;
+  padding: 0.75rem 1.25rem;
+  box-sizing: border-box;
 }
 
 .landing__code-input {
   flex: 1;
+  min-width: 0;
   padding: 0.75rem 1rem;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -372,6 +382,7 @@ const browseTables = () => {
   font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
+  box-sizing: border-box;
 }
 
 .landing__code-input:focus {
@@ -389,7 +400,9 @@ const browseTables = () => {
 .landing__browse {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
+  width: 100%;
   padding: 0.75rem 1.25rem;
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.2);

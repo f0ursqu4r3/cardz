@@ -5,7 +5,7 @@
 // Core Types
 // ============================================================================
 
-export type PlayerRole = 'creator' | 'member' | 'spectator'
+export type PlayerRole = 'creator' | 'moderator' | 'member' | 'spectator'
 
 export interface Player {
   id: string
@@ -208,6 +208,16 @@ export interface PlayerBan {
   targetPlayerId: string
 }
 
+export interface PlayerPromote {
+  type: 'player:promote'
+  targetPlayerId: string
+}
+
+export interface PlayerDemote {
+  type: 'player:demote'
+  targetPlayerId: string
+}
+
 // ============================================================================
 // Room Messages (Server → Client)
 // ============================================================================
@@ -257,6 +267,14 @@ export interface PlayerBanned {
   playerId: string
   playerName: string
   bannedBy: string // Name of the player who banned
+}
+
+export interface PlayerRoleChanged {
+  type: 'room:player_role_changed'
+  playerId: string
+  playerName: string
+  newRole: PlayerRole
+  changedBy: string // Name of the player who changed the role
 }
 
 export interface RoomError {
@@ -1264,6 +1282,8 @@ export type ActivityType =
   | 'player_spectating'
   | 'player_kicked'
   | 'player_banned'
+  | 'player_promoted'
+  | 'player_demoted'
   | 'card_placed'
   | 'stack_created'
   | 'stack_shuffled'
@@ -1353,6 +1373,8 @@ type ClientMessageBase =
   | RoomListRequest
   | PlayerKick
   | PlayerBan
+  | PlayerPromote
+  | PlayerDemote
   | CardMoveIntent
   | CardLock
   | CardUnlock
@@ -1427,6 +1449,7 @@ type ServerMessageBase =
   | PlayerReconnected
   | PlayerKicked
   | PlayerBanned
+  | PlayerRoleChanged
   | RoomError
   | RoomListResponse
   | CardMoved

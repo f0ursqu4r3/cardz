@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Users, Hand, LogOut, Ban, Crown, Eye } from 'lucide-vue-next'
+import { Users, Hand, LogOut, Ban, Crown, Eye, Shield, ChevronUp, ChevronDown } from 'lucide-vue-next'
 import type { Player } from '../../../shared/types'
 
 const props = defineProps<{
@@ -9,12 +9,15 @@ const props = defineProps<{
   currentPlayerId: string | null
   ownHandCount: number
   isCreator: boolean
+  isModerator: boolean
 }>()
 
 const emit = defineEmits<{
   close: []
   kick: [playerId: string]
   ban: [playerId: string]
+  promote: [playerId: string]
+  demote: [playerId: string]
 }>()
 
 // Track which player we're confirming ban for
@@ -58,9 +61,48 @@ const cancelBan = () => {
   confirmBanPlayerId.value = null
 }
 
-// Check if we can moderate a player (not self, not creator)
-const canModerate = (player: Player): boolean => {
+// Check if we can kick a player
+// Creator can kick anyone except themselves
+// Moderator can kick members/spectators (not creator or other moderators)
+const canKick = (player: Player): boolean => {
+  if (player.id === props.currentPlayerId) return false
+  if (props.isCreator) return player.role !== 'creator'
+  if (props.isModerator) return player.role === 'member' || player.role === 'spectator'
+  return false
+}
+
+// Check if we can ban a player (creator only)
+const canBan = (player: Player): boolean => {
   return props.isCreator && player.id !== props.currentPlayerId && player.role !== 'creator'
+}
+
+// Check if we can promote a player to moderator
+// Creator or moderator can promote members
+const canPromote = (player: Player): boolean => {
+  if (player.id === props.currentPlayerId) return false
+  if (!props.isCreator && !props.isModerator) return false
+  return player.role === 'member'
+}
+
+// Check if we can demote a player from moderator
+// Creator or moderator can demote moderators
+const canDemote = (player: Player): boolean => {
+  if (player.id === props.currentPlayerId) return false
+  if (!props.isCreator && !props.isModerator) return false
+  return player.role === 'moderator'
+}
+
+// Check if we should show any moderation actions
+const canModerate = (player: Player): boolean => {
+  return canKick(player) || canBan(player) || canPromote(player) || canDemote(player)
+}
+
+const handlePromote = (playerId: string) => {
+  emit('promote', playerId)
+}
+
+const handleDemote = (playerId: string) => {
+  emit('demote', playerId)
 }
 </script>
 
@@ -90,6 +132,9 @@ const canModerate = (player: Player): boolean => {
         <span v-if="player.role === 'creator'" class="players-panel__badge players-panel__badge--creator" title="Table Creator">
           <Crown :size="12" />
         </span>
+        <span v-else-if="player.role === 'moderator'" class="players-panel__badge players-panel__badge--moderator" title="Moderator">
+          <Shield :size="12" />
+        </span>
         <span v-else-if="player.role === 'spectator'" class="players-panel__badge players-panel__badge--spectator" title="Spectator">
           <Eye :size="12" />
         </span>
@@ -100,16 +145,38 @@ const canModerate = (player: Player): boolean => {
           <span>{{ getHandCount(player) }}</span>
         </span>
 
-        <!-- Moderation actions (creator only, not for self or other creator) -->
+        <!-- Moderation actions -->
         <div v-if="canModerate(player)" class="players-panel__actions">
+          <!-- Promote to moderator -->
           <button
+            v-if="canPromote(player)"
+            class="players-panel__action players-panel__action--promote"
+            title="Promote to moderator"
+            @click.stop="handlePromote(player.id)"
+          >
+            <ChevronUp :size="14" />
+          </button>
+          <!-- Demote from moderator -->
+          <button
+            v-if="canDemote(player)"
+            class="players-panel__action players-panel__action--demote"
+            title="Demote from moderator"
+            @click.stop="handleDemote(player.id)"
+          >
+            <ChevronDown :size="14" />
+          </button>
+          <!-- Kick player -->
+          <button
+            v-if="canKick(player)"
             class="players-panel__action players-panel__action--kick"
             title="Kick player"
             @click.stop="handleKick(player.id)"
           >
             <LogOut :size="14" />
           </button>
+          <!-- Ban player (creator only) -->
           <button
+            v-if="canBan(player)"
             class="players-panel__action players-panel__action--ban"
             title="Ban player"
             @click.stop="handleBanClick(player.id)"
@@ -237,6 +304,10 @@ const canModerate = (player: Player): boolean => {
   color: #fbbf24;
 }
 
+.players-panel__badge--moderator {
+  color: #a78bfa;
+}
+
 .players-panel__badge--spectator {
   color: #60a5fa;
 }
@@ -270,6 +341,16 @@ const canModerate = (player: Player): boolean => {
 .players-panel__action:hover {
   background: rgba(255, 255, 255, 0.15);
   color: #fff;
+}
+
+.players-panel__action--promote:hover {
+  background: rgba(167, 139, 250, 0.2);
+  color: #a78bfa;
+}
+
+.players-panel__action--demote:hover {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
 }
 
 .players-panel__action--kick:hover {

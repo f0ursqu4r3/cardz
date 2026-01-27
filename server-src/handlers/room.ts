@@ -1,4 +1,12 @@
-import type { RoomCreate, RoomJoin, RoomListRequest, PlayerKick, PlayerBan } from '../../shared/types'
+import type {
+  RoomCreate,
+  RoomJoin,
+  RoomListRequest,
+  PlayerKick,
+  PlayerBan,
+  PlayerPromote,
+  PlayerDemote,
+} from '../../shared/types'
 import type { RoomManager } from '../room'
 import type { ClientData, GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
@@ -12,6 +20,8 @@ import {
   logPlayerSpectating,
   logPlayerKicked,
   logPlayerBanned,
+  logPlayerPromoted,
+  logPlayerDemoted,
   getActivityHistory,
 } from '../activity'
 
@@ -323,7 +333,8 @@ export function handleRoomList(
 }
 
 /**
- * Handle kicking a player from the room (creator only)
+ * Handle kicking a player from the room (creator or moderator)
+ * Moderators can only kick members and spectators, not other moderators or the creator
  */
 export function handlePlayerKick(
   ws: GenericWebSocket,
@@ -342,13 +353,16 @@ export function handlePlayerKick(
     return
   }
 
-  // Check if caller is the creator
-  if (!roomManager.isCreator(clientData.roomCode, clientData.playerId)) {
+  const isCreator = roomManager.isCreator(clientData.roomCode, clientData.playerId)
+  const isModerator = roomManager.isModerator(clientData.roomCode, clientData.playerId)
+
+  // Check if caller is the creator or a moderator
+  if (!isCreator && !isModerator) {
     send(ws, {
       type: 'error',
       originalAction: 'player:kick',
       code: 'PERMISSION_DENIED',
-      message: 'Only the table creator can kick players',
+      message: 'Only the table creator or moderators can kick players',
     })
     return
   }
@@ -362,6 +376,21 @@ export function handlePlayerKick(
       message: 'Cannot kick yourself',
     })
     return
+  }
+
+  // Moderators cannot kick the creator or other moderators
+  if (isModerator && !isCreator) {
+    const targetIsCreator = roomManager.isCreator(clientData.roomCode, msg.targetPlayerId)
+    const targetIsModerator = roomManager.isModerator(clientData.roomCode, msg.targetPlayerId)
+    if (targetIsCreator || targetIsModerator) {
+      send(ws, {
+        type: 'error',
+        originalAction: 'player:kick',
+        code: 'PERMISSION_DENIED',
+        message: 'Moderators cannot kick the creator or other moderators',
+      })
+      return
+    }
   }
 
   // Kick the player
@@ -496,4 +525,154 @@ export function handlePlayerBan(
   )
 
   console.log(`[room:ban] ${clientData.name} banned ${bannedPlayer.name} from ${clientData.roomCode}`)
+}
+
+/**
+ * Handle promoting a player to moderator (creator or moderator only)
+ */
+export function handlePlayerPromote(
+  ws: GenericWebSocket,
+  msg: PlayerPromote,
+  roomManager: RoomManager,
+): void {
+  const clientData = getClientData(ws)
+
+  if (!clientData.roomCode || !clientData.playerId) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:promote',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+    })
+    return
+  }
+
+  // Check if caller is the creator or a moderator
+  if (!roomManager.isCreatorOrModerator(clientData.roomCode, clientData.playerId)) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:promote',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the table creator or moderators can promote players',
+    })
+    return
+  }
+
+  // Cannot promote yourself
+  if (msg.targetPlayerId === clientData.playerId) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:promote',
+      code: 'INVALID_ACTION',
+      message: 'Cannot promote yourself',
+    })
+    return
+  }
+
+  // Promote the player
+  const promotedPlayer = roomManager.promoteToModerator(clientData.roomCode, msg.targetPlayerId)
+  if (!promotedPlayer) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:promote',
+      code: 'INVALID_ACTION',
+      message: 'Cannot promote this player (may be spectator or creator)',
+    })
+    return
+  }
+
+  // Broadcast role change to all players
+  broadcastToRoom(roomManager.getClients(), clientData.roomCode, {
+    type: 'room:player_role_changed',
+    playerId: msg.targetPlayerId,
+    playerName: promotedPlayer.name,
+    newRole: 'moderator',
+    changedBy: clientData.name || 'The host',
+  })
+
+  // Log activity
+  logPlayerPromoted(
+    roomManager.getClients(),
+    clientData.roomCode,
+    clientData.playerId,
+    clientData.name || 'Host',
+    promotedPlayer.name,
+  )
+
+  console.log(`[room:promote] ${clientData.name} promoted ${promotedPlayer.name} to moderator in ${clientData.roomCode}`)
+}
+
+/**
+ * Handle demoting a player from moderator (creator or moderator only)
+ */
+export function handlePlayerDemote(
+  ws: GenericWebSocket,
+  msg: PlayerDemote,
+  roomManager: RoomManager,
+): void {
+  const clientData = getClientData(ws)
+
+  if (!clientData.roomCode || !clientData.playerId) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:demote',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+    })
+    return
+  }
+
+  // Check if caller is the creator or a moderator
+  if (!roomManager.isCreatorOrModerator(clientData.roomCode, clientData.playerId)) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:demote',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the table creator or moderators can demote players',
+    })
+    return
+  }
+
+  // Cannot demote yourself
+  if (msg.targetPlayerId === clientData.playerId) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:demote',
+      code: 'INVALID_ACTION',
+      message: 'Cannot demote yourself',
+    })
+    return
+  }
+
+  // Demote the player
+  const demotedPlayer = roomManager.demoteFromModerator(clientData.roomCode, msg.targetPlayerId)
+  if (!demotedPlayer) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:demote',
+      code: 'INVALID_ACTION',
+      message: 'Cannot demote this player (may not be a moderator)',
+    })
+    return
+  }
+
+  // Broadcast role change to all players
+  broadcastToRoom(roomManager.getClients(), clientData.roomCode, {
+    type: 'room:player_role_changed',
+    playerId: msg.targetPlayerId,
+    playerName: demotedPlayer.name,
+    newRole: 'member',
+    changedBy: clientData.name || 'The host',
+  })
+
+  // Log activity
+  logPlayerDemoted(
+    roomManager.getClients(),
+    clientData.roomCode,
+    clientData.playerId,
+    clientData.name || 'Host',
+    demotedPlayer.name,
+  )
+
+  console.log(`[room:demote] ${clientData.name} demoted ${demotedPlayer.name} from moderator in ${clientData.roomCode}`)
 }

@@ -21,6 +21,8 @@ import {
   handleDisconnect,
   handlePlayerKick,
   handlePlayerBan,
+  handlePlayerPromote,
+  handlePlayerDemote,
 } from './handlers/room'
 import { handleCardMove, handleCardLock, handleCardUnlock, handleCardFlip } from './handlers/card'
 import {
@@ -910,6 +912,12 @@ const server = Bun.serve<ClientData>({
             break
           case 'player:ban':
             handlePlayerBan(socket, msg, roomManager)
+            break
+          case 'player:promote':
+            handlePlayerPromote(socket, msg, roomManager)
+            break
+          case 'player:demote':
+            handlePlayerDemote(socket, msg, roomManager)
             break
         }
       } catch (err) {

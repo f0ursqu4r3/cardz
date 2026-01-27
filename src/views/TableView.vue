@@ -87,6 +87,12 @@ const isCreator = computed(() => {
   return player?.role === 'creator'
 })
 
+// Check if current player is a moderator
+const isModerator = computed(() => {
+  const player = ws.players.value.find((p) => p.id === ws.playerId.value)
+  return player?.role === 'moderator'
+})
+
 // Custom cursor based on player color (sets up global style via side effect)
 const cursor = useCursor(playerColor)
 
@@ -960,9 +966,12 @@ onBeforeUnmount(() => {
             :current-player-id="ws.playerId.value"
             :own-hand-count="cardStore.handCount"
             :is-creator="isCreator"
+            :is-moderator="isModerator"
             @close="showPlayers = false"
             @kick="ws.kickPlayer"
             @ban="ws.banPlayer"
+            @promote="ws.promotePlayer"
+            @demote="ws.demotePlayer"
           />
         </div>
         <button
@@ -1151,6 +1160,7 @@ onBeforeUnmount(() => {
             'locked-by-other': shouldShowLockGlow(card),
             'zone-reorder-shift': zoneReorderPositions.get(card.id) !== undefined,
             'remote-selected': cardStore.getRemoteSelectionColor(card.id) !== null,
+            flipping: cardStore.isFlipping(card.id),
           }"
           :style="{
             '--col': shouldShowFaceDown(card) ? CARD_BACK_COL : card.col,
@@ -1466,6 +1476,7 @@ onBeforeUnmount(() => {
   transform-origin: 0 0;
   will-change: transform;
   z-index: 1;
+  perspective: 1000px;
 }
 
 .cursors-layer {

@@ -40,4 +40,24 @@
   z-index: 2;
   box-shadow: 0px 12px 12px -4px rgba(0, 0, 0, 0.25);
 }
+
+/* 3D flip animation */
+.card.flipping {
+  animation: card-flip 0.35s ease-in-out;
+}
+
+@keyframes card-flip {
+  0% {
+    transform: perspective(800px) rotateY(0deg);
+  }
+  49.9% {
+    transform: perspective(800px) rotateY(90deg);
+  }
+  50% {
+    transform: perspective(800px) rotateY(-90deg);
+  }
+  100% {
+    transform: perspective(800px) rotateY(0deg);
+  }
+}
 </style>

@@ -90,7 +90,10 @@ export function useGameStateSync(config: GameStateSyncConfig) {
         break
 
       case 'card:flipped':
-        cardStore.updateCardFromServer(message.cardId, { faceUp: message.faceUp })
+        // Only animate for remote player flips (we already animated locally)
+        if (message.playerId !== ws.playerId.value) {
+          cardStore.handleRemoteFlip(message.cardId, message.faceUp)
+        }
         break
 
       case 'stack:created':
@@ -214,15 +217,21 @@ export function useGameStateSync(config: GameStateSyncConfig) {
         break
 
       case 'stack:flipped':
-        message.cardUpdates.forEach((update) => {
-          cardStore.updateCardFromServer(update.cardId, { faceUp: update.faceUp })
-        })
+        // Only animate for remote player flips
+        if (message.playerId !== ws.playerId.value) {
+          message.cardUpdates.forEach((update) => {
+            cardStore.handleRemoteFlip(update.cardId, update.faceUp)
+          })
+        }
         break
 
       case 'stack:faces_set':
-        message.cardIds.forEach((cardId) => {
-          cardStore.updateCardFromServer(cardId, { faceUp: message.faceUp })
-        })
+        // Only animate for remote player actions
+        if (message.playerId !== ws.playerId.value) {
+          message.cardIds.forEach((cardId) => {
+            cardStore.handleRemoteFlip(cardId, message.faceUp)
+          })
+        }
         break
 
       case 'zone:created':
