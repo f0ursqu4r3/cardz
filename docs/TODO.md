@@ -38,10 +38,12 @@
 ### Game Entities
 
 - [x] Dice with rolling animation and pip visualization
+- [x] Dice multi-selection (Ctrl+click to select, drag to move all, shake to roll all)
 - [x] Counters with increment/decrement and configurable min/max/step
 - [x] Tokens (color shapes: circle, square, star, triangle; sprite icons: star, skull, coin, heart, shield, gem)
 - [x] Timers with countdown and stopwatch modes
 - [x] Card face-up/face-down flipping
+- [x] All entities visible in minimap (dice, counters, tokens, timers)
 
 ### Host Controls
 

@@ -35,7 +35,14 @@ export interface EntityDragConfig<T extends DraggableEntity> {
   setCursor: (type: 'default' | 'grab' | 'grabbing') => void
   /** Optional callback to broadcast cursor position during drag */
   onCursorMove?: (worldX: number, worldY: number) => void
+  /** Optional callback when shake gesture is detected (for dice rolling) */
+  onShake?: (entityId: number) => void
 }
+
+// Shake detection constants (using screen coordinates for consistency)
+const SHAKE_WINDOW_MS = 400 // Time window to detect shakes
+const SHAKE_MIN_REVERSALS = 2 // Minimum direction changes to trigger shake
+const SHAKE_MIN_DISTANCE = 20 // Minimum screen pixels per movement to count
 
 /**
  * Generic composable for handling drag operations on game entities (counters, tokens, dice, timers).
@@ -55,12 +62,22 @@ export function useEntityDrag<T extends DraggableEntity>(config: EntityDragConfi
     trackActivity,
     setCursor,
     onCursorMove,
+    onShake,
   } = config
 
   // Drag state
   const draggingId = ref<number | null>(null)
   const dragOffset = ref({ x: 0, y: 0 })
   let lastPositionUpdate = 0
+
+  // Shake detection state
+  interface PositionSample {
+    x: number
+    y: number
+    time: number
+  }
+  let positionHistory: PositionSample[] = []
+  let hasShaken = false // Prevent multiple shakes per drag
 
   /**
    * Get a player's color by their ID
@@ -69,6 +86,59 @@ export function useEntityDrag<T extends DraggableEntity>(config: EntityDragConfi
     if (!pid) return null
     const player = players.value.find((p) => p.id === pid)
     return player?.color || null
+  }
+
+  /**
+   * Detect shake gesture from position history (uses screen coordinates)
+   * Returns true if rapid direction reversals are detected
+   */
+  const detectShake = (screenX: number, screenY: number): boolean => {
+    if (!onShake || hasShaken) return false
+
+    const now = Date.now()
+
+    // Add new position sample (screen coordinates)
+    positionHistory.push({ x: screenX, y: screenY, time: now })
+
+    // Remove old samples outside the time window
+    positionHistory = positionHistory.filter((p) => now - p.time < SHAKE_WINDOW_MS)
+
+    // Need at least 4 samples to detect direction changes
+    if (positionHistory.length < 4) return false
+
+    // Count direction reversals by looking at velocity sign changes
+    let reversals = 0
+    let lastVx = 0
+    let lastVy = 0
+    let hadSignificantMove = false
+
+    for (let i = 1; i < positionHistory.length; i++) {
+      const prev = positionHistory[i - 1]
+      const curr = positionHistory[i]
+      if (!prev || !curr) continue
+
+      // Calculate velocity
+      const vx = curr.x - prev.x
+      const vy = curr.y - prev.y
+
+      // Check if movement is significant enough
+      const dist = Math.sqrt(vx * vx + vy * vy)
+      if (dist < SHAKE_MIN_DISTANCE) continue
+
+      // Check for direction reversal (dot product negative means opposite direction)
+      if (hadSignificantMove) {
+        const dot = lastVx * vx + lastVy * vy
+        if (dot < 0) {
+          reversals++
+        }
+      }
+
+      lastVx = vx
+      lastVy = vy
+      hadSignificantMove = true
+    }
+
+    return reversals >= SHAKE_MIN_REVERSALS
   }
 
   /**
@@ -94,6 +164,10 @@ export function useEntityDrag<T extends DraggableEntity>(config: EntityDragConfi
     draggingId.value = entityId
     setCursor('grabbing')
 
+    // Reset shake detection state
+    positionHistory = []
+    hasShaken = false
+
     // Lock the entity
     trackActivity()
     sendMessage({
@@ -118,6 +192,12 @@ export function useEntityDrag<T extends DraggableEntity>(config: EntityDragConfi
     // Update local position immediately for smooth dragging
     entity.x = newX
     entity.y = newY
+
+    // Check for shake gesture (for dice rolling) - use screen coordinates
+    if (onShake && detectShake(event.clientX, event.clientY)) {
+      hasShaken = true
+      onShake(draggingId.value)
+    }
 
     // Broadcast cursor position during drag (for remote player cursors)
     onCursorMove?.(worldPos.x, worldPos.y)

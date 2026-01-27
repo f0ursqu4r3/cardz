@@ -26,6 +26,8 @@ export const useCardStore = defineStore('cards', () => {
   const selectedIds = ref<Set<number>>(new Set())
   // Remote player selections: Map<playerId, { cardIds: Set<number>, color: string }>
   const remoteSelections = ref<Map<string, { cardIds: Set<number>; color: string }>>(new Map())
+  // Dice selection
+  const selectedDieIds = ref<Set<number>>(new Set())
   const handCardIds = ref<number[]>([])
   const shufflingStackId = ref<number | null>(null)
 
@@ -715,6 +717,7 @@ export const useCardStore = defineStore('cards', () => {
     if (!stack || stack.cardIds.length === 0) return
     // Top card is the last one in the array
     const topCardId = stack.cardIds[stack.cardIds.length - 1]
+    if (topCardId === undefined) return
     const card = cardById.value.get(topCardId)
     if (card) {
       card.faceUp = !card.faceUp
@@ -813,6 +816,27 @@ export const useCardStore = defineStore('cards', () => {
     clearSelection()
     return stack
   }
+
+  // Dice selection management
+  const isDieSelected = (dieId: number) => selectedDieIds.value.has(dieId)
+
+  const toggleDieSelect = (dieId: number) => {
+    if (selectedDieIds.value.has(dieId)) {
+      selectedDieIds.value.delete(dieId)
+    } else {
+      selectedDieIds.value.add(dieId)
+    }
+  }
+
+  const clearDieSelection = () => {
+    selectedDieIds.value.clear()
+  }
+
+  const hasDieSelection = computed(() => selectedDieIds.value.size > 0)
+
+  const dieSelectionCount = computed(() => selectedDieIds.value.size)
+
+  const getSelectedDieIds = () => Array.from(selectedDieIds.value)
 
   // Merge source stack into target stack
   const mergeStacks = (sourceStackId: number, targetStackId: number): boolean => {
@@ -1358,6 +1382,14 @@ export const useCardStore = defineStore('cards', () => {
     bumpSelectionZ,
     getSelectedIds,
     stackSelection,
+    // Dice selection
+    selectedDieIds,
+    isDieSelected,
+    toggleDieSelect,
+    clearDieSelection,
+    hasDieSelection,
+    dieSelectionCount,
+    getSelectedDieIds,
     mergeStacks,
     shuffleStack,
     reorderStack,

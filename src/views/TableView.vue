@@ -308,6 +308,20 @@ const dieDrag = useEntityDrag({
   trackActivity,
   setCursor: cursor.setCursor,
   onCursorMove: onEntityCursorMove,
+  onShake: (dieId) => {
+    // Roll the shaken die and all selected dice
+    if (cardStore.isDieSelected(dieId) && cardStore.dieSelectionCount > 1) {
+      // Roll all selected dice
+      cardStore.getSelectedDieIds().forEach((id) => {
+        cardStore.setDieRolling(id, true)
+        ws.send({ type: 'die:roll', dieId: id })
+      })
+    } else {
+      // Just roll the single die
+      cardStore.setDieRolling(dieId, true)
+      ws.send({ type: 'die:roll', dieId })
+    }
+  },
 })
 
 const timerDrag = useEntityDrag({
@@ -583,6 +597,91 @@ const onDieDelete = (dieId: number) => {
   })
 }
 
+// Dice selection drag state
+const dieSelectionStartPositions = ref<Map<number, { x: number; y: number }>>(new Map())
+const dieSelectionDragStart = ref<{ x: number; y: number } | null>(null)
+
+const onDiePointerDown = (event: PointerEvent, dieId: number) => {
+  const isCtrlClick = event.ctrlKey || event.metaKey
+
+  if (isCtrlClick) {
+    // Toggle selection on Ctrl+click
+    event.stopPropagation() // Prevent canvas from clearing selection
+    cardStore.toggleDieSelect(dieId)
+    return
+  }
+
+  // Clear selection if clicking on an unselected die
+  if (cardStore.hasDieSelection && !cardStore.isDieSelected(dieId)) {
+    cardStore.clearDieSelection()
+  }
+
+  // If this die is selected, set up selection drag
+  if (cardStore.isDieSelected(dieId)) {
+    event.stopPropagation() // Prevent canvas from clearing selection
+    const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
+    dieSelectionDragStart.value = { x: worldPos.x, y: worldPos.y }
+    dieSelectionStartPositions.value = new Map()
+
+    // Store initial positions of all selected dice
+    cardStore.getSelectedDieIds().forEach((id) => {
+      const die = cardStore.getDieById(id)
+      if (die) {
+        dieSelectionStartPositions.value.set(id, { x: die.x, y: die.y })
+      }
+    })
+  }
+
+  // Proceed with normal drag handling
+  dieDrag.onPointerDown(event, dieId)
+}
+
+// Wrapper for die pointer move that also moves other selected dice
+const onDiePointerMove = (event: PointerEvent) => {
+  // If we're doing a selection drag, move all selected dice
+  if (dieSelectionDragStart.value && dieDrag.draggingId.value !== null) {
+    const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
+    const deltaX = worldPos.x - dieSelectionDragStart.value.x
+    const deltaY = worldPos.y - dieSelectionDragStart.value.y
+
+    // Move all selected dice except the one being actively dragged (that's handled by dieDrag)
+    dieSelectionStartPositions.value.forEach((startPos, id) => {
+      if (id !== dieDrag.draggingId.value) {
+        const die = cardStore.getDieById(id)
+        if (die) {
+          die.x = startPos.x + deltaX
+          die.y = startPos.y + deltaY
+        }
+      }
+    })
+  }
+
+  dieDrag.onPointerMove(event)
+}
+
+const onDiePointerUp = (event: PointerEvent) => {
+  // If we were doing a selection drag, send final positions for all selected dice
+  if (dieSelectionDragStart.value && dieDrag.draggingId.value !== null) {
+    dieSelectionStartPositions.value.forEach((_, id) => {
+      if (id !== dieDrag.draggingId.value) {
+        const die = cardStore.getDieById(id)
+        if (die) {
+          // Send final position to server
+          ws.send({
+            type: 'die:update',
+            dieId: id,
+            updates: { x: die.x, y: die.y },
+          })
+        }
+      }
+    })
+  }
+
+  dieSelectionDragStart.value = null
+  dieSelectionStartPositions.value.clear()
+  dieDrag.onPointerUp(event)
+}
+
 const addTimer = (mode: 'countdown' | 'stopwatch' = 'countdown') => {
   const bounds = viewport.getVisibleBounds()
   const centerX = bounds.x + bounds.width / 2
@@ -765,9 +864,10 @@ const onCanvasPointerDown = (event: PointerEvent) => {
   showSettings.value = false
   showPlayers.value = false
 
-  // Clear card selection when clicking on empty canvas (left-click only)
+  // Clear all selections when clicking on empty canvas (left-click only)
   if (event.button === 0 && !spaceHeld.value) {
     cardStore.clearSelection()
+    cardStore.clearDieSelection()
   }
 
   // Middle mouse button or space+left click for panning
@@ -1115,10 +1215,11 @@ onBeforeUnmount(() => {
           :die="die"
           :is-dragging="dieDrag.isDragging(die.id)"
           :is-locked-by-other="dieDrag.isLockedByOther(die)"
+          :is-selected="cardStore.isDieSelected(die.id)"
           :lock-color="dieDrag.getLockColor(die)"
-          @pointerdown="dieDrag.onPointerDown($event, die.id)"
-          @pointermove="dieDrag.onPointerMove"
-          @pointerup="dieDrag.onPointerUp"
+          @pointerdown="onDiePointerDown($event, die.id)"
+          @pointermove="onDiePointerMove"
+          @pointerup="onDiePointerUp"
           @contextmenu="onDieRightClick($event, die.id)"
           @die:roll="onDieRoll"
           @die:update="onDieUpdate"
@@ -1239,7 +1340,10 @@ onBeforeUnmount(() => {
 
       <!-- Selection count indicator -->
       <div v-if="cardStore.hasSelection" class="selection-indicator">
-        {{ cardStore.selectionCount }} selected
+        {{ cardStore.selectionCount }} card{{ cardStore.selectionCount > 1 ? 's' : '' }} selected
+      </div>
+      <div v-if="cardStore.hasDieSelection" class="selection-indicator selection-indicator--dice">
+        {{ cardStore.dieSelectionCount }} {{ cardStore.dieSelectionCount > 1 ? 'dice' : 'die' }} selected
       </div>
     </div>
 
@@ -1603,6 +1707,11 @@ onBeforeUnmount(() => {
   font-weight: 500;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   z-index: 200;
+}
+
+.selection-indicator--dice {
+  bottom: 160px;
+  background: rgba(239, 68, 68, 0.9);
 }
 
 .panels-container-top-left {

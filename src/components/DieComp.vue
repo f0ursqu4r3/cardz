@@ -8,6 +8,7 @@ const props = defineProps<{
   die: Die
   isDragging: boolean
   isLockedByOther: boolean
+  isSelected: boolean
   lockColor?: string
 }>()
 
@@ -99,6 +100,7 @@ defineExpose({ openModal, rollDie })
       'die--dragging': isDragging,
       'die--locked': isLockedByOther,
       'die--rolling': die.isRolling,
+      'die--selected': isSelected,
     }"
     :style="{
       left: `${die.x - DIE_SIZE / 2}px`,
@@ -187,6 +189,11 @@ defineExpose({ openModal, rollDie })
 
 .die--rolling {
   animation: die-shake 0.5s ease-in-out;
+}
+
+.die--selected {
+  box-shadow: 0 0 0 2px #3b82f6, 0 4px 12px rgba(59, 130, 246, 0.3);
+  border-radius: var(--radius-lg);
 }
 
 @keyframes die-shake {

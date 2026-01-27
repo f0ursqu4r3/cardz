@@ -47,6 +47,38 @@ const worldBounds = computed(() => {
     maxY = Math.max(maxY, zone.y + zone.height + 50)
   })
 
+  // Include all dice
+  cardStore.dice.forEach((die) => {
+    minX = Math.min(minX, die.x - 50)
+    minY = Math.min(minY, die.y - 50)
+    maxX = Math.max(maxX, die.x + 100)
+    maxY = Math.max(maxY, die.y + 100)
+  })
+
+  // Include all counters
+  cardStore.counters.forEach((counter) => {
+    minX = Math.min(minX, counter.x - 50)
+    minY = Math.min(minY, counter.y - 50)
+    maxX = Math.max(maxX, counter.x + 150)
+    maxY = Math.max(maxY, counter.y + 100)
+  })
+
+  // Include all tokens
+  cardStore.tokens.forEach((token) => {
+    minX = Math.min(minX, token.x - 50)
+    minY = Math.min(minY, token.y - 50)
+    maxX = Math.max(maxX, token.x + 100)
+    maxY = Math.max(maxY, token.y + 100)
+  })
+
+  // Include all timers
+  cardStore.timers.forEach((timer) => {
+    minX = Math.min(minX, timer.x - 50)
+    minY = Math.min(minY, timer.y - 50)
+    maxX = Math.max(maxX, timer.x + 200)
+    maxY = Math.max(maxY, timer.y + 100)
+  })
+
   // Add padding
   const padding = 200
   return {
@@ -119,6 +151,57 @@ const minimapZones = computed(() =>
       y: pos.y,
       width: zone.width * scale.value,
       height: zone.height * scale.value,
+    }
+  }),
+)
+
+// Dice positions on minimap
+const minimapDice = computed(() =>
+  cardStore.dice.map((die) => {
+    const pos = toMinimap(die.x, die.y)
+    return {
+      id: die.id,
+      x: pos.x,
+      y: pos.y,
+      color: die.color,
+    }
+  }),
+)
+
+// Counter positions on minimap
+const minimapCounters = computed(() =>
+  cardStore.counters.map((counter) => {
+    const pos = toMinimap(counter.x, counter.y)
+    return {
+      id: counter.id,
+      x: pos.x,
+      y: pos.y,
+      color: counter.color,
+    }
+  }),
+)
+
+// Token positions on minimap
+const minimapTokens = computed(() =>
+  cardStore.tokens.map((token) => {
+    const pos = toMinimap(token.x, token.y)
+    return {
+      id: token.id,
+      x: pos.x,
+      y: pos.y,
+      color: token.color,
+    }
+  }),
+)
+
+// Timer positions on minimap
+const minimapTimers = computed(() =>
+  cardStore.timers.map((timer) => {
+    const pos = toMinimap(timer.x, timer.y)
+    return {
+      id: timer.id,
+      x: pos.x,
+      y: pos.y,
     }
   }),
 )
@@ -252,6 +335,53 @@ const toggleCollapsed = () => {
           }"
         />
 
+        <!-- Dice -->
+        <div
+          v-for="die in minimapDice"
+          :key="`die-${die.id}`"
+          class="minimap__die"
+          :style="{
+            left: `${die.x}px`,
+            top: `${die.y}px`,
+            background: die.color,
+          }"
+        />
+
+        <!-- Counters -->
+        <div
+          v-for="counter in minimapCounters"
+          :key="`counter-${counter.id}`"
+          class="minimap__counter"
+          :style="{
+            left: `${counter.x}px`,
+            top: `${counter.y}px`,
+            borderColor: counter.color,
+          }"
+        />
+
+        <!-- Tokens -->
+        <div
+          v-for="token in minimapTokens"
+          :key="`token-${token.id}`"
+          class="minimap__token"
+          :style="{
+            left: `${token.x}px`,
+            top: `${token.y}px`,
+            background: token.color,
+          }"
+        />
+
+        <!-- Timers -->
+        <div
+          v-for="timer in minimapTimers"
+          :key="`timer-${timer.id}`"
+          class="minimap__timer"
+          :style="{
+            left: `${timer.x}px`,
+            top: `${timer.y}px`,
+          }"
+        />
+
         <!-- Viewport indicator -->
         <div
           class="minimap__viewport"
@@ -290,6 +420,41 @@ const toggleCollapsed = () => {
 
 .minimap__card--stacked {
   background: rgba(200, 200, 255, 0.8);
+}
+
+.minimap__die {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+.minimap__counter {
+  position: absolute;
+  width: 8px;
+  height: 5px;
+  background: rgba(40, 40, 40, 0.8);
+  border: 1px solid;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.minimap__token {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.minimap__timer {
+  position: absolute;
+  width: 10px;
+  height: 4px;
+  background: rgba(100, 150, 255, 0.8);
+  border-radius: 1px;
+  pointer-events: none;
 }
 
 .minimap__viewport {
