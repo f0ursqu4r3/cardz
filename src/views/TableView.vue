@@ -25,7 +25,7 @@ import { useWebSocket } from '@/composables/useWebSocket'
 import { useCursor } from '@/composables/useCursor'
 import { useRemoteThrow } from '@/composables/useRemoteThrow'
 import { useRadialMenu } from '@/composables/useRadialMenu'
-import { useEntityDrag } from '@/composables/useEntityDrag'
+import { useAllEntityManagers } from '@/composables/useEntityManager'
 import { useCardDisplayHelpers } from '@/composables/useCardDisplayHelpers'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useRadialMenuActions } from '@/composables/useRadialMenuActions'
@@ -233,10 +233,6 @@ const {
   onZoneRightClick,
   onCanvasRightClick,
   onHandCardRightClick,
-  onCounterRightClick,
-  onTokenRightClick,
-  onDieRightClick,
-  onTimerRightClick,
 } = contextMenu
 
 // Initialize radial menu actions
@@ -273,46 +269,23 @@ const onEntityCursorMove = (worldX: number, worldY: number) => {
   ws.send({ type: 'cursor:update', x: worldX, y: worldY, state: 'grabbing' })
 }
 
-// Initialize entity drag handlers
-const counterDrag = useEntityDrag({
-  entityType: 'counter',
-  getEntityById: cardStore.getCounterById,
+// Initialize all entity managers (replaces 4 separate useEntityDrag calls)
+const entities = useAllEntityManagers({
+  cardStore,
   playerId: ws.playerId,
   players: ws.players,
   viewport,
+  radialMenu,
   sendMessage: ws.send,
   trackActivity,
   setCursor: cursor.setCursor,
   onCursorMove: onEntityCursorMove,
-})
-
-const tokenDrag = useEntityDrag({
-  entityType: 'token',
-  getEntityById: cardStore.getTokenById,
-  playerId: ws.playerId,
-  players: ws.players,
-  viewport,
-  sendMessage: ws.send,
-  trackActivity,
-  setCursor: cursor.setCursor,
-  onCursorMove: onEntityCursorMove,
-})
-
-const dieDrag = useEntityDrag({
-  entityType: 'die',
-  getEntityById: cardStore.getDieById,
-  playerId: ws.playerId,
-  players: ws.players,
-  viewport,
-  sendMessage: ws.send,
-  trackActivity,
-  setCursor: cursor.setCursor,
-  onCursorMove: onEntityCursorMove,
-  onShake: (dieId) => {
+  onDieShake: (dieId) => {
     // Roll the shaken die and all selected dice
-    if (cardStore.isDieSelected(dieId) && cardStore.dieSelectionCount > 1) {
+    const dieSelection = entities.die.selection
+    if (dieSelection?.isSelected(dieId) && (dieSelection.selectionCount.value ?? 0) > 1) {
       // Roll all selected dice
-      cardStore.getSelectedDieIds().forEach((id) => {
+      dieSelection.getSelectedIds().forEach((id) => {
         cardStore.setDieRolling(id, true)
         ws.send({ type: 'die:roll', dieId: id })
       })
@@ -322,18 +295,14 @@ const dieDrag = useEntityDrag({
       ws.send({ type: 'die:roll', dieId })
     }
   },
-})
-
-const timerDrag = useEntityDrag({
-  entityType: 'timer',
-  getEntityById: cardStore.getTimerById,
-  playerId: ws.playerId,
-  players: ws.players,
-  viewport,
-  sendMessage: ws.send,
-  trackActivity,
-  setCursor: cursor.setCursor,
-  onCursorMove: onEntityCursorMove,
+  dieSelectionState: {
+    isSelected: cardStore.isDieSelected,
+    toggleSelect: cardStore.toggleDieSelect,
+    clearSelection: cardStore.clearDieSelection,
+    hasSelection: () => cardStore.hasDieSelection,
+    selectionCount: () => cardStore.dieSelectionCount,
+    getSelectedIds: cardStore.getSelectedDieIds,
+  },
 })
 
 // Ghost card for hand dragging
@@ -597,91 +566,6 @@ const onDieDelete = (dieId: number) => {
   })
 }
 
-// Dice selection drag state
-const dieSelectionStartPositions = ref<Map<number, { x: number; y: number }>>(new Map())
-const dieSelectionDragStart = ref<{ x: number; y: number } | null>(null)
-
-const onDiePointerDown = (event: PointerEvent, dieId: number) => {
-  const isCtrlClick = event.ctrlKey || event.metaKey
-
-  if (isCtrlClick) {
-    // Toggle selection on Ctrl+click
-    event.stopPropagation() // Prevent canvas from clearing selection
-    cardStore.toggleDieSelect(dieId)
-    return
-  }
-
-  // Clear selection if clicking on an unselected die
-  if (cardStore.hasDieSelection && !cardStore.isDieSelected(dieId)) {
-    cardStore.clearDieSelection()
-  }
-
-  // If this die is selected, set up selection drag
-  if (cardStore.isDieSelected(dieId)) {
-    event.stopPropagation() // Prevent canvas from clearing selection
-    const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
-    dieSelectionDragStart.value = { x: worldPos.x, y: worldPos.y }
-    dieSelectionStartPositions.value = new Map()
-
-    // Store initial positions of all selected dice
-    cardStore.getSelectedDieIds().forEach((id) => {
-      const die = cardStore.getDieById(id)
-      if (die) {
-        dieSelectionStartPositions.value.set(id, { x: die.x, y: die.y })
-      }
-    })
-  }
-
-  // Proceed with normal drag handling
-  dieDrag.onPointerDown(event, dieId)
-}
-
-// Wrapper for die pointer move that also moves other selected dice
-const onDiePointerMove = (event: PointerEvent) => {
-  // If we're doing a selection drag, move all selected dice
-  if (dieSelectionDragStart.value && dieDrag.draggingId.value !== null) {
-    const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
-    const deltaX = worldPos.x - dieSelectionDragStart.value.x
-    const deltaY = worldPos.y - dieSelectionDragStart.value.y
-
-    // Move all selected dice except the one being actively dragged (that's handled by dieDrag)
-    dieSelectionStartPositions.value.forEach((startPos, id) => {
-      if (id !== dieDrag.draggingId.value) {
-        const die = cardStore.getDieById(id)
-        if (die) {
-          die.x = startPos.x + deltaX
-          die.y = startPos.y + deltaY
-        }
-      }
-    })
-  }
-
-  dieDrag.onPointerMove(event)
-}
-
-const onDiePointerUp = (event: PointerEvent) => {
-  // If we were doing a selection drag, send final positions for all selected dice
-  if (dieSelectionDragStart.value && dieDrag.draggingId.value !== null) {
-    dieSelectionStartPositions.value.forEach((_, id) => {
-      if (id !== dieDrag.draggingId.value) {
-        const die = cardStore.getDieById(id)
-        if (die) {
-          // Send final position to server
-          ws.send({
-            type: 'die:update',
-            dieId: id,
-            updates: { x: die.x, y: die.y },
-          })
-        }
-      }
-    })
-  }
-
-  dieSelectionDragStart.value = null
-  dieSelectionStartPositions.value.clear()
-  dieDrag.onPointerUp(event)
-}
-
 const addTimer = (mode: 'countdown' | 'stopwatch' = 'countdown') => {
   const bounds = viewport.getVisibleBounds()
   const centerX = bounds.x + bounds.width / 2
@@ -905,19 +789,19 @@ const sendCursorStateChange = () => {
 
 // Watch all drag states to broadcast cursor changes
 watch(() => interaction.drag.isDragging.value, sendCursorStateChange)
-watch(() => counterDrag.draggingId.value, sendCursorStateChange)
-watch(() => tokenDrag.draggingId.value, sendCursorStateChange)
-watch(() => dieDrag.draggingId.value, sendCursorStateChange)
-watch(() => timerDrag.draggingId.value, sendCursorStateChange)
+watch(() => entities.counter.draggingId.value, sendCursorStateChange)
+watch(() => entities.token.draggingId.value, sendCursorStateChange)
+watch(() => entities.die.draggingId.value, sendCursorStateChange)
+watch(() => entities.timer.draggingId.value, sendCursorStateChange)
 
 // Get current cursor state for sending
 const getCursorState = (): 'default' | 'grab' | 'grabbing' => {
   // Check all drag states
   if (interaction.drag.isDragging.value) return 'grabbing'
-  if (counterDrag.draggingId.value !== null) return 'grabbing'
-  if (tokenDrag.draggingId.value !== null) return 'grabbing'
-  if (dieDrag.draggingId.value !== null) return 'grabbing'
-  if (timerDrag.draggingId.value !== null) return 'grabbing'
+  if (entities.counter.draggingId.value !== null) return 'grabbing'
+  if (entities.token.draggingId.value !== null) return 'grabbing'
+  if (entities.die.draggingId.value !== null) return 'grabbing'
+  if (entities.timer.draggingId.value !== null) return 'grabbing'
   return 'default'
 }
 
@@ -1178,13 +1062,13 @@ onBeforeUnmount(() => {
           :key="counter.id"
           :ref="(el: any) => el && counterRefs.set(counter.id, el)"
           :counter="counter"
-          :is-dragging="counterDrag.isDragging(counter.id)"
-          :is-locked-by-other="counterDrag.isLockedByOther(counter)"
-          :lock-color="counterDrag.getLockColor(counter)"
-          @pointerdown="counterDrag.onPointerDown($event, counter.id)"
-          @pointermove="counterDrag.onPointerMove"
-          @pointerup="counterDrag.onPointerUp"
-          @contextmenu="onCounterRightClick($event, counter.id)"
+          :is-dragging="entities.counter.isDragging(counter.id)"
+          :is-locked-by-other="entities.counter.isLockedByOther(counter)"
+          :lock-color="entities.counter.getLockColor(counter)"
+          @pointerdown="entities.counter.onPointerDown($event, counter.id)"
+          @pointermove="entities.counter.onPointerMove"
+          @pointerup="entities.counter.onPointerUp"
+          @contextmenu="entities.counter.onContextMenu($event, counter.id)"
           @counter:increment="onCounterIncrement"
           @counter:update="onCounterUpdate"
           @counter:delete="onCounterDelete"
@@ -1196,13 +1080,13 @@ onBeforeUnmount(() => {
           :key="token.id"
           :ref="(el: any) => el && tokenRefs.set(token.id, el)"
           :token="token"
-          :is-dragging="tokenDrag.isDragging(token.id)"
-          :is-locked-by-other="tokenDrag.isLockedByOther(token)"
-          :lock-color="tokenDrag.getLockColor(token)"
-          @pointerdown="tokenDrag.onPointerDown($event, token.id)"
-          @pointermove="tokenDrag.onPointerMove"
-          @pointerup="tokenDrag.onPointerUp"
-          @contextmenu="onTokenRightClick($event, token.id)"
+          :is-dragging="entities.token.isDragging(token.id)"
+          :is-locked-by-other="entities.token.isLockedByOther(token)"
+          :lock-color="entities.token.getLockColor(token)"
+          @pointerdown="entities.token.onPointerDown($event, token.id)"
+          @pointermove="entities.token.onPointerMove"
+          @pointerup="entities.token.onPointerUp"
+          @contextmenu="entities.token.onContextMenu($event, token.id)"
           @token:update="onTokenUpdate"
           @token:delete="onTokenDelete"
         />
@@ -1213,14 +1097,14 @@ onBeforeUnmount(() => {
           :key="die.id"
           :ref="(el: any) => el && dieRefs.set(die.id, el)"
           :die="die"
-          :is-dragging="dieDrag.isDragging(die.id)"
-          :is-locked-by-other="dieDrag.isLockedByOther(die)"
-          :is-selected="cardStore.isDieSelected(die.id)"
-          :lock-color="dieDrag.getLockColor(die)"
-          @pointerdown="onDiePointerDown($event, die.id)"
-          @pointermove="onDiePointerMove"
-          @pointerup="onDiePointerUp"
-          @contextmenu="onDieRightClick($event, die.id)"
+          :is-dragging="entities.die.isDragging(die.id)"
+          :is-locked-by-other="entities.die.isLockedByOther(die)"
+          :is-selected="entities.die.selection?.isSelected(die.id) ?? false"
+          :lock-color="entities.die.getLockColor(die)"
+          @pointerdown="entities.die.onPointerDown($event, die.id)"
+          @pointermove="entities.die.onPointerMove"
+          @pointerup="entities.die.onPointerUp"
+          @contextmenu="entities.die.onContextMenu($event, die.id)"
           @die:roll="onDieRoll"
           @die:update="onDieUpdate"
           @die:delete="onDieDelete"
@@ -1232,13 +1116,13 @@ onBeforeUnmount(() => {
           :key="timer.id"
           :ref="(el: any) => el && timerRefs.set(timer.id, el)"
           :timer="timer"
-          :is-dragging="timerDrag.isDragging(timer.id)"
-          :is-locked-by-other="timerDrag.isLockedByOther(timer)"
-          :lock-color="timerDrag.getLockColor(timer)"
-          @pointerdown="timerDrag.onPointerDown($event, timer.id)"
-          @pointermove="timerDrag.onPointerMove"
-          @pointerup="timerDrag.onPointerUp"
-          @contextmenu="onTimerRightClick($event, timer.id)"
+          :is-dragging="entities.timer.isDragging(timer.id)"
+          :is-locked-by-other="entities.timer.isLockedByOther(timer)"
+          :lock-color="entities.timer.getLockColor(timer)"
+          @pointerdown="entities.timer.onPointerDown($event, timer.id)"
+          @pointermove="entities.timer.onPointerMove"
+          @pointerup="entities.timer.onPointerUp"
+          @contextmenu="entities.timer.onContextMenu($event, timer.id)"
           @timer:start="onTimerStart"
           @timer:pause="onTimerPause"
           @timer:reset="onTimerReset"

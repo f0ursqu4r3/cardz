@@ -2804,11 +2804,11 @@ var uuid4 = /* @__PURE__ */ uuid(4)
 var uuid6 = /* @__PURE__ */ uuid(6)
 var uuid7 = /* @__PURE__ */ uuid(7)
 var email =
-  /^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$/
+  /^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9-]*\.)+[A-Za-z]{2,}$/
 var html5Email =
   /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
 var rfc5322Email =
-  /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+  /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
 var unicodeEmail = /^[^\s@"]{1,64}@[^\s@]{1,255}$/u
 var idnEmail = unicodeEmail
 var browserEmail =
@@ -3477,7 +3477,7 @@ class Doc {
     const F = Function
     const args = this?.args
     const content = this?.content ?? [``]
-    const lines = [...content.map((x) => `  ${x}`)]
+    const lines = content.map((x) => `  ${x}`)
     return new F(
       ...args,
       lines.join(`
@@ -11213,7 +11213,7 @@ class $ZodRegistry {
   get(schema) {
     const p = schema._zod.parent
     if (p) {
-      const pm = { ...(this.get(p) ?? {}) }
+      const pm = { ...this.get(p) }
       delete pm.id
       const f = { ...pm, ...this._map.get(schema) }
       return Object.keys(f).length ? f : undefined
@@ -12496,7 +12496,7 @@ var createStandardJSONSchemaMethod =
   (schema, io, processors = {}) =>
   (params) => {
     const { libraryOptions, target } = params ?? {}
-    const ctx = initializeContext({ ...(libraryOptions ?? {}), target, io, processors })
+    const ctx = initializeContext({ ...libraryOptions, target, io, processors })
     process2(schema, ctx)
     extractDefs(ctx, schema)
     return finalize(ctx, schema)
@@ -12527,14 +12527,12 @@ var stringProcessor = (schema, ctx, _json, _params) => {
     const regexes = [...patterns]
     if (regexes.length === 1) json.pattern = regexes[0].source
     else if (regexes.length > 1) {
-      json.allOf = [
-        ...regexes.map((regex) => ({
+      json.allOf = regexes.map((regex) => ({
           ...(ctx.target === 'draft-07' || ctx.target === 'draft-04' || ctx.target === 'openapi-3.0'
             ? { type: 'string' }
             : {}),
           pattern: regex.source,
-        })),
-      ]
+        }))
     }
   }
 }

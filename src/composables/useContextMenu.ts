@@ -143,83 +143,13 @@ export function useContextMenu(config: ContextMenuConfig) {
     })
   }
 
-  /**
-   * Right-click handler for counters
-   */
-  const onCounterRightClick = (event: MouseEvent, counterId: number) => {
-    event.preventDefault()
-    event.stopPropagation()
-
-    const counter = cardStore.getCounterById(counterId)
-    if (!counter) return
-
-    radialMenu.open(event.clientX, event.clientY, {
-      type: 'counter',
-      counterId,
-      value: counter.value,
-    })
-  }
-
-  /**
-   * Right-click handler for tokens
-   */
-  const onTokenRightClick = (event: MouseEvent, tokenId: number) => {
-    event.preventDefault()
-    event.stopPropagation()
-
-    const token = cardStore.getTokenById(tokenId)
-    if (!token) return
-
-    radialMenu.open(event.clientX, event.clientY, {
-      type: 'token',
-      tokenId,
-      kind: token.kind,
-    })
-  }
-
-  /**
-   * Right-click handler for dice
-   */
-  const onDieRightClick = (event: MouseEvent, dieId: number) => {
-    event.preventDefault()
-    event.stopPropagation()
-
-    const die = cardStore.getDieById(dieId)
-    if (!die) return
-
-    radialMenu.open(event.clientX, event.clientY, {
-      type: 'die',
-      dieId,
-      value: die.value,
-    })
-  }
-
-  /**
-   * Right-click handler for timers
-   */
-  const onTimerRightClick = (event: MouseEvent, timerId: number) => {
-    event.preventDefault()
-    event.stopPropagation()
-
-    const timer = cardStore.getTimerById(timerId)
-    if (!timer) return
-
-    radialMenu.open(event.clientX, event.clientY, {
-      type: 'timer',
-      timerId,
-      status: timer.status,
-      mode: timer.mode,
-    })
-  }
+  // Note: Entity context menu handlers (counter, token, die, timer) are now
+  // handled by useEntityManager composable for better consolidation.
 
   return {
     onCardRightClick,
     onZoneRightClick,
     onCanvasRightClick,
     onHandCardRightClick,
-    onCounterRightClick,
-    onTokenRightClick,
-    onDieRightClick,
-    onTimerRightClick,
   }
 }
