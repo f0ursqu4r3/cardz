@@ -1299,6 +1299,7 @@ export const useCardStore = defineStore('cards', () => {
     value: state.value as DieValue,
     isRolling: state.isRolling,
     color: state.color,
+    pipColor: state.pipColor,
     lockedBy: state.lockedBy,
   })
 
@@ -1313,6 +1314,7 @@ export const useCardStore = defineStore('cards', () => {
     if (updates.value !== undefined) die.value = updates.value as DieValue
     if (updates.isRolling !== undefined) die.isRolling = updates.isRolling
     if (updates.color !== undefined) die.color = updates.color
+    if (updates.pipColor !== undefined) die.pipColor = updates.pipColor
     if (updates.lockedBy !== undefined) die.lockedBy = updates.lockedBy
   }
 

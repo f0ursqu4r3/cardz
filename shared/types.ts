@@ -124,7 +124,8 @@ export interface DieState {
   z: number // Z-order for stacking
   value: DieValue // Current face value (1-6)
   isRolling: boolean // True while animation is playing
-  color: string // Die color (hex)
+  color: string // Die body color (hex)
+  pipColor: string // Pip (dot) color (hex)
   lockedBy: string | null // Player currently dragging
 }
 
@@ -890,6 +891,7 @@ export interface DieCreate {
   x: number
   y: number
   color?: string
+  pipColor?: string
 }
 
 export interface DieRoll {
@@ -904,6 +906,7 @@ export interface DieUpdate {
     x?: number
     y?: number
     color?: string
+    pipColor?: string
   }
 }
 

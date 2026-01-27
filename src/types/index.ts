@@ -90,6 +90,7 @@ export type Die = {
   value: DieValue
   isRolling: boolean
   color: string
+  pipColor: string
   lockedBy: string | null
 }
 

@@ -15,6 +15,7 @@ export function handleDieCreate(
 
   const die = gameState.createDie(msg.x, msg.y, {
     color: msg.color,
+    pipColor: msg.pipColor,
   })
 
   // Broadcast to all players in the room (exclude sender)

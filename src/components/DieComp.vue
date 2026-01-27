@@ -24,6 +24,7 @@ const emit = defineEmits<{
 
 const showModal = ref(false)
 const formColor = ref('#ef4444')
+const formPipColor = ref('#ffffff')
 
 const DIE_SIZE = 40
 
@@ -71,6 +72,7 @@ const rollDie = () => {
 
 const openModal = () => {
   formColor.value = props.die.color
+  formPipColor.value = props.die.pipColor
   showModal.value = true
 }
 
@@ -81,6 +83,7 @@ const closeModal = () => {
 const saveChanges = () => {
   emit('die:update', props.die.id, {
     color: formColor.value,
+    pipColor: formPipColor.value,
   })
   closeModal()
 }
@@ -106,6 +109,7 @@ defineExpose({ openModal, rollDie })
       left: `${die.x - DIE_SIZE / 2}px`,
       top: `${die.y - DIE_SIZE / 2}px`,
       '--die-color': die.color,
+      '--pip-color': die.pipColor,
       '--lock-color': lockColor,
       zIndex: isDragging || isLockedByOther ? 10000 : die.z,
     }"
@@ -132,11 +136,24 @@ defineExpose({ openModal, rollDie })
   <!-- Die Properties Modal -->
   <ModalBase v-if="showModal" title="Die Properties" @close="closeModal">
     <label class="form-field">
-      <span class="form-label">Color</span>
+      <span class="form-label">Body Color</span>
       <div class="color-row">
         <input v-model="formColor" type="color" class="color-picker" />
         <input
           v-model="formColor"
+          type="text"
+          class="form-input form-input--color"
+          pattern="^#[0-9a-fA-F]{6}$"
+        />
+      </div>
+    </label>
+
+    <label class="form-field">
+      <span class="form-label">Pip Color</span>
+      <div class="color-row">
+        <input v-model="formPipColor" type="color" class="color-picker" />
+        <input
+          v-model="formPipColor"
           type="text"
           class="form-input form-input--color"
           pattern="^#[0-9a-fA-F]{6}$"
@@ -222,7 +239,7 @@ defineExpose({ openModal, rollDie })
   position: absolute;
   width: 8px;
   height: 8px;
-  background: white;
+  background: var(--pip-color, white);
   border-radius: var(--radius-full);
   transform: translate(-50%, -50%);
   box-shadow:

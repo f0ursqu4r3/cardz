@@ -585,7 +585,8 @@ const addDie = () => {
     type: 'die:create',
     x: centerX,
     y: centerY,
-    color: '#ef4444',
+    color: '#f5f5f5',
+    pipColor: '#1a1a1a',
   })
 }
 

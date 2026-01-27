@@ -1051,6 +1051,7 @@ export class GameStateManager {
     y: number,
     options: {
       color?: string
+      pipColor?: string
     } = {},
   ): DieState {
     // Generate random initial value
@@ -1064,6 +1065,7 @@ export class GameStateManager {
       value,
       isRolling: false,
       color: options.color ?? '#f5f5f5', // Default white/light gray
+      pipColor: options.pipColor ?? '#1a1a1a', // Default dark pips
       lockedBy: null,
     }
 
@@ -1087,7 +1089,7 @@ export class GameStateManager {
 
   updateDie(
     dieId: number,
-    updates: Partial<Pick<DieState, 'x' | 'y' | 'color'>>,
+    updates: Partial<Pick<DieState, 'x' | 'y' | 'color' | 'pipColor'>>,
   ): DieState | null {
     const die = this.getDie(dieId)
     if (!die) return null
@@ -1100,6 +1102,7 @@ export class GameStateManager {
     if (updates.x !== undefined) die.x = updates.x
     if (updates.y !== undefined) die.y = updates.y
     if (updates.color !== undefined) die.color = updates.color
+    if (updates.pipColor !== undefined) die.pipColor = updates.pipColor
 
     this.incrementVersion()
     return die

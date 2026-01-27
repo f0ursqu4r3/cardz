@@ -455,6 +455,7 @@ export const DieCreateSchema = z.object({
   x: z.number(),
   y: z.number(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  pipColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
 })
 
 export const DieRollSchema = z.object({
@@ -469,6 +470,7 @@ export const DieUpdateSchema = z.object({
     x: z.number().optional(),
     y: z.number().optional(),
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    pipColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   }),
 })
 
