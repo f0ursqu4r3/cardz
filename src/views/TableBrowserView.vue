@@ -3,12 +3,13 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Users, RefreshCw, Globe, Search, Clock } from 'lucide-vue-next'
 import type { ServerMessage, PublicRoomInfo } from '../../shared/types'
+import { usePlayerProfile } from '@/composables/usePlayerProfile'
 
 const router = useRouter()
+const { name: playerName } = usePlayerProfile()
 const tables = ref<PublicRoomInfo[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
-const playerName = ref('')
 const searchQuery = ref('')
 const sortBy = ref<'players' | 'newest' | 'oldest'>('players')
 
@@ -116,11 +117,12 @@ const fetchTables = () => {
 }
 
 const joinTable = (code: string) => {
-  const name = playerName.value.trim() || 'Player'
+  if (!playerName.value.trim()) {
+    playerName.value = 'Player'
+  }
   router.push({
     name: 'table',
     params: { code },
-    query: { name },
   })
 }
 

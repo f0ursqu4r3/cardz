@@ -190,6 +190,12 @@ export const PlayerDemoteSchema = z.object({
   targetPlayerId: z.string().min(1),
 })
 
+export const PlayerUpdateSchema = z.object({
+  type: z.literal('player:update'),
+  name: z.string().max(20).optional(),
+  color: z.string().optional(),
+})
+
 // ============================================================================
 // Card Message Schemas (Client → Server)
 // ============================================================================
@@ -693,6 +699,7 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   PlayerBanSchema,
   PlayerPromoteSchema,
   PlayerDemoteSchema,
+  PlayerUpdateSchema,
   CardMoveIntentSchema,
   CardLockSchema,
   CardUnlockSchema,

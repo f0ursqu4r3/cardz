@@ -3,9 +3,11 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { PlayCircle, Users, Sparkles, Globe } from 'lucide-vue-next'
 import { useToast } from '@/composables/useToast'
+import { usePlayerProfile } from '@/composables/usePlayerProfile'
 
 const router = useRouter()
 const toast = useToast()
+const { name: playerName, preferredColor, PLAYER_COLORS } = usePlayerProfile()
 
 // Check for kicked/banned message on mount
 onMounted(() => {
@@ -15,8 +17,8 @@ onMounted(() => {
     sessionStorage.removeItem('cardz_kicked_reason')
   }
 })
+
 const joinCode = ref('')
-const playerName = ref('')
 const tableName = ref('')
 const isPublic = ref(false)
 
@@ -24,7 +26,7 @@ const createTable = () => {
   if (!playerName.value.trim()) {
     playerName.value = 'Player'
   }
-  const query: Record<string, string> = { name: playerName.value }
+  const query: Record<string, string> = {}
   if (isPublic.value) {
     query.public = 'true'
   }
@@ -33,7 +35,7 @@ const createTable = () => {
   }
   router.push({
     name: 'table-new',
-    query,
+    query: Object.keys(query).length > 0 ? query : undefined,
   })
 }
 
@@ -45,7 +47,6 @@ const joinTable = () => {
   router.push({
     name: 'table',
     params: { code: joinCode.value.toUpperCase() },
-    query: { name: playerName.value },
   })
 }
 
@@ -81,6 +82,21 @@ const browseTables = () => {
               placeholder="Enter your name"
               maxlength="20"
             />
+          </div>
+
+          <div class="landing__field">
+            <label>Your Color</label>
+            <div class="landing__colors">
+              <button
+                v-for="color in PLAYER_COLORS"
+                :key="color"
+                type="button"
+                class="landing__color-swatch"
+                :class="{ 'landing__color-swatch--active': preferredColor === color }"
+                :style="{ backgroundColor: color }"
+                @click="preferredColor = color"
+              />
+            </div>
           </div>
 
           <div class="landing__field">
@@ -265,6 +281,31 @@ const browseTables = () => {
 .landing__optional {
   color: #666;
   font-weight: 400;
+}
+
+.landing__colors {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.landing__color-swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.landing__color-swatch:hover {
+  transform: scale(1.1);
+}
+
+.landing__color-swatch--active {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
 }
 
 .landing__checkbox {

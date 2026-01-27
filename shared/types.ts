@@ -175,6 +175,7 @@ export interface GameState {
 export interface RoomCreate {
   type: 'room:create'
   playerName: string
+  preferredColor?: string // Player's preferred color
   tableName?: string
   isPublic?: boolean
   sessionId?: string // For reconnection after refresh
@@ -185,6 +186,7 @@ export interface RoomJoin {
   type: 'room:join'
   roomCode: string
   playerName: string
+  preferredColor?: string // Player's preferred color
   sessionId?: string // For reconnection after refresh
   deviceId?: string // Persistent device identifier
   asSpectator?: boolean // Join as view-only spectator
@@ -216,6 +218,12 @@ export interface PlayerPromote {
 export interface PlayerDemote {
   type: 'player:demote'
   targetPlayerId: string
+}
+
+export interface PlayerUpdate {
+  type: 'player:update'
+  name?: string
+  color?: string
 }
 
 // ============================================================================
@@ -275,6 +283,13 @@ export interface PlayerRoleChanged {
   playerName: string
   newRole: PlayerRole
   changedBy: string // Name of the player who changed the role
+}
+
+export interface PlayerUpdated {
+  type: 'room:player_updated'
+  playerId: string
+  name?: string
+  color?: string
 }
 
 export interface RoomError {
@@ -1375,6 +1390,7 @@ type ClientMessageBase =
   | PlayerBan
   | PlayerPromote
   | PlayerDemote
+  | PlayerUpdate
   | CardMoveIntent
   | CardLock
   | CardUnlock
@@ -1450,6 +1466,7 @@ type ServerMessageBase =
   | PlayerKicked
   | PlayerBanned
   | PlayerRoleChanged
+  | PlayerUpdated
   | RoomError
   | RoomListResponse
   | CardMoved

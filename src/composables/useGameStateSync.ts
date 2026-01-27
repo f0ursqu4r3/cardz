@@ -1,4 +1,3 @@
-import type { Ref } from 'vue'
 import type { Router } from 'vue-router'
 import type { useCardStore } from '@/stores/cards'
 import type { useWebSocket } from './useWebSocket'
@@ -18,8 +17,6 @@ export interface GameStateSyncConfig {
   remoteThrow: ReturnType<typeof useRemoteThrow>
   /** Vue router instance */
   router: Router
-  /** Player name ref (for navigation) */
-  playerName: Ref<string>
 }
 
 /**
@@ -27,7 +24,7 @@ export interface GameStateSyncConfig {
  * Handles all server messages and updates the local card store accordingly.
  */
 export function useGameStateSync(config: GameStateSyncConfig) {
-  const { cardStore, ws, remoteThrow, router, playerName } = config
+  const { cardStore, ws, remoteThrow, router } = config
 
   // Set up the message handler
   ws.onMessage((message: ServerMessage) => {
@@ -40,7 +37,6 @@ export function useGameStateSync(config: GameStateSyncConfig) {
         router.replace({
           name: 'table',
           params: { code: message.roomCode },
-          query: { name: playerName.value },
         })
         break
 

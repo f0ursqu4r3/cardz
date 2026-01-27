@@ -31,6 +31,7 @@ import { useContextMenu } from '@/composables/useContextMenu'
 import { useRadialMenuActions } from '@/composables/useRadialMenuActions'
 import { useGameStateSync } from '@/composables/useGameStateSync'
 import { useToast } from '@/composables/useToast'
+import { usePlayerProfile } from '@/composables/usePlayerProfile'
 import {
   SquarePlus,
   Copy,
@@ -58,9 +59,12 @@ const route = useRoute()
 const router = useRouter()
 const cardStore = useCardStore()
 
+// Player profile from localStorage
+const profile = usePlayerProfile()
+const playerName = computed(() => profile.name.value || 'Player')
+
 // Room info from route
 const routeRoomCode = computed(() => (route.params.code as string)?.toUpperCase() || null)
-const playerName = computed(() => (route.query.name as string) || 'Player')
 const tableName = computed(() => (route.query.tableName as string) || '')
 const isPublicTable = computed(() => route.query.public === 'true')
 const isNewTable = computed(() => route.name === 'table-new')
@@ -81,6 +85,41 @@ const playerColor = computed(() => {
   return player?.color || '#ef4444' // Default to red
 })
 
+// Notify if assigned color differs from preferred (one-time check after joining)
+const colorMismatchChecked = ref(false)
+watch(
+  () => ws.playerId.value && ws.players.value.length > 0,
+  (ready) => {
+    if (ready && !colorMismatchChecked.value) {
+      colorMismatchChecked.value = true
+      const player = ws.players.value.find((p) => p.id === ws.playerId.value)
+      if (player && profile.preferredColor.value && player.color !== profile.preferredColor.value) {
+        toast.info('Your preferred color was taken')
+      }
+    }
+  },
+  { immediate: true },
+)
+
+// Sync player profile to localStorage when it changes (from panel edits)
+watch(
+  () => {
+    const player = ws.players.value.find((p) => p.id === ws.playerId.value)
+    return player ? { name: player.name, color: player.color } : null
+  },
+  (playerInfo) => {
+    if (playerInfo && colorMismatchChecked.value) {
+      // Only sync after initial join (when colorMismatchChecked is true)
+      if (playerInfo.name && playerInfo.name !== profile.name.value) {
+        profile.name.value = playerInfo.name
+      }
+      if (playerInfo.color && playerInfo.color !== profile.preferredColor.value) {
+        profile.preferredColor.value = playerInfo.color
+      }
+    }
+  },
+)
+
 // Check if current player is the table creator
 const isCreator = computed(() => {
   const player = ws.players.value.find((p) => p.id === ws.playerId.value)
@@ -91,6 +130,15 @@ const isCreator = computed(() => {
 const isModerator = computed(() => {
   const player = ws.players.value.find((p) => p.id === ws.playerId.value)
   return player?.role === 'moderator'
+})
+
+// Colors used by other players (for color selection in edit mode)
+const usedColors = computed(() => {
+  return new Set(
+    ws.players.value
+      .filter((p) => p.id !== ws.playerId.value)
+      .map((p) => p.color)
+  )
 })
 
 // Custom cursor based on player color (sets up global style via side effect)
@@ -267,7 +315,6 @@ useGameStateSync({
   ws,
   remoteThrow,
   router,
-  playerName,
 })
 
 // Callback to broadcast cursor position during entity drags
@@ -885,9 +932,10 @@ onMounted(() => {
           ws.createRoom(playerName.value, {
             tableName: tableName.value || undefined,
             isPublic: isPublicTable.value || undefined,
+            preferredColor: profile.preferredColor.value,
           })
         } else if (routeRoomCode.value) {
-          ws.joinRoom(routeRoomCode.value, playerName.value)
+          ws.joinRoom(routeRoomCode.value, playerName.value, profile.preferredColor.value)
         }
         unwatch()
       }
@@ -967,11 +1015,13 @@ onBeforeUnmount(() => {
             :own-hand-count="cardStore.handCount"
             :is-creator="isCreator"
             :is-moderator="isModerator"
+            :used-colors="usedColors"
             @close="showPlayers = false"
             @kick="ws.kickPlayer"
             @ban="ws.banPlayer"
             @promote="ws.promotePlayer"
             @demote="ws.demotePlayer"
+            @update-player="ws.updatePlayer"
           />
         </div>
         <button

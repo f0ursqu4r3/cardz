@@ -6,7 +6,9 @@ import type {
   PlayerBan,
   PlayerPromote,
   PlayerDemote,
+  PlayerUpdate,
 } from '../../shared/types'
+import { PLAYER_COLORS } from '../../shared/types'
 import type { RoomManager } from '../room'
 import type { ClientData, GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
@@ -55,6 +57,7 @@ export function handleRoomCreate(
     tableName,
     msg.isPublic,
     msg.deviceId, // for kick/ban tracking
+    msg.preferredColor,
   )
   clientData.roomCode = room.code
   clientData.playerId = playerId // Store stable player ID
@@ -150,6 +153,7 @@ export function handleRoomJoin(
     verifiedPlayerId, // stable player ID from verified token
     msg.asSpectator, // join as spectator
     msg.deviceId, // for kick/ban tracking
+    msg.preferredColor,
   )
 
   if ('error' in result) {
@@ -675,4 +679,102 @@ export function handlePlayerDemote(
   )
 
   console.log(`[room:demote] ${clientData.name} demoted ${demotedPlayer.name} from moderator in ${clientData.roomCode}`)
+}
+
+/**
+ * Handle player updating their own name or color
+ */
+export function handlePlayerUpdate(
+  ws: GenericWebSocket,
+  msg: PlayerUpdate,
+  roomManager: RoomManager,
+): void {
+  const clientData = getClientData(ws)
+
+  if (!clientData.roomCode || !clientData.playerId) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:update',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+    })
+    return
+  }
+
+  const room = roomManager.getRoom(clientData.roomCode)
+  if (!room) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:update',
+      code: 'NOT_FOUND',
+      message: 'Room not found',
+    })
+    return
+  }
+
+  const player = room.players.get(clientData.playerId)
+  if (!player) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'player:update',
+      code: 'NOT_FOUND',
+      message: 'Player not found',
+    })
+    return
+  }
+
+  const updates: { name?: string; color?: string } = {}
+
+  // Handle name change
+  if (msg.name !== undefined) {
+    const sanitizedName = sanitizePlayerName(msg.name) || 'Player'
+    if (sanitizedName !== player.name) {
+      player.name = sanitizedName
+      clientData.name = sanitizedName
+      updates.name = sanitizedName
+    }
+  }
+
+  // Handle color change
+  if (msg.color !== undefined) {
+    // Validate color is in PLAYER_COLORS
+    if ((PLAYER_COLORS as readonly string[]).includes(msg.color)) {
+      // Check if color is available (not used by another player)
+      const usedColors = new Set(
+        [...room.players.values()]
+          .filter((p) => p.id !== clientData.playerId)
+          .map((p) => p.color),
+      )
+      if (!usedColors.has(msg.color)) {
+        player.color = msg.color
+        updates.color = msg.color
+      } else {
+        send(ws, {
+          type: 'error',
+          originalAction: 'player:update',
+          code: 'COLOR_TAKEN',
+          message: 'That color is already in use',
+        })
+        return
+      }
+    } else {
+      send(ws, {
+        type: 'error',
+        originalAction: 'player:update',
+        code: 'INVALID_COLOR',
+        message: 'Invalid color',
+      })
+      return
+    }
+  }
+
+  // Only broadcast if something changed
+  if (Object.keys(updates).length > 0) {
+    broadcastToRoom(roomManager.getClients(), clientData.roomCode, {
+      type: 'room:player_updated',
+      playerId: clientData.playerId,
+      ...updates,
+    })
+    console.log(`[player:update] ${clientData.playerId} updated:`, updates)
+  }
 }

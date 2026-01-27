@@ -168,6 +168,20 @@ export function handleRoomMessage(
       return true
     }
 
+    case 'room:player_updated': {
+      // Update the player's name and/or color
+      players.value = players.value.map((p) => {
+        if (p.id !== message.playerId) return p
+        return {
+          ...p,
+          ...(message.name !== undefined && { name: message.name }),
+          ...(message.color !== undefined && { color: message.color }),
+        }
+      })
+      console.log('[ws] player updated:', message.playerId, message.name, message.color)
+      return true
+    }
+
     case 'room:error':
       error.value = message.message
       console.error('[ws] room error:', message.code, message.message)

@@ -292,6 +292,7 @@ export class RoomManager {
     tableName?: string,
     isPublic?: boolean,
     deviceId?: string,
+    preferredColor?: string,
   ): { room: Room; playerId: string } {
     // Generate unique room code
     let code: string
@@ -302,11 +303,17 @@ export class RoomManager {
     // Generate a stable player ID (separate from socket ID)
     const playerId = nanoid()
 
+    // Use preferred color if valid, otherwise default to first color
+    const color =
+      preferredColor && (PLAYER_COLORS as readonly string[]).includes(preferredColor)
+        ? preferredColor
+        : PLAYER_COLORS[0]
+
     const player: Player = {
       id: playerId,
       name: playerName,
       connected: true,
-      color: PLAYER_COLORS[0],
+      color,
       sessionId,
       role: 'creator',
     }
@@ -405,6 +412,7 @@ export class RoomManager {
     stablePlayerId?: string,
     asSpectator?: boolean,
     deviceId?: string,
+    preferredColor?: string,
   ):
     | { room: Room; player: Player; isReconnect: boolean; loaded: boolean; playerId: string }
     | { error: 'NOT_FOUND' | 'FULL' | 'BANNED' } {
@@ -412,7 +420,7 @@ export class RoomManager {
     const existingRoom = this.rooms.get(roomCode)
     if (existingRoom) {
       // Use normal join flow
-      const result = this.joinRoom(roomCode, socketId, playerName, sessionId, stablePlayerId, asSpectator, deviceId)
+      const result = this.joinRoom(roomCode, socketId, playerName, sessionId, stablePlayerId, asSpectator, deviceId, preferredColor)
       if ('error' in result) return result
       return { ...result, loaded: false }
     }
@@ -448,12 +456,18 @@ export class RoomManager {
     const isLegacyTable = !persisted.metadata.creatorPlayerId
     const creatorPlayerId = isLegacyTable && !asSpectator ? playerId : persisted.metadata.creatorPlayerId
 
+    // Use preferred color if valid, otherwise default to first color
+    const color =
+      preferredColor && (PLAYER_COLORS as readonly string[]).includes(preferredColor)
+        ? preferredColor
+        : PLAYER_COLORS[0]
+
     // Recreate the room from persisted data
     const player: Player = {
       id: playerId,
       name: playerName,
       connected: true,
-      color: PLAYER_COLORS[0],
+      color,
       sessionId,
       role,
     }
@@ -548,6 +562,7 @@ export class RoomManager {
     stablePlayerId?: string,
     asSpectator?: boolean,
     deviceId?: string,
+    preferredColor?: string,
   ): { room: Room; player: Player; isReconnect: boolean; playerId: string } | { error: 'NOT_FOUND' | 'FULL' | 'BANNED' } {
     const room = this.rooms.get(roomCode)
     if (!room) {
@@ -611,15 +626,24 @@ export class RoomManager {
       role = 'member'
     }
 
-    // Assign next available color
+    // Assign color - use preferred if available and not taken, otherwise next available
     const usedColors = new Set([...room.players.values()].map((p) => p.color))
-    const availableColor = PLAYER_COLORS.find((c) => !usedColors.has(c)) ?? PLAYER_COLORS[0]
+    let assignedColor: string
+    if (
+      preferredColor &&
+      (PLAYER_COLORS as readonly string[]).includes(preferredColor) &&
+      !usedColors.has(preferredColor)
+    ) {
+      assignedColor = preferredColor
+    } else {
+      assignedColor = PLAYER_COLORS.find((c) => !usedColors.has(c)) ?? PLAYER_COLORS[0]
+    }
 
     const player: Player = {
       id: newPlayerId,
       name: playerName,
       connected: true,
-      color: availableColor,
+      color: assignedColor,
       sessionId,
       role,
     }

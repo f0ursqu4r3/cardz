@@ -65,8 +65,8 @@ export interface UseWebSocketReturn {
   // Actions
   connect: () => void
   disconnect: () => void
-  createRoom: (playerName: string, options?: { tableName?: string; isPublic?: boolean }) => void
-  joinRoom: (roomCode: string, playerName: string) => void
+  createRoom: (playerName: string, options?: { tableName?: string; isPublic?: boolean; preferredColor?: string }) => void
+  joinRoom: (roomCode: string, playerName: string, preferredColor?: string) => void
   leaveRoom: () => void
   send: (message: ClientMessage) => void
 
@@ -81,6 +81,9 @@ export interface UseWebSocketReturn {
   banPlayer: (targetPlayerId: string) => void
   promotePlayer: (targetPlayerId: string) => void
   demotePlayer: (targetPlayerId: string) => void
+
+  // Player profile
+  updatePlayer: (updates: { name?: string; color?: string }) => void
 
   // Chat
   sendChat: (message: string) => void
@@ -310,25 +313,27 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
   }
 
   // Room actions
-  const createRoom = (playerName: string, options?: { tableName?: string; isPublic?: boolean }) => {
+  const createRoom = (playerName: string, options?: { tableName?: string; isPublic?: boolean; preferredColor?: string }) => {
     // Don't send session token when creating a new room - server will generate one
     console.log('[ws] creating room for:', playerName, options?.isPublic ? '(public)' : '(private)')
     send({
       type: 'room:create',
       playerName,
+      preferredColor: options?.preferredColor,
       tableName: options?.tableName,
       isPublic: options?.isPublic,
       deviceId: getOrCreateDeviceId(),
     })
   }
 
-  const joinRoom = (code: string, playerName: string) => {
+  const joinRoom = (code: string, playerName: string, preferredColor?: string) => {
     const sessionId = getSessionToken() // Use stored HMAC token if available
     console.log('[ws] joining room:', code, sessionId ? '(with session)' : '(new session)')
     send({
       type: 'room:join',
       roomCode: code.toUpperCase(),
       playerName,
+      preferredColor,
       sessionId,
       deviceId: getOrCreateDeviceId(),
     })
@@ -395,6 +400,11 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
 
   const demotePlayer = (targetPlayerId: string) => {
     send({ type: 'player:demote', targetPlayerId })
+  }
+
+  // Player profile update
+  const updatePlayer = (updates: { name?: string; color?: string }) => {
+    send({ type: 'player:update', ...updates })
   }
 
   // Message handling
@@ -518,6 +528,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     banPlayer,
     promotePlayer,
     demotePlayer,
+    updatePlayer,
     sendChat,
     sendTyping,
     onMessage,

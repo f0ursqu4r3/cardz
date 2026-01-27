@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { Users, Hand, LogOut, Ban, Crown, Eye, Shield, ChevronUp, ChevronDown } from 'lucide-vue-next'
+import { computed, ref, nextTick } from 'vue'
+import { Users, Hand, LogOut, Ban, Crown, Eye, Shield, ChevronUp, ChevronDown, Pencil, Check, X } from 'lucide-vue-next'
 import type { Player } from '../../../shared/types'
+import { PLAYER_COLORS } from '../../../shared/types'
 
 const props = defineProps<{
   players: Player[]
@@ -10,6 +11,7 @@ const props = defineProps<{
   ownHandCount: number
   isCreator: boolean
   isModerator: boolean
+  usedColors: Set<string>
 }>()
 
 const emit = defineEmits<{
@@ -18,10 +20,60 @@ const emit = defineEmits<{
   ban: [playerId: string]
   promote: [playerId: string]
   demote: [playerId: string]
+  updatePlayer: [updates: { name?: string; color?: string }]
 }>()
 
 // Track which player we're confirming ban for
 const confirmBanPlayerId = ref<string | null>(null)
+
+// Edit mode for current player
+const isEditing = ref(false)
+const editName = ref('')
+const editColor = ref('')
+const nameInputRef = ref<HTMLInputElement | null>(null)
+
+const currentPlayer = computed(() =>
+  props.players.find((p) => p.id === props.currentPlayerId)
+)
+
+const startEditing = () => {
+  if (!currentPlayer.value) return
+  editName.value = currentPlayer.value.name
+  editColor.value = currentPlayer.value.color
+  isEditing.value = true
+  nextTick(() => {
+    nameInputRef.value?.focus()
+    nameInputRef.value?.select()
+  })
+}
+
+const cancelEditing = () => {
+  isEditing.value = false
+}
+
+const saveEditing = () => {
+  if (!currentPlayer.value) return
+  const updates: { name?: string; color?: string } = {}
+  if (editName.value.trim() && editName.value.trim() !== currentPlayer.value.name) {
+    updates.name = editName.value.trim()
+  }
+  if (editColor.value !== currentPlayer.value.color) {
+    updates.color = editColor.value
+  }
+  if (Object.keys(updates).length > 0) {
+    emit('updatePlayer', updates)
+  }
+  isEditing.value = false
+}
+
+const selectColor = (color: string) => {
+  editColor.value = color
+}
+
+const isColorAvailable = (color: string): boolean => {
+  if (color === currentPlayer.value?.color) return true
+  return !props.usedColors.has(color)
+}
 
 // Sort players: current player first, then others by name
 const sortedPlayers = computed(() => {
@@ -122,68 +174,120 @@ const handleDemote = (playerId: string) => {
           'players-panel__player--disconnected': !player.connected,
         }"
       >
-        <span class="players-panel__color" :style="{ backgroundColor: player.color }"></span>
-        <span class="players-panel__name">
-          {{ player.name }}
-          <span v-if="player.id === currentPlayerId" class="players-panel__you">(you)</span>
-        </span>
+        <!-- Edit mode for current player -->
+        <template v-if="player.id === currentPlayerId && isEditing">
+          <div class="players-panel__edit">
+            <div class="players-panel__edit-row">
+              <input
+                ref="nameInputRef"
+                v-model="editName"
+                type="text"
+                class="players-panel__edit-input"
+                maxlength="20"
+                placeholder="Your name"
+                @keyup.enter="saveEditing"
+                @keyup.escape="cancelEditing"
+              />
+              <button class="players-panel__edit-btn players-panel__edit-btn--save" title="Save" @click="saveEditing">
+                <Check :size="14" />
+              </button>
+              <button class="players-panel__edit-btn players-panel__edit-btn--cancel" title="Cancel" @click="cancelEditing">
+                <X :size="14" />
+              </button>
+            </div>
+            <div class="players-panel__edit-colors">
+              <button
+                v-for="color in PLAYER_COLORS"
+                :key="color"
+                type="button"
+                class="players-panel__edit-color"
+                :class="{
+                  'players-panel__edit-color--active': editColor === color,
+                  'players-panel__edit-color--disabled': !isColorAvailable(color),
+                }"
+                :style="{ backgroundColor: color }"
+                :disabled="!isColorAvailable(color)"
+                @click="selectColor(color)"
+              />
+            </div>
+          </div>
+        </template>
 
-        <!-- Role badges -->
-        <span v-if="player.role === 'creator'" class="players-panel__badge players-panel__badge--creator" title="Table Creator">
-          <Crown :size="12" />
-        </span>
-        <span v-else-if="player.role === 'moderator'" class="players-panel__badge players-panel__badge--moderator" title="Moderator">
-          <Shield :size="12" />
-        </span>
-        <span v-else-if="player.role === 'spectator'" class="players-panel__badge players-panel__badge--spectator" title="Spectator">
-          <Eye :size="12" />
-        </span>
+        <!-- Normal view -->
+        <template v-else>
+          <span class="players-panel__color" :style="{ backgroundColor: player.color }"></span>
+          <span class="players-panel__name">
+            {{ player.name }}
+            <span v-if="player.id === currentPlayerId" class="players-panel__you">(you)</span>
+          </span>
 
-        <!-- Hand count (not for spectators) -->
-        <span v-if="player.role !== 'spectator'" class="players-panel__hand" :title="`${getHandCount(player)} cards in hand`">
-          <Hand :size="14" />
-          <span>{{ getHandCount(player) }}</span>
-        </span>
+          <!-- Role badges -->
+          <span v-if="player.role === 'creator'" class="players-panel__badge players-panel__badge--creator" title="Table Creator">
+            <Crown :size="12" />
+          </span>
+          <span v-else-if="player.role === 'moderator'" class="players-panel__badge players-panel__badge--moderator" title="Moderator">
+            <Shield :size="12" />
+          </span>
+          <span v-else-if="player.role === 'spectator'" class="players-panel__badge players-panel__badge--spectator" title="Spectator">
+            <Eye :size="12" />
+          </span>
 
-        <!-- Moderation actions -->
-        <div v-if="canModerate(player)" class="players-panel__actions">
-          <!-- Promote to moderator -->
+          <!-- Hand count (not for spectators) -->
+          <span v-if="player.role !== 'spectator'" class="players-panel__hand" :title="`${getHandCount(player)} cards in hand`">
+            <Hand :size="14" />
+            <span>{{ getHandCount(player) }}</span>
+          </span>
+
+          <!-- Edit button for current player -->
           <button
-            v-if="canPromote(player)"
-            class="players-panel__action players-panel__action--promote"
-            title="Promote to moderator"
-            @click.stop="handlePromote(player.id)"
+            v-if="player.id === currentPlayerId"
+            class="players-panel__action players-panel__action--edit"
+            title="Edit profile"
+            @click.stop="startEditing"
           >
-            <ChevronUp :size="14" />
+            <Pencil :size="14" />
           </button>
-          <!-- Demote from moderator -->
-          <button
-            v-if="canDemote(player)"
-            class="players-panel__action players-panel__action--demote"
-            title="Demote from moderator"
-            @click.stop="handleDemote(player.id)"
-          >
-            <ChevronDown :size="14" />
-          </button>
-          <!-- Kick player -->
-          <button
-            v-if="canKick(player)"
-            class="players-panel__action players-panel__action--kick"
-            title="Kick player"
-            @click.stop="handleKick(player.id)"
-          >
-            <LogOut :size="14" />
-          </button>
-          <!-- Ban player (creator only) -->
-          <button
-            v-if="canBan(player)"
-            class="players-panel__action players-panel__action--ban"
-            title="Ban player"
-            @click.stop="handleBanClick(player.id)"
-          >
-            <Ban :size="14" />
-          </button>
-        </div>
+
+          <!-- Moderation actions -->
+          <div v-if="canModerate(player)" class="players-panel__actions">
+            <!-- Promote to moderator -->
+            <button
+              v-if="canPromote(player)"
+              class="players-panel__action players-panel__action--promote"
+              title="Promote to moderator"
+              @click.stop="handlePromote(player.id)"
+            >
+              <ChevronUp :size="14" />
+            </button>
+            <!-- Demote from moderator -->
+            <button
+              v-if="canDemote(player)"
+              class="players-panel__action players-panel__action--demote"
+              title="Demote from moderator"
+              @click.stop="handleDemote(player.id)"
+            >
+              <ChevronDown :size="14" />
+            </button>
+            <!-- Kick player -->
+            <button
+              v-if="canKick(player)"
+              class="players-panel__action players-panel__action--kick"
+              title="Kick player"
+              @click.stop="handleKick(player.id)"
+            >
+              <LogOut :size="14" />
+            </button>
+            <!-- Ban player (creator only) -->
+            <button
+              v-if="canBan(player)"
+              class="players-panel__action players-panel__action--ban"
+              title="Ban player"
+              @click.stop="handleBanClick(player.id)"
+            >
+              <Ban :size="14" />
+            </button>
+          </div>
+        </template>
       </li>
     </ul>
 
@@ -408,5 +512,104 @@ const handleDemote = (playerId: string) => {
 
 .players-panel__confirm-btn--confirm:hover {
   background: #dc2626;
+}
+
+/* Edit mode styles */
+.players-panel__edit {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.players-panel__edit-row {
+  display: flex;
+  gap: 0.375rem;
+  align-items: center;
+}
+
+.players-panel__edit-input {
+  flex: 1;
+  padding: 0.375rem 0.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.8125rem;
+  outline: none;
+}
+
+.players-panel__edit-input:focus {
+  border-color: #e94560;
+}
+
+.players-panel__edit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.players-panel__edit-btn--save {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.players-panel__edit-btn--save:hover {
+  background: rgba(34, 197, 94, 0.3);
+}
+
+.players-panel__edit-btn--cancel {
+  background: rgba(255, 255, 255, 0.1);
+  color: #a0a0b0;
+}
+
+.players-panel__edit-btn--cancel:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.players-panel__edit-colors {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.players-panel__edit-color {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 0;
+}
+
+.players-panel__edit-color:hover:not(:disabled) {
+  transform: scale(1.15);
+}
+
+.players-panel__edit-color--active {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+.players-panel__edit-color--disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.players-panel__action--edit {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.players-panel__player--current:hover .players-panel__action--edit {
+  opacity: 1;
 }
 </style>
