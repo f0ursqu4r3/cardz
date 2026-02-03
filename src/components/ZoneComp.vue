@@ -90,7 +90,6 @@ const toggleFaceUp = () => {
 
 const toggleLocked = () => {
   const newLocked = !props.zone.locked
-  cardStore.updateZone(props.zone.id, { locked: newLocked })
   emit('zone:update', props.zone.id, { locked: newLocked })
 }
 
@@ -102,7 +101,6 @@ const setVisibility = (visibility: Zone['visibility']) => {
   } else if (visibility !== 'owner') {
     updates.ownerId = null
   }
-  cardStore.updateZone(props.zone.id, updates)
   emit('zone:update', props.zone.id, updates)
 }
 
@@ -151,7 +149,6 @@ const onRandomRotationChange = (event: Event) => {
 
 const deleteZone = () => {
   closeModal()
-  cardStore.deleteZone(props.zone.id)
   emit('zone:delete', props.zone.id)
 }
 

@@ -78,6 +78,24 @@ export function useViewport(canvasRef: Ref<HTMLElement | null>) {
     zoom.value = newZoom
   }
 
+  // Zoom to a specific scale centered on a point
+  const zoomTo = (screenX: number, screenY: number, nextZoom: number) => {
+    const rect = canvasRef.value?.getBoundingClientRect()
+    if (!rect) return
+
+    const relX = screenX - rect.left
+    const relY = screenY - rect.top
+
+    const worldX = (relX - panX.value) / zoom.value
+    const worldY = (relY - panY.value) / zoom.value
+
+    const clampedZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom))
+
+    panX.value = relX - worldX * clampedZoom
+    panY.value = relY - worldY * clampedZoom
+    zoom.value = clampedZoom
+  }
+
   // Handle wheel events (pan by default, zoom with modifiers)
   const onWheel = (event: WheelEvent) => {
     event.preventDefault()
@@ -218,6 +236,7 @@ export function useViewport(canvasRef: Ref<HTMLElement | null>) {
     zoomAt,
     zoomIn,
     zoomOut,
+    zoomTo,
     fitAll,
     onWheel,
     startPan,

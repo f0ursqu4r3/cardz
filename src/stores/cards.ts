@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef, watch, type Ref } from 'vue'
+import { computed, ref, shallowRef, type Ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { CardData, Stack, Zone, Counter, Token, Die, DieValue, Timer, TimerMode, TimerStatus } from '@/types'
 import {
@@ -46,16 +46,6 @@ export const useCardStore = defineStore('cards', () => {
     return map
   }
 
-  const watchIdMap = <T extends { id: number }>(source: Ref<T[]>, target: Ref<Map<number, T>>) => {
-    watch(
-      () => [source.value, source.value.length],
-      () => {
-        target.value = rebuildIdMap(source.value)
-      },
-      { immediate: true, flush: 'sync' },
-    )
-  }
-
   // O(1) lookup Maps - rebuild only on structural array changes
   const cardById = shallowRef(new Map<number, CardData>())
   const stackById = shallowRef(new Map<number, Stack>())
@@ -64,14 +54,26 @@ export const useCardStore = defineStore('cards', () => {
   const tokenById = shallowRef(new Map<number, Token>())
   const dieById = shallowRef(new Map<number, Die>())
   const timerById = shallowRef(new Map<number, Timer>())
-
-  watchIdMap(cards, cardById)
-  watchIdMap(stacks, stackById)
-  watchIdMap(zones, zoneById)
-  watchIdMap(counters, counterById)
-  watchIdMap(tokens, tokenById)
-  watchIdMap(dice, dieById)
-  watchIdMap(timers, timerById)
+  const setIdMap = <T extends { id: number }>(target: Ref<Map<number, T>>, items: T[]) => {
+    target.value = rebuildIdMap(items)
+  }
+  const registerItem = <T extends { id: number }>(target: Ref<Map<number, T>>, item: T) => {
+    target.value.set(item.id, item)
+  }
+  const unregisterItem = <T extends { id: number }>(target: Ref<Map<number, T>>, id: number) => {
+    target.value.delete(id)
+  }
+  const removeItemById = <T extends { id: number }>(
+    list: T[],
+    target: Ref<Map<number, T>>,
+    id: number,
+  ) => {
+    const index = list.findIndex((item) => item.id === id)
+    if (index !== -1) {
+      list.splice(index, 1)
+    }
+    unregisterItem(target, id)
+  }
 
   // Helper functions for O(1) lookups
   const getCardById = (id: number): CardData | undefined => cardById.value.get(id)
@@ -121,6 +123,7 @@ export const useCardStore = defineStore('cards', () => {
       inHand: false,
       lockedBy: null,
     }))
+    setIdMap(cardById, cards.value)
   }
 
   // Stack position management
@@ -351,7 +354,13 @@ export const useCardStore = defineStore('cards', () => {
   }
 
   const updateAllStacks = () => {
-    stacks.value = stacks.value.filter((stack) => stack.cardIds.length > 0)
+    for (let i = stacks.value.length - 1; i >= 0; i--) {
+      const stack = stacks.value[i]
+      if (stack.cardIds.length === 0) {
+        stacks.value.splice(i, 1)
+        unregisterItem(stackById, stack.id)
+      }
+    }
     // Update zone stackId references for empty stacks
     zones.value.forEach((zone) => {
       if (zone.stackId !== null && !stackById.value.get(zone.stackId!)) {
@@ -391,7 +400,7 @@ export const useCardStore = defineStore('cards', () => {
         const zone = zoneById.value.get(stack.zoneId!)
         if (zone) zone.stackId = null
       }
-      stacks.value = stacks.value.filter((item) => item.id !== stack.id)
+      removeItemById(stacks.value, stackById, stack.id)
     } else {
       // Update remaining cards positions
       updateStackPositions(stack)
@@ -448,7 +457,7 @@ export const useCardStore = defineStore('cards', () => {
               const oldZone = zoneById.value.get(oldStack.zoneId)
               if (oldZone) oldZone.stackId = null
             }
-            stacks.value = stacks.value.filter((s) => s.id !== oldStack.id)
+            removeItemById(stacks.value, stackById, oldStack.id)
           }
         }
       }
@@ -488,6 +497,7 @@ export const useCardStore = defineStore('cards', () => {
       lockedBy: null,
     }
     stacks.value.push(stack)
+    registerItem(stackById, stack)
     return stack
   }
 
@@ -525,6 +535,7 @@ export const useCardStore = defineStore('cards', () => {
       cardSettings,
     }
     zones.value.push(zone)
+    registerItem(zoneById, zone)
     return zone
   }
 
@@ -543,11 +554,11 @@ export const useCardStore = defineStore('cards', () => {
             card.isInDeck = false
           }
         })
-        stacks.value = stacks.value.filter((s) => s.id !== zone.stackId)
+        removeItemById(stacks.value, stackById, zone.stackId)
       }
     }
 
-    zones.value = zones.value.filter((z) => z.id !== zoneId)
+    removeItemById(zones.value, zoneById, zoneId)
   }
 
   const updateZone = (zoneId: number, updates: Partial<Omit<Zone, 'id' | 'stackId'>>) => {
@@ -904,7 +915,7 @@ export const useCardStore = defineStore('cards', () => {
 
     // Remove source stack
     sourceStack.cardIds = []
-    stacks.value = stacks.value.filter((s) => s.id !== sourceStackId)
+    removeItemById(stacks.value, stackById, sourceStackId)
 
     updateStackPositions(targetStack)
     return true
@@ -1061,6 +1072,13 @@ export const useCardStore = defineStore('cards', () => {
     tokens.value = (state.tokens ?? []).map(tokenStateToToken)
     dice.value = (state.dice ?? []).map(dieStateToDie)
     timers.value = (state.timers ?? []).map(timerStateToTimer)
+    setIdMap(cardById, cards.value)
+    setIdMap(stackById, stacks.value)
+    setIdMap(zoneById, zones.value)
+    setIdMap(counterById, counters.value)
+    setIdMap(tokenById, tokens.value)
+    setIdMap(dieById, dice.value)
+    setIdMap(timerById, timers.value)
 
     // Preserve local hand order if the same cards exist (just reordered)
     // Only update if cards have actually been added/removed
@@ -1125,13 +1143,15 @@ export const useCardStore = defineStore('cards', () => {
     if (existing) {
       Object.assign(existing, stackStateToStack(state))
     } else {
-      stacks.value.push(stackStateToStack(state))
+      const stack = stackStateToStack(state)
+      stacks.value.push(stack)
+      registerItem(stackById, stack)
     }
   }
 
   // Remove a stack
   const removeStack = (stackId: number) => {
-    stacks.value = stacks.value.filter((s) => s.id !== stackId)
+    removeItemById(stacks.value, stackById, stackId)
   }
 
   // Update a single zone from server
@@ -1159,13 +1179,15 @@ export const useCardStore = defineStore('cards', () => {
     if (existing) {
       Object.assign(existing, zoneStateToZone(state))
     } else {
-      zones.value.push(zoneStateToZone(state))
+      const zone = zoneStateToZone(state)
+      zones.value.push(zone)
+      registerItem(zoneById, zone)
     }
   }
 
   // Remove a zone (without local side effects)
   const removeZone = (zoneId: number) => {
-    zones.value = zones.value.filter((z) => z.id !== zoneId)
+    removeItemById(zones.value, zoneById, zoneId)
   }
 
   // Convert server CounterState to local Counter
@@ -1206,13 +1228,15 @@ export const useCardStore = defineStore('cards', () => {
     if (existing) {
       Object.assign(existing, counterStateToCounter(state))
     } else {
-      counters.value.push(counterStateToCounter(state))
+      const counter = counterStateToCounter(state)
+      counters.value.push(counter)
+      registerItem(counterById, counter)
     }
   }
 
   // Remove a counter
   const removeCounter = (counterId: number) => {
-    counters.value = counters.value.filter((c) => c.id !== counterId)
+    removeItemById(counters.value, counterById, counterId)
   }
 
   const tokenStateToToken = (state: TokenState): Token => ({
@@ -1251,13 +1275,15 @@ export const useCardStore = defineStore('cards', () => {
     if (existing) {
       Object.assign(existing, tokenStateToToken(state))
     } else {
-      tokens.value.push(tokenStateToToken(state))
+      const token = tokenStateToToken(state)
+      tokens.value.push(token)
+      registerItem(tokenById, token)
     }
   }
 
   // Remove a token
   const removeToken = (tokenId: number) => {
-    tokens.value = tokens.value.filter((t) => t.id !== tokenId)
+    removeItemById(tokens.value, tokenById, tokenId)
   }
 
   const dieStateToDie = (state: DieState): Die => ({
@@ -1293,13 +1319,15 @@ export const useCardStore = defineStore('cards', () => {
     if (existing) {
       Object.assign(existing, dieStateToDie(state))
     } else {
-      dice.value.push(dieStateToDie(state))
+      const die = dieStateToDie(state)
+      dice.value.push(die)
+      registerItem(dieById, die)
     }
   }
 
   // Remove a die
   const removeDie = (dieId: number) => {
-    dice.value = dice.value.filter((d) => d.id !== dieId)
+    removeItemById(dice.value, dieById, dieId)
   }
 
   // Set die rolling state (for animation)
@@ -1347,13 +1375,15 @@ export const useCardStore = defineStore('cards', () => {
     if (existing) {
       Object.assign(existing, timerStateToTimer(state))
     } else {
-      timers.value.push(timerStateToTimer(state))
+      const timer = timerStateToTimer(state)
+      timers.value.push(timer)
+      registerItem(timerById, timer)
     }
   }
 
   // Remove a timer
   const removeTimer = (timerId: number) => {
-    timers.value = timers.value.filter((t) => t.id !== timerId)
+    removeItemById(timers.value, timerById, timerId)
   }
 
   // Set hand card IDs from server (only updates OUR hand, doesn't touch other players' cards)

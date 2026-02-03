@@ -2,11 +2,19 @@
 defineProps<{
   noPadding?: boolean
   column?: boolean
+  allowOverflow?: boolean
 }>()
 </script>
 
 <template>
-  <div class="table-panel" :class="{ 'table-panel--no-padding': noPadding, column: column }">
+  <div
+    class="table-panel"
+    :class="{
+      'table-panel--no-padding': noPadding,
+      'table-panel--overflow': allowOverflow,
+      column: column,
+    }"
+  >
     <slot />
   </div>
 </template>
@@ -20,6 +28,10 @@ defineProps<{
   overflow: hidden;
   backdrop-filter: blur(8px);
   justify-content: space-between;
+}
+
+.table-panel--overflow {
+  overflow: visible;
 }
 
 .table-panel.column {

@@ -32,6 +32,7 @@ import { useRadialMenuActions } from '@/composables/useRadialMenuActions'
 import { useGameStateSync } from '@/composables/useGameStateSync'
 import { useToast } from '@/composables/useToast'
 import { usePlayerProfile } from '@/composables/usePlayerProfile'
+import { usePerformanceSettings, type PerformanceSettings } from '@/composables/usePerformanceSettings'
 import {
   SquarePlus,
   Copy,
@@ -44,7 +45,10 @@ import {
   Hash,
   CircleDot,
   Dices,
+  ChevronDown,
   Timer,
+  MessageCircle,
+  Activity,
 } from 'lucide-vue-next'
 import {
   CARD_BACK_COL,
@@ -62,6 +66,11 @@ const cardStore = useCardStore()
 // Player profile from localStorage
 const profile = usePlayerProfile()
 const playerName = computed(() => profile.name.value || 'Player')
+const performance = usePerformanceSettings()
+const performanceClasses = computed(() => ({
+  'table-view--low-latency': performance.settings.value.lowLatencyDrag,
+  'table-view--reduced-effects': performance.settings.value.reduceEffects,
+}))
 
 // Room info from route
 const routeRoomCode = computed(() => (route.params.code as string)?.toUpperCase() || null)
@@ -79,6 +88,7 @@ const showActivity = ref(false)
 const showInstructions = ref(false)
 const editingZoneId = ref<number | null>(null)
 const requestToPlaySent = ref(false)
+const showZoneTemplates = ref(false)
 
 // Get current player's color for cursor
 const playerColor = computed(() => {
@@ -137,6 +147,8 @@ const isSpectator = computed(() => {
   const player = ws.players.value.find((p) => p.id === ws.playerId.value)
   return player?.role === 'spectator'
 })
+
+const canUndoRedo = computed(() => isCreator.value || isModerator.value)
 
 const lastSpectatorNoticeAt = ref(0)
 const showSpectatorNotice = (message = 'Spectators are view-only. Request to play to interact.') => {
@@ -562,22 +574,135 @@ const isZoneDragging = (zoneId: number): boolean => {
   )
 }
 
-const addZone = () => {
+type ZoneTemplate = {
+  id: string
+  label: string
+  description: string
+  width?: number
+  height?: number
+  faceUp: boolean
+  visibility: 'public' | 'owner' | 'hidden'
+  layout: 'stack' | 'row' | 'column' | 'grid' | 'fan' | 'circle'
+  cardSettings?: {
+    cardScale: number
+    cardSpacing: number
+    randomOffset?: number
+    randomRotation?: number
+  }
+}
+
+const defaultZoneTemplate: ZoneTemplate = {
+  id: 'custom',
+  label: 'New Zone',
+  description: 'Blank zone',
+  faceUp: false,
+  visibility: 'public',
+  layout: 'stack',
+}
+
+const zoneTemplates: ZoneTemplate[] = [
+  {
+    id: 'deck',
+    label: 'Deck',
+    description: 'Hidden stack',
+    faceUp: false,
+    visibility: 'hidden',
+    layout: 'stack',
+  },
+  {
+    id: 'discard',
+    label: 'Discard',
+    description: 'Face-up stack',
+    faceUp: true,
+    visibility: 'public',
+    layout: 'stack',
+  },
+  {
+    id: 'private',
+    label: 'Private',
+    description: 'Owner-only row',
+    faceUp: true,
+    visibility: 'owner',
+    layout: 'row',
+    width: ZONE_DEFAULT_WIDTH * 2,
+    cardSettings: { cardScale: 1.0, cardSpacing: 0.6 },
+  },
+  {
+    id: 'row',
+    label: 'Row',
+    description: 'Public row',
+    faceUp: true,
+    visibility: 'public',
+    layout: 'row',
+    width: ZONE_DEFAULT_WIDTH * 2,
+    cardSettings: { cardScale: 1.0, cardSpacing: 0.6 },
+  },
+  {
+    id: 'grid',
+    label: 'Grid',
+    description: 'Public grid',
+    faceUp: true,
+    visibility: 'public',
+    layout: 'grid',
+    width: ZONE_DEFAULT_WIDTH * 2.2,
+    height: ZONE_DEFAULT_HEIGHT * 1.6,
+    cardSettings: { cardScale: 0.95, cardSpacing: 0.7 },
+  },
+]
+
+const toggleZoneTemplates = () => {
+  showZoneTemplates.value = !showZoneTemplates.value
+}
+
+const closeZoneTemplates = () => {
+  showZoneTemplates.value = false
+}
+
+const createZoneFromTemplate = (template: ZoneTemplate) => {
   if (!canInteract()) return
   const bounds = viewport.getVisibleBounds()
-  const centerX = bounds.x + bounds.width / 2 - ZONE_DEFAULT_WIDTH / 2
-  const centerY = bounds.y + bounds.height / 2 - ZONE_DEFAULT_HEIGHT / 2
+  const width = template.width ?? ZONE_DEFAULT_WIDTH
+  const height = template.height ?? ZONE_DEFAULT_HEIGHT
+  const centerX = bounds.x + bounds.width / 2 - width / 2
+  const centerY = bounds.y + bounds.height / 2 - height / 2
 
   trackActivity()
-  ws.send({
+  const payload: {
+    type: 'zone:create'
+    x: number
+    y: number
+    width: number
+    height: number
+    label: string
+    faceUp: boolean
+    visibility?: 'public' | 'owner' | 'hidden'
+    layout?: 'stack' | 'row' | 'column' | 'grid' | 'fan' | 'circle'
+    cardSettings?: {
+      cardScale: number
+      cardSpacing: number
+      randomOffset?: number
+      randomRotation?: number
+    }
+  } = {
     type: 'zone:create',
     x: centerX,
     y: centerY,
-    width: ZONE_DEFAULT_WIDTH,
-    height: ZONE_DEFAULT_HEIGHT,
-    label: 'New Zone',
-    faceUp: false,
-  })
+    width,
+    height,
+    label: template.label,
+    faceUp: template.faceUp,
+    visibility: template.visibility,
+    layout: template.layout,
+  }
+  if (template.cardSettings) {
+    payload.cardSettings = template.cardSettings
+  }
+  ws.send(payload)
+  closeZoneTemplates()
+}
+
+const addZone = () => {
+  createZoneFromTemplate(defaultZoneTemplate)
 }
 
 const onZoneUpdate = (zoneId: number, updates: Record<string, unknown>) => {
@@ -869,10 +994,40 @@ const handleNameUpdate = (name: string) => {
   ws.updateTableName(name)
 }
 
+const handlePerformanceUpdate = (updates: Partial<PerformanceSettings>) => {
+  performance.updateSettings(updates)
+}
+
 const handleTableReset = () => {
   if (!canInteract()) return
   ws.resetTable()
   showSettings.value = false
+}
+
+const handleUndo = () => {
+  if (!canUndoRedo.value) {
+    toast.error('Only the table creator or moderators can undo')
+    return
+  }
+  if (!canInteract()) return
+  if (!ws.isConnected.value) {
+    toast.error('Not connected yet')
+    return
+  }
+  ws.undoTable()
+}
+
+const handleRedo = () => {
+  if (!canUndoRedo.value) {
+    toast.error('Only the table creator or moderators can redo')
+    return
+  }
+  if (!canInteract()) return
+  if (!ws.isConnected.value) {
+    toast.error('Not connected yet')
+    return
+  }
+  ws.redoTable()
 }
 
 const handleSnapshotCreate = (name?: string) => {
@@ -938,6 +1093,23 @@ const onKeyDown = (event: KeyboardEvent) => {
     return
   }
 
+  if ((event.metaKey || event.ctrlKey) && !event.altKey) {
+    if (event.code === 'KeyZ') {
+      event.preventDefault()
+      if (event.shiftKey) {
+        handleRedo()
+      } else {
+        handleUndo()
+      }
+      return
+    }
+    if (event.code === 'KeyY') {
+      event.preventDefault()
+      handleRedo()
+      return
+    }
+  }
+
   if (event.code === 'Space' && !event.repeat) {
     spaceHeld.value = true
     event.preventDefault()
@@ -955,14 +1127,83 @@ const onKeyUp = (event: KeyboardEvent) => {
   }
 }
 
+const touchPointers = new Map<number, { x: number; y: number }>()
+let isPinching = false
+let pinchStartDistance = 0
+let pinchStartZoom = 1
+
+const isTouchPanTarget = (event: PointerEvent): boolean => {
+  const target = event.target as HTMLElement | null
+  if (!target) return false
+  if (
+    target.closest('.table-ui') ||
+    target.closest('.table-header') ||
+    target.closest('.panels-container-top-left') ||
+    target.closest('.panels-container-bottom-right') ||
+    target.closest('.mobile-hud')
+  ) {
+    return false
+  }
+  if (
+    target.closest('.card') ||
+    target.closest('.token') ||
+    target.closest('.die') ||
+    target.closest('.counter') ||
+    target.closest('.timer') ||
+    target.closest('.zone') ||
+    target.closest('.hand')
+  ) {
+    return false
+  }
+  return true
+}
+
+const updateTouchPointer = (event: PointerEvent) => {
+  touchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+}
+
+const getPinchMetrics = () => {
+  const points = Array.from(touchPointers.values())
+  if (points.length < 2) return null
+  const [p1, p2] = points
+  const distance = Math.hypot(p2.x - p1.x, p2.y - p1.y)
+  const centerX = (p1.x + p2.x) / 2
+  const centerY = (p1.y + p2.y) / 2
+  return { distance, centerX, centerY }
+}
+
 // Canvas pointer handlers for panning
 const onCanvasPointerDown = (event: PointerEvent) => {
   // Close radial menu on any click
   radialMenu.close()
+  showZoneTemplates.value = false
 
   // Close any open panels when clicking on canvas
   showSettings.value = false
   showPlayers.value = false
+
+  if (event.pointerType === 'touch') {
+    updateTouchPointer(event)
+    if (touchPointers.size >= 2) {
+      const metrics = getPinchMetrics()
+      if (metrics) {
+        isPinching = true
+        pinchStartDistance = metrics.distance
+        pinchStartZoom = viewport.zoom.value
+        viewport.endPan()
+        interaction.drag.reset()
+        event.preventDefault()
+        return
+      }
+    }
+
+    if (isTouchPanTarget(event)) {
+      event.preventDefault()
+      viewport.startPan(event)
+      ;(event.target as HTMLElement)?.setPointerCapture(event.pointerId)
+      return
+    }
+  }
 
   // Clear all selections when clicking on empty canvas (left-click only)
   if (event.button === 0 && !spaceHeld.value) {
@@ -1022,6 +1263,21 @@ const getCursorState = (): 'default' | 'grab' | 'grabbing' => {
 }
 
 const onCanvasPointerMove = (event: PointerEvent) => {
+  if (event.pointerType === 'touch') {
+    if (touchPointers.has(event.pointerId)) {
+      updateTouchPointer(event)
+    }
+    if (isPinching && touchPointers.size >= 2) {
+      const metrics = getPinchMetrics()
+      if (metrics && pinchStartDistance > 0) {
+        const scale = metrics.distance / pinchStartDistance
+        const targetZoom = pinchStartZoom * scale
+        viewport.zoomTo(metrics.centerX, metrics.centerY, targetZoom)
+      }
+      return
+    }
+  }
+
   if (viewport.isPanning.value) {
     viewport.updatePan(event)
   }
@@ -1033,6 +1289,13 @@ const onCanvasPointerMove = (event: PointerEvent) => {
 }
 
 const onCanvasPointerUp = (event: PointerEvent) => {
+  if (event.pointerType === 'touch') {
+    touchPointers.delete(event.pointerId)
+    if (isPinching && touchPointers.size < 2) {
+      isPinching = false
+      pinchStartDistance = 0
+    }
+  }
   if (viewport.isPanning.value) {
     viewport.endPan()
     ;(event.target as HTMLElement)?.releasePointerCapture(event.pointerId)
@@ -1162,7 +1425,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="table-view"
-    :class="[cursorClass, { 'table-view--spectator': isSpectator }]"
+    :class="[cursorClass, performanceClasses, { 'table-view--spectator': isSpectator }]"
     @contextmenu.prevent
   >
     <!-- Header bar -->
@@ -1256,10 +1519,15 @@ onBeforeUnmount(() => {
           :snapshots="ws.snapshots.value"
           :last-autosave-at="ws.lastAutosaveAt.value"
           :can-manage-snapshots="canManageSnapshots"
+          :can-undo-redo="canUndoRedo"
+          :performance-settings="performance.settings.value"
           @update:settings="handleSettingsUpdate"
           @update:visibility="handleVisibilityUpdate"
           @update:name="handleNameUpdate"
+          @update:performance="handlePerformanceUpdate"
           @reset="handleTableReset"
+          @undo="handleUndo"
+          @redo="handleRedo"
           @snapshot:create="handleSnapshotCreate"
           @snapshot:restore="handleSnapshotRestore"
           @close="showSettings = false"
@@ -1288,10 +1556,26 @@ onBeforeUnmount(() => {
           :canvas-height="canvasDimensions.height"
         />
 
-        <TablePanel class="table-ui__add-panel" title="Add Item">
-          <TableButton title="Add Zone" @click="addZone">
-            <SquarePlus />
-          </TableButton>
+        <TablePanel class="table-ui__add-panel" title="Add Item" allow-overflow>
+          <div class="table-ui__zone-actions" @pointerdown.stop>
+            <TableButton title="Add Zone" @click="addZone">
+              <SquarePlus />
+            </TableButton>
+            <TableButton title="Zone Templates" @click="toggleZoneTemplates">
+              <ChevronDown />
+            </TableButton>
+            <div v-if="showZoneTemplates" class="zone-template-menu" @pointerdown.stop>
+              <button
+                v-for="template in zoneTemplates"
+                :key="template.id"
+                class="zone-template-item"
+                @click="createZoneFromTemplate(template)"
+              >
+                <span class="zone-template-item__title">{{ template.label }}</span>
+                <span class="zone-template-item__meta">{{ template.description }}</span>
+              </button>
+            </div>
+          </div>
           <TableButton title="Add Counter" @click="addCounter">
             <Hash />
           </TableButton>
@@ -1305,6 +1589,64 @@ onBeforeUnmount(() => {
             <Timer />
           </TableButton>
         </TablePanel>
+      </div>
+
+      <div class="mobile-hud">
+        <div class="mobile-hud__row">
+          <div class="mobile-hud__zone-actions" @pointerdown.stop>
+            <TableButton title="Add Zone" @click="addZone">
+              <SquarePlus />
+            </TableButton>
+            <TableButton title="Zone Templates" @click="toggleZoneTemplates">
+              <ChevronDown />
+            </TableButton>
+            <div
+              v-if="showZoneTemplates"
+              class="zone-template-menu zone-template-menu--mobile"
+              @pointerdown.stop
+            >
+              <button
+                v-for="template in zoneTemplates"
+                :key="template.id"
+                class="zone-template-item"
+                @click="createZoneFromTemplate(template)"
+              >
+                <span class="zone-template-item__title">{{ template.label }}</span>
+                <span class="zone-template-item__meta">{{ template.description }}</span>
+              </button>
+            </div>
+          </div>
+          <TableButton title="Add Counter" @click="addCounter">
+            <Hash />
+          </TableButton>
+          <TableButton title="Add Token" @click="addColorToken">
+            <CircleDot />
+          </TableButton>
+          <TableButton title="Add Die" @click="addDie">
+            <Dices />
+          </TableButton>
+          <TableButton title="Add Timer" @click="addTimer('countdown')">
+            <Timer />
+          </TableButton>
+        </div>
+        <div class="mobile-hud__row mobile-hud__row--secondary">
+          <TableButton title="Players" :active="showPlayers" @click="showPlayers = !showPlayers">
+            <Users />
+          </TableButton>
+          <TableButton title="Chat" :active="showChat" @click="showChat = !showChat">
+            <MessageCircle />
+          </TableButton>
+          <TableButton
+            title="Activity"
+            :active="showActivity"
+            @click="showActivity = !showActivity"
+          >
+            <Activity />
+          </TableButton>
+          <TableButton title="Settings" :active="showSettings" @click="showSettings = !showSettings">
+            <Settings />
+          </TableButton>
+        </div>
       </div>
 
       <!-- World container (pan/zoom transform) -->
@@ -1516,9 +1858,12 @@ onBeforeUnmount(() => {
       <ChatPanel
         :messages="ws.chatMessages.value"
         :typing-players="ws.typingPlayers.value"
+        :current-player-name="playerName"
+        :can-moderate="isCreator || isModerator"
         v-model:is-open="showChat"
         @send="ws.sendChat"
         @typing="ws.sendTyping"
+        @delete-message="ws.deleteChatMessage"
       />
     </div>
 
@@ -1562,6 +1907,29 @@ onBeforeUnmount(() => {
 
 .table-view--spectator :deep(.table-ui__add-panel) {
   opacity: 0.5;
+}
+
+.table-view--low-latency :deep(.card),
+.table-view--low-latency :deep(.card.locked-by-other),
+.table-view--low-latency :deep(.card.zone-reorder-shift) {
+  transition: none !important;
+}
+
+.table-view--reduced-effects :deep(.card),
+.table-view--reduced-effects :deep(.card.dragging),
+.table-view--reduced-effects :deep(.card.stack-bottom),
+.table-view--reduced-effects :deep(.card.hand-ghost),
+.table-view--reduced-effects :deep(.card.zone-ghost) {
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+.table-view--reduced-effects :deep(.card.shuffling) {
+  animation: none !important;
+}
+
+.table-view--reduced-effects :deep(.zone) {
+  box-shadow: none;
 }
 
 .table-header {
@@ -1796,6 +2164,104 @@ onBeforeUnmount(() => {
   min-width: 100%;
 }
 
+.table-ui__zone-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mobile-hud {
+  position: fixed;
+  left: 50%;
+  bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: none;
+  flex-direction: column;
+  gap: 0.4rem;
+  z-index: 2400;
+  pointer-events: auto;
+}
+
+.mobile-hud__row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.mobile-hud__row--secondary {
+  justify-content: center;
+  background: rgba(12, 12, 20, 0.7);
+}
+
+.mobile-hud__zone-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.zone-template-menu--mobile {
+  top: auto;
+  bottom: 42px;
+  left: 0;
+}
+
+.zone-template-menu {
+  position: absolute;
+  top: 38px;
+  left: 0;
+  min-width: 180px;
+  padding: 6px;
+  border-radius: 8px;
+  background: rgba(12, 12, 20, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 12px 24px rgba(0, 0, 0, 0.35),
+    0 4px 12px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 2600;
+}
+
+.zone-template-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.zone-template-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.zone-template-item__title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.zone-template-item__meta {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .world {
   position: absolute;
   transform-origin: 0 0;
@@ -1954,5 +2420,49 @@ onBeforeUnmount(() => {
   align-items: flex-end;
   gap: 0.5rem;
   z-index: 100;
+}
+
+@media (max-width: 900px) {
+  .table-ui {
+    display: none;
+  }
+
+  .mobile-hud {
+    display: flex;
+  }
+
+  .table-header {
+    padding: 0.35rem 0.5rem;
+  }
+
+  .table-header__title {
+    display: none;
+  }
+
+  .table-header__info {
+    gap: 0.5rem;
+  }
+
+  .table-header__players span {
+    display: none;
+  }
+
+  .table-header__spectator-label {
+    display: none;
+  }
+
+  .table-header__spectator-button {
+    padding: 0.25rem 0.5rem;
+  }
+
+  .panels-container-top-left {
+    top: 3.25rem;
+    left: 0.5rem;
+  }
+
+  .panels-container-bottom-right {
+    bottom: 6.5rem;
+    right: 0.75rem;
+  }
 }
 </style>

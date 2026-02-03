@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid'
-import type { Player, TableSettings, TableBackground } from '../shared/types'
+import type { Player, TableSettings, TableBackground, GameState } from '../shared/types'
 import { PLAYER_COLORS } from '../shared/types'
 import { GameStateManager, createInitialGameState } from './game-state'
 import { LockManager } from './utils/locks'
@@ -54,6 +54,9 @@ export interface Room {
   moderatorPlayerIds: Set<string> // Player IDs with moderator role (persisted across sessions)
   settings: TableSettings
   bannedDevices: Set<string> // Device IDs that are banned from this room
+  undoStack: GameState[]
+  redoStack: GameState[]
+  lastMutationByActor: Map<string, number>
 }
 
 /**
@@ -72,6 +75,8 @@ export class RoomManager {
 
   // How long to wait before cleaning up an empty room (1 minute)
   private static readonly EMPTY_ROOM_CLEANUP_DELAY = 60_000
+  private static readonly UNDO_HISTORY_LIMIT = 50
+  private static readonly UNDO_GROUP_WINDOW_MS = 500
 
   constructor() {
     // Clean up empty rooms every minute
@@ -157,6 +162,64 @@ export class RoomManager {
    */
   getClient(id: string): GenericWebSocket | undefined {
     return this.clients.get(id)
+  }
+
+  private cloneGameState(state: GameState): GameState {
+    if (typeof structuredClone === 'function') {
+      return structuredClone(state)
+    }
+    return JSON.parse(JSON.stringify(state)) as GameState
+  }
+
+  prepareUndoSnapshot(room: Room, actorId: string, now: number = Date.now()): GameState | null {
+    const lastMutationAt = room.lastMutationByActor.get(actorId) ?? 0
+    if (now - lastMutationAt <= RoomManager.UNDO_GROUP_WINDOW_MS) {
+      return null
+    }
+    return this.cloneGameState(room.gameState.getState())
+  }
+
+  commitUndoSnapshot(room: Room, snapshot: GameState): void {
+    room.undoStack.push(snapshot)
+    if (room.undoStack.length > RoomManager.UNDO_HISTORY_LIMIT) {
+      room.undoStack.shift()
+    }
+    room.redoStack = []
+  }
+
+  noteUndoMutation(room: Room, actorId: string, now: number = Date.now()): void {
+    room.lastMutationByActor.set(actorId, now)
+    if (room.redoStack.length > 0) {
+      room.redoStack = []
+    }
+  }
+
+  resetUndoGrouping(roomCode: string): void {
+    const room = this.rooms.get(roomCode)
+    if (!room) return
+    room.lastMutationByActor.clear()
+  }
+
+  undo(roomCode: string): GameState | null {
+    const room = this.rooms.get(roomCode)
+    if (!room || room.undoStack.length === 0) return null
+    const current = this.cloneGameState(room.gameState.getState())
+    room.redoStack.push(current)
+    if (room.redoStack.length > RoomManager.UNDO_HISTORY_LIMIT) {
+      room.redoStack.shift()
+    }
+    return room.undoStack.pop() ?? null
+  }
+
+  redo(roomCode: string): GameState | null {
+    const room = this.rooms.get(roomCode)
+    if (!room || room.redoStack.length === 0) return null
+    const current = this.cloneGameState(room.gameState.getState())
+    room.undoStack.push(current)
+    if (room.undoStack.length > RoomManager.UNDO_HISTORY_LIMIT) {
+      room.undoStack.shift()
+    }
+    return room.redoStack.pop() ?? null
   }
 
   /**
@@ -375,6 +438,9 @@ export class RoomManager {
       moderatorPlayerIds: new Set(),
       settings,
       bannedDevices: new Set(),
+      undoStack: [],
+      redoStack: [],
+      lastMutationByActor: new Map(),
     }
 
     this.rooms.set(code, room)
@@ -537,6 +603,9 @@ export class RoomManager {
       moderatorPlayerIds: new Set(persisted.metadata.moderatorPlayerIds || []),
       settings: persisted.metadata.settings || { background: 'green-felt' },
       bannedDevices: new Set(),
+      undoStack: [],
+      redoStack: [],
+      lastMutationByActor: new Map(),
     }
 
     this.rooms.set(roomCode, room)

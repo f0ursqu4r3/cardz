@@ -856,6 +856,52 @@ export function loadChatMessages(roomCode: string, limit: number = 100): Persist
 }
 
 /**
+ * Delete a single chat message by id (returns the deleted message if found)
+ */
+export function deleteChatMessage(
+  roomCode: string,
+  messageId: string,
+): PersistedChatMessage | null {
+  const database = getDb()
+
+  const selectStmt = database.prepare(`
+    SELECT id, room_code, player_id, player_name, player_color, message, timestamp
+    FROM chat_messages
+    WHERE room_code = $room_code AND id = $id
+    LIMIT 1
+  `)
+
+  const row = selectStmt.get({ $room_code: roomCode, $id: messageId }) as
+    | {
+        id: string
+        room_code: string
+        player_id: string
+        player_name: string
+        player_color: string
+        message: string
+        timestamp: number
+      }
+    | undefined
+
+  if (!row) return null
+
+  const deleteStmt = database.prepare(
+    'DELETE FROM chat_messages WHERE room_code = $room_code AND id = $id',
+  )
+  deleteStmt.run({ $room_code: roomCode, $id: messageId })
+
+  return {
+    id: row.id,
+    roomCode: row.room_code,
+    playerId: row.player_id,
+    playerName: row.player_name,
+    playerColor: row.player_color,
+    message: row.message,
+    timestamp: row.timestamp,
+  }
+}
+
+/**
  * Delete all chat messages for a room
  */
 export function deleteChatMessages(roomCode: string): void {

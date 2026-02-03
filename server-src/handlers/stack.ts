@@ -16,6 +16,47 @@ import type { GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom, broadcastToViewport, getClientData } from '../utils/broadcast'
 import { logStackCreated, logStackShuffled, logStackFlipped } from '../activity'
 
+const canManageZone = (room: Room, zoneOwnerId: string | null, playerId: string): boolean => {
+  return (
+    room.creatorPlayerId === playerId ||
+    room.moderatorPlayerIds.has(playerId) ||
+    zoneOwnerId === playerId
+  )
+}
+
+const enforceZoneStackAccess = (
+  ws: GenericWebSocket,
+  room: Room,
+  zone: { locked: boolean; visibility: 'public' | 'owner' | 'hidden'; ownerId: string | null },
+  playerId: string,
+  originalAction: string,
+  requestId?: string,
+): boolean => {
+  if (zone.locked) {
+    send(ws, {
+      type: 'error',
+      originalAction,
+      code: 'ZONE_LOCKED',
+      message: 'Zone is locked',
+      requestId,
+    })
+    return false
+  }
+
+  if (zone.visibility === 'owner' && !canManageZone(room, zone.ownerId, playerId)) {
+    send(ws, {
+      type: 'error',
+      originalAction,
+      code: 'PERMISSION_DENIED',
+      message: 'Only the zone owner or table moderators can modify this zone',
+      requestId,
+    })
+    return false
+  }
+
+  return true
+}
+
 export function handleStackCreate(
   ws: GenericWebSocket,
   msg: StackCreate,
@@ -118,6 +159,13 @@ export function handleStackMove(
     return
   }
 
+  if (stack.kind === 'zone' && stack.zoneId !== undefined && clientData.playerId) {
+    const zone = gameState.getZone(stack.zoneId)
+    if (zone && !enforceZoneStackAccess(ws, room, zone, clientData.playerId, 'stack:move', msg.requestId)) {
+      return
+    }
+  }
+
   // Atomically try to acquire lock (or refresh if we already hold it)
   if (!locks.lockStack(msg.stackId, clientData.id)) {
     send(ws, {
@@ -172,6 +220,13 @@ export function handleStackLock(
       requestId: msg.requestId,
     })
     return
+  }
+
+  if (stack.kind === 'zone' && stack.zoneId !== undefined && clientData.playerId) {
+    const zone = gameState.getZone(stack.zoneId)
+    if (zone && !enforceZoneStackAccess(ws, room, zone, clientData.playerId, 'stack:lock', msg.requestId)) {
+      return
+    }
   }
 
   if (!locks.lockStack(msg.stackId, clientData.id)) {
@@ -292,6 +347,13 @@ export function handleStackAddCard(
     return
   }
 
+  if (stack.kind === 'zone' && stack.zoneId !== undefined && clientData.playerId) {
+    const zone = gameState.getZone(stack.zoneId)
+    if (zone && !enforceZoneStackAccess(ws, room, zone, clientData.playerId, 'stack:add_card', msg.requestId)) {
+      return
+    }
+  }
+
   // For non-zone stacks, preserve the card's current faceUp state (allow mixed)
   // Zone stacks will set faceUp based on zone settings in gameState.addCardToStack
   const result = gameState.addCardToStack(msg.stackId, msg.cardId, undefined)
@@ -342,6 +404,14 @@ export function handleStackRemoveCard(
     return
   }
 
+  const stack = gameState.getStack(card.stackId)
+  if (stack && stack.kind === 'zone' && stack.zoneId !== undefined && clientData.playerId) {
+    const zone = gameState.getZone(stack.zoneId)
+    if (zone && !enforceZoneStackAccess(ws, room, zone, clientData.playerId, 'stack:remove_card', msg.requestId)) {
+      return
+    }
+  }
+
   // Check stack lock
   const stackLockedBy = locks.isStackLocked(card.stackId)
   if (stackLockedBy && stackLockedBy !== clientData.id) {
@@ -356,7 +426,6 @@ export function handleStackRemoveCard(
   }
 
   // Get stack position before removal for viewport broadcasting
-  const stack = gameState.getStack(card.stackId)
   const stackPos = stack ? { x: stack.anchorX, y: stack.anchorY } : { x: card.x, y: card.y }
 
   const result = gameState.removeCardFromStack(msg.cardId)
@@ -401,9 +470,9 @@ export function handleStackMerge(
     }
   }
 
-  // Get target stack position for viewport broadcasting
+  const sourceStack = gameState.getStack(msg.sourceStackId)
   const targetStack = gameState.getStack(msg.targetStackId)
-  if (!targetStack) {
+  if (!sourceStack || !targetStack) {
     send(ws, {
       type: 'error',
       originalAction: 'stack:merge',
@@ -413,6 +482,23 @@ export function handleStackMerge(
     })
     return
   }
+
+  if (clientData.playerId) {
+    if (sourceStack.kind === 'zone' && sourceStack.zoneId !== undefined) {
+      const zone = gameState.getZone(sourceStack.zoneId)
+      if (zone && !enforceZoneStackAccess(ws, room, zone, clientData.playerId, 'stack:merge', msg.requestId)) {
+        return
+      }
+    }
+    if (targetStack.kind === 'zone' && targetStack.zoneId !== undefined) {
+      const zone = gameState.getZone(targetStack.zoneId)
+      if (zone && !enforceZoneStackAccess(ws, room, zone, clientData.playerId, 'stack:merge', msg.requestId)) {
+        return
+      }
+    }
+  }
+
+  // Get target stack position for viewport broadcasting
   const targetPos = { x: targetStack.anchorX, y: targetStack.anchorY }
 
   const result = gameState.mergeStacks(msg.sourceStackId, msg.targetStackId)
@@ -480,6 +566,13 @@ export function handleStackShuffle(
     return
   }
 
+  if (stack.kind === 'zone' && stack.zoneId !== undefined && clientData.playerId) {
+    const zone = gameState.getZone(stack.zoneId)
+    if (zone && !enforceZoneStackAccess(ws, room, zone, clientData.playerId, 'stack:shuffle', msg.requestId)) {
+      return
+    }
+  }
+
   const result = gameState.shuffleStack(msg.stackId)
   if (!result) {
     return
@@ -535,6 +628,13 @@ export function handleStackFlip(
       requestId: msg.requestId,
     })
     return
+  }
+
+  if (stack.kind === 'zone' && stack.zoneId !== undefined && clientData.playerId) {
+    const zone = gameState.getZone(stack.zoneId)
+    if (zone && !enforceZoneStackAccess(ws, room, zone, clientData.playerId, 'stack:flip', msg.requestId)) {
+      return
+    }
   }
 
   const result = gameState.flipStack(msg.stackId)
@@ -593,6 +693,13 @@ export function handleStackSetFaces(
     return
   }
 
+  if (stack.kind === 'zone' && stack.zoneId !== undefined && clientData.playerId) {
+    const zone = gameState.getZone(stack.zoneId)
+    if (zone && !enforceZoneStackAccess(ws, room, zone, clientData.playerId, 'stack:set_faces', msg.requestId)) {
+      return
+    }
+  }
+
   const result = gameState.setStackFaces(msg.stackId, msg.faceUp)
   if (!result) {
     return
@@ -645,6 +752,13 @@ export function handleStackReorder(
       requestId: msg.requestId,
     })
     return
+  }
+
+  if (stack.kind === 'zone' && stack.zoneId !== undefined && clientData.playerId) {
+    const zone = gameState.getZone(stack.zoneId)
+    if (zone && !enforceZoneStackAccess(ws, room, zone, clientData.playerId, 'stack:reorder', msg.requestId)) {
+      return
+    }
   }
 
   const result = gameState.reorderStack(msg.stackId, msg.fromIndex, msg.toIndex)

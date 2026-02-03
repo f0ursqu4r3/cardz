@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { ref, nextTick, watch, onMounted, onUnmounted, computed } from 'vue'
-import { MessageCircle, Send, X, ChevronDown } from 'lucide-vue-next'
+import { MessageCircle, Send, X, ChevronDown, Clock, Shield, Trash2 } from 'lucide-vue-next'
 import type { ChatMessage } from '../../../shared/types'
 
 const props = defineProps<{
   messages: ChatMessage[]
   isOpen: boolean
   typingPlayers?: Map<string, string> // playerId -> playerName
+  currentPlayerName?: string
+  canModerate?: boolean
 }>()
 
 const emit = defineEmits<{
   send: [message: string]
   typing: [isTyping: boolean]
+  'delete-message': [messageId: string]
   'update:isOpen': [value: boolean]
 }>()
 
@@ -20,6 +23,26 @@ const messagesRef = ref<HTMLDivElement | null>(null)
 const messageText = ref('')
 const unreadCount = ref(0)
 const isAtBottom = ref(true)
+const showTimestamps = ref(true)
+const showModerationQueue = ref(false)
+
+const TIMESTAMP_KEY = 'cardz_chat_show_timestamps'
+const storedTimestamps = localStorage.getItem(TIMESTAMP_KEY)
+if (storedTimestamps) {
+  try {
+    showTimestamps.value = JSON.parse(storedTimestamps) === true
+  } catch {
+    // Ignore invalid stored value
+  }
+}
+
+watch(
+  showTimestamps,
+  (value) => {
+    localStorage.setItem(TIMESTAMP_KEY, JSON.stringify(value))
+  },
+  { immediate: false },
+)
 
 // Track unread messages when panel is closed
 watch(
@@ -115,12 +138,61 @@ const typingIndicatorText = computed(() => {
   return `${names.slice(0, 2).join(', ')} and ${names.length - 2} more are typing...`
 })
 
+const escapeRegExp = (value: string): string => {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+const buildMentionRegex = (name?: string): RegExp | null => {
+  const trimmed = name?.trim()
+  if (!trimmed) return null
+  const escaped = escapeRegExp(trimmed)
+  return new RegExp(`@${escaped}(?=\\b|\\s|$)`, 'gi')
+}
+
+const getMessageParts = (message: string) => {
+  const regex = buildMentionRegex(props.currentPlayerName)
+  if (!regex) return [{ text: message, isMention: false }]
+  const parts: { text: string; isMention: boolean }[] = []
+  let lastIndex = 0
+  for (const match of message.matchAll(regex)) {
+    if (match.index === undefined) continue
+    const start = match.index
+    if (start > lastIndex) {
+      parts.push({ text: message.slice(lastIndex, start), isMention: false })
+    }
+    const end = start + match[0].length
+    parts.push({ text: message.slice(start, end), isMention: true })
+    lastIndex = end
+  }
+  if (lastIndex < message.length) {
+    parts.push({ text: message.slice(lastIndex), isMention: false })
+  }
+  return parts
+}
+
+const messageHasMention = (message: string): boolean => {
+  const regex = buildMentionRegex(props.currentPlayerName)
+  if (!regex) return false
+  return regex.test(message)
+}
+
 const formatTime = (timestamp: number): string => {
   return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
 const togglePanel = () => {
   emit('update:isOpen', !props.isOpen)
+}
+
+const recentMessages = computed(() => {
+  const slice = props.messages.slice(-20)
+  return slice.reverse()
+})
+
+const requestDelete = (messageId: string) => {
+  if (!props.canModerate) return
+  if (!window.confirm('Remove this chat message?')) return
+  emit('delete-message', messageId)
 }
 
 // Handle Escape key to close panel
@@ -159,21 +231,82 @@ onUnmounted(() => {
       <div class="chat__header">
         <MessageCircle :size="16" />
         <span>Chat</span>
+        <button
+          class="chat__toggle-button"
+          :class="{ 'chat__toggle-button--active': showTimestamps }"
+          :title="showTimestamps ? 'Hide timestamps' : 'Show timestamps'"
+          type="button"
+          @click="showTimestamps = !showTimestamps"
+          :aria-pressed="showTimestamps"
+        >
+          <Clock :size="14" />
+        </button>
+        <button
+          v-if="canModerate"
+          class="chat__toggle-button"
+          :class="{ 'chat__toggle-button--active': showModerationQueue }"
+          :title="showModerationQueue ? 'Hide moderation queue' : 'Show moderation queue'"
+          type="button"
+          @click="showModerationQueue = !showModerationQueue"
+          :aria-pressed="showModerationQueue"
+        >
+          <Shield :size="14" />
+        </button>
         <button class="chat__close" @click="togglePanel">
           <X :size="16" />
         </button>
       </div>
 
+      <div v-if="showModerationQueue && canModerate" class="chat__moderation">
+        <div class="chat__moderation-header">
+          <Shield :size="14" />
+          <span>Moderation queue</span>
+        </div>
+        <div v-if="recentMessages.length === 0" class="chat__moderation-empty">
+          No messages to review.
+        </div>
+        <div v-else class="chat__moderation-list">
+          <div v-for="msg in recentMessages" :key="msg.id" class="chat__moderation-item">
+            <div class="chat__moderation-meta">
+              <span class="chat__moderation-author" :style="{ color: msg.playerColor }">
+                {{ msg.playerName }}
+              </span>
+              <span class="chat__moderation-time">{{ formatTime(msg.timestamp) }}</span>
+            </div>
+            <div class="chat__moderation-message">{{ msg.message }}</div>
+            <button
+              class="chat__moderation-delete"
+              type="button"
+              title="Remove message"
+              @click="requestDelete(msg.id)"
+            >
+              <Trash2 :size="14" />
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div ref="messagesRef" class="chat__messages" @scroll="handleScroll">
         <div v-if="messages.length === 0" class="chat__empty">No messages yet. Say hello!</div>
-        <div v-for="msg in messages" :key="msg.id" class="chat__message">
+        <div
+          v-for="msg in messages"
+          :key="msg.id"
+          class="chat__message"
+          :class="{ 'chat__message--mention': messageHasMention(msg.message) }"
+        >
           <div class="chat__message-header">
             <span class="chat__message-author" :style="{ color: msg.playerColor }">
               {{ msg.playerName }}
             </span>
-            <span class="chat__message-time">{{ formatTime(msg.timestamp) }}</span>
+            <span v-if="showTimestamps" class="chat__message-time">
+              {{ formatTime(msg.timestamp) }}
+            </span>
           </div>
-          <div class="chat__message-content">{{ msg.message }}</div>
+          <div class="chat__message-content">
+            <template v-for="(part, idx) in getMessageParts(msg.message)" :key="idx">
+              <span :class="{ 'chat__message-mention': part.isMention }">{{ part.text }}</span>
+            </template>
+          </div>
         </div>
       </div>
 
@@ -277,6 +410,95 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+.chat__moderation {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.5rem 0.75rem;
+  background: rgba(20, 20, 30, 0.6);
+}
+
+.chat__moderation-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #f7c6cf;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.4rem;
+}
+
+.chat__moderation-empty {
+  font-size: 0.75rem;
+  color: #777;
+  padding: 0.25rem 0.25rem 0.5rem;
+}
+
+.chat__moderation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.chat__moderation-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.4rem 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.chat__moderation-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  color: #888;
+}
+
+.chat__moderation-author {
+  font-weight: 600;
+}
+
+.chat__moderation-time {
+  color: #666;
+}
+
+.chat__moderation-message {
+  grid-column: 1 / -1;
+  color: #d6d6e4;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.chat__moderation-delete {
+  align-self: start;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: rgba(233, 69, 96, 0.15);
+  border: 1px solid rgba(233, 69, 96, 0.35);
+  border-radius: 6px;
+  color: #f4a6b3;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chat__moderation-delete:hover {
+  background: rgba(233, 69, 96, 0.3);
+  color: #fff;
+}
+
 .chat__header {
   display: flex;
   align-items: center;
@@ -288,8 +510,36 @@ onUnmounted(() => {
   font-size: 0.875rem;
 }
 
-.chat__close {
+.chat__toggle-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #8a8aa0;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chat__header button.chat__toggle-button:first-of-type {
   margin-left: auto;
+}
+
+.chat__toggle-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.chat__toggle-button--active {
+  background: rgba(233, 69, 96, 0.2);
+  color: #f7c6cf;
+}
+
+.chat__close {
+  margin-left: 0.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -331,6 +581,13 @@ onUnmounted(() => {
   margin-bottom: 0.75rem;
 }
 
+.chat__message--mention {
+  background: rgba(233, 69, 96, 0.08);
+  border: 1px solid rgba(233, 69, 96, 0.25);
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
 .chat__message:last-child {
   margin-bottom: 0;
 }
@@ -357,6 +614,13 @@ onUnmounted(() => {
   font-size: 0.875rem;
   line-height: 1.4;
   word-wrap: break-word;
+}
+
+.chat__message-mention {
+  color: #fff;
+  background: rgba(233, 69, 96, 0.3);
+  padding: 0 4px;
+  border-radius: 4px;
 }
 
 .chat__scroll-bottom {

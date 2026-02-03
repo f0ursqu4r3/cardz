@@ -9,6 +9,7 @@ import {
   HandAddSchema,
   HandRemoveSchema,
   ChatSendSchema,
+  ChatDeleteSchema,
   ClientMessageSchema,
 } from '../validation'
 
@@ -360,6 +361,24 @@ describe('ChatSendSchema', () => {
   })
 })
 
+describe('ChatDeleteSchema', () => {
+  test('accepts valid chat delete', () => {
+    const result = ChatDeleteSchema.safeParse({
+      type: 'chat:delete',
+      messageId: 'msg_123',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  test('rejects empty message id', () => {
+    const result = ChatDeleteSchema.safeParse({
+      type: 'chat:delete',
+      messageId: '',
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
 describe('ClientMessageSchema (discriminated union)', () => {
   test('parses room:create message', () => {
     const result = ClientMessageSchema.safeParse({
@@ -389,6 +408,14 @@ describe('ClientMessageSchema (discriminated union)', () => {
     const result = ClientMessageSchema.safeParse({
       type: 'chat:send',
       message: 'Hello',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  test('parses chat:delete message', () => {
+    const result = ClientMessageSchema.safeParse({
+      type: 'chat:delete',
+      messageId: 'msg_123',
     })
     expect(result.success).toBe(true)
   })

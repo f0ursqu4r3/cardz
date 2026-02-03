@@ -364,6 +364,10 @@ export function handleChatMessage(
       return true
     }
 
+    case 'chat:deleted':
+      chatMessages.value = chatMessages.value.filter((msg) => msg.id !== message.messageId)
+      return true
+
     case 'chat:typing_status':
       if (message.isTyping) {
         typingPlayers.value.set(message.playerId, message.playerName)

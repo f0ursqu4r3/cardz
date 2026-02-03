@@ -13,6 +13,12 @@
 - [x] Role tools UI + moderation audit log visibility
 - [x] Table snapshots (manual save/restore) + autosave indicator
 - [x] Spectator polish (view-only cursor/chat, banner, request-to-play)
+- [x] Undo/redo action history
+- [x] Zone templates + visibility/locking rules
+- [x] Optimize client ID maps (incremental maps vs rebuilds in card store)
+- [x] Performance settings (low-latency drag, reduce effects)
+- [x] Chat upgrades (mentions/pings, timestamps toggle, moderation queue)
+- [x] Mobile HUD + gesture improvements
 
 ---
 
@@ -24,12 +30,6 @@
 
 ### Next (2–4 sprints)
 
-- [ ] Undo/redo action history
-- [ ] Zone templates + visibility/locking rules
-- [ ] Optimize client ID maps (incremental maps vs rebuilds in card store)
-- [ ] Performance settings (low-latency drag, reduce effects)
-- [ ] Chat upgrades (mentions/pings, timestamps toggle, moderation queue)
-- [ ] Mobile HUD + gesture improvements
 - [ ] Table templates (save/load configurations)
 
 ### Later / Backlog

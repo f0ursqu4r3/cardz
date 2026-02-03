@@ -3,6 +3,10 @@ import { ref, computed, watch } from 'vue'
 import {
   Settings,
   RotateCcw,
+  CornerUpLeft,
+  CornerUpRight,
+  Zap,
+  Sparkles,
   Globe,
   Lock,
   Palette,
@@ -20,6 +24,11 @@ const props = defineProps<{
   snapshots: { id: number; name: string; createdAt: number; createdBy: string }[]
   lastAutosaveAt: number | null
   canManageSnapshots: boolean
+  canUndoRedo: boolean
+  performanceSettings: {
+    lowLatencyDrag: boolean
+    reduceEffects: boolean
+  }
 }>()
 
 const emit = defineEmits<{
@@ -29,6 +38,9 @@ const emit = defineEmits<{
   reset: []
   'snapshot:create': [name?: string]
   'snapshot:restore': [snapshotId: number]
+  undo: []
+  redo: []
+  'update:performance': [settings: { lowLatencyDrag?: boolean; reduceEffects?: boolean }]
   close: []
 }>()
 
@@ -235,6 +247,54 @@ const formatAutosave = (timestamp: number | null): string => {
           <span class="settings-label">Autosave</span>
         </div>
         <span class="settings-value">{{ formatAutosave(lastAutosaveAt) }}</span>
+      </div>
+
+      <!-- History -->
+      <div class="settings-row settings-row--history">
+        <div class="settings-label-group">
+          <CornerUpLeft :size="16" />
+          <span class="settings-label">History</span>
+        </div>
+        <div class="settings-history-actions">
+          <button class="settings-history-btn" :disabled="!canUndoRedo" @click="$emit('undo')">
+            <CornerUpLeft :size="14" />
+            <span>Undo</span>
+          </button>
+          <button class="settings-history-btn" :disabled="!canUndoRedo" @click="$emit('redo')">
+            <CornerUpRight :size="14" />
+            <span>Redo</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Performance -->
+      <div class="settings-row settings-row--performance">
+        <div class="settings-label-group">
+          <Zap :size="16" />
+          <span class="settings-label">Low-latency drag</span>
+        </div>
+        <button
+          class="settings-toggle-btn"
+          :class="{ 'settings-toggle-btn--active': performanceSettings.lowLatencyDrag }"
+          @click="
+            emit('update:performance', { lowLatencyDrag: !performanceSettings.lowLatencyDrag })
+          "
+        >
+          {{ performanceSettings.lowLatencyDrag ? 'On' : 'Off' }}
+        </button>
+      </div>
+      <div class="settings-row settings-row--performance">
+        <div class="settings-label-group">
+          <Sparkles :size="16" />
+          <span class="settings-label">Reduce effects</span>
+        </div>
+        <button
+          class="settings-toggle-btn"
+          :class="{ 'settings-toggle-btn--active': performanceSettings.reduceEffects }"
+          @click="emit('update:performance', { reduceEffects: !performanceSettings.reduceEffects })"
+        >
+          {{ performanceSettings.reduceEffects ? 'On' : 'Off' }}
+        </button>
       </div>
 
       <!-- Snapshots -->
@@ -515,6 +575,65 @@ const formatAutosave = (timestamp: number | null): string => {
   color: #666;
   text-align: center;
   margin: 0;
+}
+
+.settings-row--history {
+  align-items: center;
+}
+
+.settings-history-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.settings-history-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.settings-history-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-history-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.settings-row--performance {
+  align-items: center;
+}
+
+.settings-toggle-btn {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.settings-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.settings-toggle-btn--active {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #22c55e;
 }
 
 .settings-row--snapshots {

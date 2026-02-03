@@ -161,6 +161,21 @@ export function logZoneDeleted(
 }
 
 /**
+ * Helper to log chat message deletion
+ */
+export function logChatDeleted(
+  clients: Map<string, GenericWebSocket>,
+  roomCode: string,
+  moderatorId: string,
+  moderatorName: string,
+  targetName?: string,
+): void {
+  logActivity(clients, roomCode, moderatorId, moderatorName, 'chat_deleted', {
+    targetName,
+  })
+}
+
+/**
  * Helper to log die rolled
  */
 export function logDieRolled(
@@ -229,6 +244,30 @@ export function logTableReset(
   playerName: string,
 ): void {
   logActivity(clients, roomCode, playerId, playerName, 'table_reset')
+}
+
+/**
+ * Helper to log undo
+ */
+export function logUndo(
+  clients: Map<string, GenericWebSocket>,
+  roomCode: string,
+  playerId: string,
+  playerName: string,
+): void {
+  logActivity(clients, roomCode, playerId, playerName, 'undo')
+}
+
+/**
+ * Helper to log redo
+ */
+export function logRedo(
+  clients: Map<string, GenericWebSocket>,
+  roomCode: string,
+  playerId: string,
+  playerName: string,
+): void {
+  logActivity(clients, roomCode, playerId, playerName, 'redo')
 }
 
 /**

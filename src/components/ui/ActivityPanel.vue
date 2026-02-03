@@ -26,6 +26,7 @@ const moderationTypes = new Set([
   'player_banned',
   'player_promoted',
   'player_demoted',
+  'chat_deleted',
 ])
 
 const filteredEntries = computed(() => {
@@ -114,6 +115,14 @@ const formatActivity = (entry: ActivityLogEntry): string => {
       return `${name} stopped ${data.name || 'timer'}`
     case 'table_reset':
       return `${name} reset the table`
+    case 'undo':
+      return `${name} undid an action`
+    case 'redo':
+      return `${name} redid an action`
+    case 'chat_deleted': {
+      const targetName = (data.targetName as string) || 'a player'
+      return `${name} removed a chat message from ${targetName}`
+    }
     case 'settings_changed':
       return `${name} changed settings (${data.setting || 'unknown'})`
     case 'player_kicked':
@@ -149,6 +158,9 @@ const getActivityColor = (actionType: string): string => {
       return '#60a5fa' // blue
     case 'table_reset':
       return '#f97316' // orange
+    case 'undo':
+    case 'redo':
+      return '#f59e0b' // amber
     case 'counter_changed':
       return '#a78bfa' // purple
     case 'timer_started':

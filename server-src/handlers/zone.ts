@@ -97,6 +97,11 @@ export function handleZoneUpdate(
     return
   }
 
+  const isCreator = room.creatorPlayerId === playerId
+  const isModerator = room.moderatorPlayerIds.has(playerId)
+  const isOwner = zone.ownerId === playerId
+  const canManageZone = isCreator || isModerator || isOwner
+
   // Allow unlocking a locked zone, but block other updates
   const isOnlyUnlocking = msg.updates.locked === false && Object.keys(msg.updates).length === 1
 
@@ -111,22 +116,42 @@ export function handleZoneUpdate(
     return
   }
 
+  if (isOnlyUnlocking && !canManageZone) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'zone:update',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the zone owner or table moderators can unlock this zone',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  if (msg.updates.locked !== undefined && !canManageZone) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'zone:update',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the zone owner or table moderators can lock this zone',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
   const wantsOwnershipUpdate =
     msg.updates.visibility !== undefined || msg.updates.ownerId !== undefined
   if (wantsOwnershipUpdate) {
-    const isCreator = room.creatorPlayerId === playerId
-    const isOwner = zone.ownerId === playerId
-    if (!isCreator && !isOwner) {
+    if (!canManageZone) {
       send(ws, {
         type: 'error',
         originalAction: 'zone:update',
         code: 'PERMISSION_DENIED',
-        message: 'Only the zone owner or table creator can change visibility',
+        message: 'Only the zone owner or table moderators can change visibility',
         requestId: msg.requestId,
       })
       return
     }
-    if (!isCreator && msg.updates.ownerId !== undefined) {
+    if (!isCreator && !isModerator && msg.updates.ownerId !== undefined) {
       send(ws, {
         type: 'error',
         originalAction: 'zone:update',
@@ -247,6 +272,34 @@ export function handleZoneAddCard(
     return
   }
 
+  const playerId = clientData.playerId
+  const isCreator = playerId ? room.creatorPlayerId === playerId : false
+  const isModerator = playerId ? room.moderatorPlayerIds.has(playerId) : false
+  const isOwner = playerId ? zone.ownerId === playerId : false
+  const canManageZone = isCreator || isModerator || isOwner
+
+  if (zone.locked) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'zone:add_card',
+      code: 'ZONE_LOCKED',
+      message: 'Zone is locked',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  if (zone.visibility === 'owner' && !canManageZone) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'zone:add_card',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the zone owner or table moderators can add cards to this zone',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
   const card = gameState.getCard(msg.cardId)
   if (!card) {
     send(ws, {
@@ -318,6 +371,34 @@ export function handleZoneAddCards(
       originalAction: 'zone:add_cards',
       code: 'NOT_FOUND',
       message: 'Zone not found',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  const playerId = clientData.playerId
+  const isCreator = playerId ? room.creatorPlayerId === playerId : false
+  const isModerator = playerId ? room.moderatorPlayerIds.has(playerId) : false
+  const isOwner = playerId ? zone.ownerId === playerId : false
+  const canManageZone = isCreator || isModerator || isOwner
+
+  if (zone.locked) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'zone:add_cards',
+      code: 'ZONE_LOCKED',
+      message: 'Zone is locked',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  if (zone.visibility === 'owner' && !canManageZone) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'zone:add_cards',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the zone owner or table moderators can add cards to this zone',
       requestId: msg.requestId,
     })
     return

@@ -5,12 +5,13 @@ import { ClientMessageSchema } from './validation'
 import type { ClientData, GenericWebSocket } from './utils/broadcast'
 import { send, broadcastToRoom, broadcastToViewport, updateClientViewport } from './utils/broadcast'
 import { CURSOR_THROTTLE_MS } from '../shared/types'
-import { closeDatabase, saveChatMessage } from './persistence'
+import { closeDatabase, saveChatMessage, deleteChatMessage } from './persistence'
 import { RateLimiter } from './utils/rate-limit'
 import { sanitizeChatMessage } from './utils/sanitize'
 import { heartbeatManager } from './utils/heartbeat'
 import { config, logConfigSummary } from './config'
 import { initAnalytics, trackConnection, trackChatMessage, getStats } from './analytics'
+import { logChatDeleted } from './activity'
 
 // Handlers
 import {
@@ -60,6 +61,8 @@ import {
   handleTableSnapshotCreate,
   handleTableSnapshotList,
   handleTableSnapshotRestore,
+  handleTableUndo,
+  handleTableRedo,
 } from './handlers/table'
 import {
   handleCounterCreate,
@@ -99,6 +102,49 @@ const roomManager = new RoomManager()
 
 // Initialize analytics with room manager reference
 initAnalytics(roomManager)
+
+const UNDOABLE_ACTIONS = new Set([
+  'card:move',
+  'card:flip',
+  'stack:create',
+  'stack:move',
+  'stack:add_card',
+  'stack:remove_card',
+  'stack:merge',
+  'stack:shuffle',
+  'stack:flip',
+  'stack:set_faces',
+  'stack:reorder',
+  'zone:create',
+  'zone:update',
+  'zone:delete',
+  'zone:add_card',
+  'zone:add_cards',
+  'counter:create',
+  'counter:update',
+  'counter:increment',
+  'counter:delete',
+  'token:create',
+  'token:update',
+  'token:delete',
+  'die:create',
+  'die:roll',
+  'die:update',
+  'die:delete',
+  'timer:create',
+  'timer:start',
+  'timer:pause',
+  'timer:reset',
+  'timer:update',
+  'timer:delete',
+  'hand:add',
+  'hand:remove',
+  'hand:reorder',
+  'hand:add_stack',
+  'selection:stack',
+  'table:reset',
+  'table:snapshot_restore',
+])
 
 // Track cursor update timestamps for throttling
 const lastCursorUpdate = new Map<string, number>()
@@ -546,6 +592,12 @@ const server = Bun.serve<ClientData>({
           return
         }
 
+        const undoActorId = clientData.playerId ?? clientData.id
+        const undoable = UNDOABLE_ACTIONS.has(msg.type)
+        const beforeManager = undoable ? room.gameState : null
+        const beforeVersion = undoable ? room.gameState.getVersion() : null
+        const undoSnapshot = undoable ? roomManager.prepareUndoSnapshot(room, undoActorId) : null
+
         // Route to appropriate handler
         switch (msg.type) {
           // Card actions
@@ -876,6 +928,39 @@ const server = Bun.serve<ClientData>({
             break
           }
 
+          case 'chat:delete': {
+            if (!clientData.playerId) break
+            if (!roomManager.isCreatorOrModerator(room.code, clientData.playerId)) {
+              send(socket, {
+                type: 'error',
+                code: 'PERMISSION_DENIED',
+                message: 'Only the table creator or moderators can remove chat messages',
+              })
+              break
+            }
+
+            const player = room.players.get(clientData.playerId)
+            if (!player) break
+
+            const deleted = deleteChatMessage(room.code, msg.messageId)
+            if (!deleted) {
+              send(socket, {
+                type: 'error',
+                code: 'NOT_FOUND',
+                message: 'Chat message not found',
+              })
+              break
+            }
+
+            broadcastToRoom(clients, room.code, {
+              type: 'chat:deleted',
+              messageId: msg.messageId,
+            })
+
+            logChatDeleted(clients, room.code, clientData.playerId, player.name, deleted.playerName)
+            break
+          }
+
           case 'chat:typing': {
             if (!clientData.playerId) break
             const player = room.players.get(clientData.playerId)
@@ -918,6 +1003,12 @@ const server = Bun.serve<ClientData>({
           case 'table:snapshot_restore':
             handleTableSnapshotRestore(socket, msg, roomManager)
             break
+          case 'table:undo':
+            handleTableUndo(socket, msg, roomManager)
+            break
+          case 'table:redo':
+            handleTableRedo(socket, msg, roomManager)
+            break
 
           // Player moderation
           case 'player:kick':
@@ -935,6 +1026,17 @@ const server = Bun.serve<ClientData>({
           case 'player:update':
             handlePlayerUpdate(socket, msg, roomManager)
             break
+        }
+
+        if (undoable && beforeManager && beforeVersion !== null) {
+          const didMutate =
+            room.gameState !== beforeManager || room.gameState.getVersion() !== beforeVersion
+          if (didMutate) {
+            if (undoSnapshot) {
+              roomManager.commitUndoSnapshot(room, undoSnapshot)
+            }
+            roomManager.noteUndoMutation(room, undoActorId)
+          }
         }
       } catch (err) {
         console.error(`[error] Handler error for ${msg.type}:`, err)

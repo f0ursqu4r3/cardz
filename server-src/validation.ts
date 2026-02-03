@@ -679,6 +679,14 @@ export const TableSnapshotRestoreSchema = z.object({
   snapshotId: z.number().int().positive(),
 })
 
+export const TableUndoSchema = z.object({
+  type: z.literal('table:undo'),
+})
+
+export const TableRedoSchema = z.object({
+  type: z.literal('table:redo'),
+})
+
 // ============================================================================
 // Chat Message Schemas (Client → Server)
 // ============================================================================
@@ -691,6 +699,11 @@ export const ChatSendSchema = z.object({
 export const ChatTypingSchema = z.object({
   type: z.literal('chat:typing'),
   isTyping: z.boolean(),
+})
+
+export const ChatDeleteSchema = z.object({
+  type: z.literal('chat:delete'),
+  messageId: z.string().min(1),
 })
 
 // ============================================================================
@@ -777,8 +790,11 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   TableSnapshotCreateSchema,
   TableSnapshotListSchema,
   TableSnapshotRestoreSchema,
+  TableUndoSchema,
+  TableRedoSchema,
   ChatSendSchema,
   ChatTypingSchema,
+  ChatDeleteSchema,
   PongSchema,
 ])
 

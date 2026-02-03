@@ -6,12 +6,14 @@ import type {
   TableSnapshotCreate,
   TableSnapshotListRequest,
   TableSnapshotRestore,
+  TableUndo,
+  TableRedo,
 } from '../../shared/types'
-import type { RoomManager } from '../room'
+import type { RoomManager, Room } from '../room'
 import type { GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
 import { sanitizeTableName } from '../utils/sanitize'
-import { logTableReset, logSettingsChanged } from '../activity'
+import { logTableReset, logSettingsChanged, logUndo, logRedo } from '../activity'
 import { createSnapshot, listSnapshots, loadSnapshot } from '../persistence'
 import { GameStateManager } from '../game-state'
 
@@ -40,6 +42,27 @@ function clearLocksInState(state: {
   }
   for (const timer of state.timers) {
     timer.lockedBy = null
+  }
+}
+
+function broadcastStateSync(roomManager: RoomManager, room: Room): void {
+  const state = room.gameState.getState()
+  const handCounts = state.hands.map((h) => ({
+    playerId: h.playerId,
+    count: h.cardIds.length,
+  }))
+
+  for (const client of roomManager.getClients().values()) {
+    const data = getClientData(client)
+    if (data.roomCode !== room.code || !data.playerId) continue
+    const playerHand = state.hands.find((h) => h.playerId === data.playerId)
+    send(client, {
+      type: 'state:sync',
+      state,
+      yourHand: playerHand?.cardIds ?? [],
+      handCounts,
+      stateVersion: room.gameState.getVersion(),
+    })
   }
 }
 
@@ -463,20 +486,159 @@ export function handleTableSnapshotRestore(
     },
   })
 
-  for (const client of roomManager.getClients().values()) {
-    const data = getClientData(client)
-    if (data.roomCode !== room.code || !data.playerId) continue
-    const playerHand = snapshot.gameState.hands.find((h) => h.playerId === data.playerId)
-    const handCounts = snapshot.gameState.hands.map((h) => ({
-      playerId: h.playerId,
-      count: h.cardIds.length,
-    }))
-    send(client, {
-      type: 'state:sync',
-      state: snapshot.gameState,
-      yourHand: playerHand?.cardIds ?? [],
-      handCounts,
-      stateVersion: room.gameState.getVersion(),
+  broadcastStateSync(roomManager, room)
+}
+
+/**
+ * Handle table undo request
+ * Only the room creator or moderator can undo
+ */
+export function handleTableUndo(
+  ws: GenericWebSocket,
+  msg: TableUndo,
+  roomManager: RoomManager,
+): void {
+  const clientData = getClientData(ws)
+  if (!clientData.roomCode) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:undo',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+      requestId: msg.requestId,
     })
+    return
   }
+
+  if (!clientData.playerId || !roomManager.isCreatorOrModerator(clientData.roomCode, clientData.playerId)) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:undo',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the table creator or moderators can undo actions',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  const room = roomManager.getRoom(clientData.roomCode)
+  if (!room) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:undo',
+      code: 'NOT_FOUND',
+      message: 'Room not found',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  const snapshot = roomManager.undo(room.code)
+  if (!snapshot) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:undo',
+      code: 'NOTHING_TO_UNDO',
+      message: 'No actions to undo',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  clearLocksInState(snapshot)
+  room.gameState = new GameStateManager(snapshot)
+  room.locks.releaseAll()
+
+  for (const playerId of room.players.keys()) {
+    room.gameState.getOrCreateHand(playerId)
+  }
+
+  roomManager.resetUndoGrouping(room.code)
+  roomManager.markDirtyImmediate(room.code)
+
+  broadcastStateSync(roomManager, room)
+
+  logUndo(
+    roomManager.getClients(),
+    room.code,
+    clientData.playerId,
+    clientData.name,
+  )
+}
+
+/**
+ * Handle table redo request
+ * Only the room creator or moderator can redo
+ */
+export function handleTableRedo(
+  ws: GenericWebSocket,
+  msg: TableRedo,
+  roomManager: RoomManager,
+): void {
+  const clientData = getClientData(ws)
+  if (!clientData.roomCode) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:redo',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  if (!clientData.playerId || !roomManager.isCreatorOrModerator(clientData.roomCode, clientData.playerId)) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:redo',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the table creator or moderators can redo actions',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  const room = roomManager.getRoom(clientData.roomCode)
+  if (!room) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:redo',
+      code: 'NOT_FOUND',
+      message: 'Room not found',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  const snapshot = roomManager.redo(room.code)
+  if (!snapshot) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:redo',
+      code: 'NOTHING_TO_REDO',
+      message: 'No actions to redo',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  clearLocksInState(snapshot)
+  room.gameState = new GameStateManager(snapshot)
+  room.locks.releaseAll()
+
+  for (const playerId of room.players.keys()) {
+    room.gameState.getOrCreateHand(playerId)
+  }
+
+  roomManager.resetUndoGrouping(room.code)
+  roomManager.markDirtyImmediate(room.code)
+
+  broadcastStateSync(roomManager, room)
+
+  logRedo(
+    roomManager.getClients(),
+    room.code,
+    clientData.playerId,
+    clientData.name,
+  )
 }

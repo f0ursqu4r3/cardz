@@ -83,6 +83,8 @@ export interface UseWebSocketReturn {
   createSnapshot: (name?: string) => void
   listSnapshots: () => void
   restoreSnapshot: (snapshotId: number) => void
+  undoTable: () => void
+  redoTable: () => void
 
   // Player moderation (creator or moderator)
   kickPlayer: (targetPlayerId: string) => void
@@ -96,6 +98,7 @@ export interface UseWebSocketReturn {
   // Chat
   sendChat: (message: string) => void
   sendTyping: (isTyping: boolean) => void
+  deleteChatMessage: (messageId: string) => void
 
   // Event handlers
   onMessage: (handler: (message: ServerMessage) => void) => void
@@ -412,6 +415,14 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     send({ type: 'table:snapshot_restore', snapshotId })
   }
 
+  const undoTable = () => {
+    send({ type: 'table:undo' })
+  }
+
+  const redoTable = () => {
+    send({ type: 'table:redo' })
+  }
+
   // Chat
   const sendChat = (message: string) => {
     if (message.trim()) {
@@ -421,6 +432,11 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
 
   const sendTyping = (isTyping: boolean) => {
     send({ type: 'chat:typing', isTyping })
+  }
+
+  const deleteChatMessage = (messageId: string) => {
+    if (!messageId) return
+    send({ type: 'chat:delete', messageId })
   }
 
   // Player moderation (creator or moderator)
@@ -581,6 +597,8 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     createSnapshot,
     listSnapshots,
     restoreSnapshot,
+    undoTable,
+    redoTable,
     kickPlayer,
     banPlayer,
     promotePlayer,
@@ -588,6 +606,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     updatePlayer,
     sendChat,
     sendTyping,
+    deleteChatMessage,
     onMessage,
     offMessage,
   }

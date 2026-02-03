@@ -372,6 +372,14 @@ export interface TableSnapshotRestore {
   snapshotId: number
 }
 
+export interface TableUndo {
+  type: 'table:undo'
+}
+
+export interface TableRedo {
+  type: 'table:redo'
+}
+
 // ============================================================================
 // Table Management Messages (Server → Client)
 // ============================================================================
@@ -1311,6 +1319,11 @@ export interface ChatTyping {
   isTyping: boolean
 }
 
+export interface ChatDelete {
+  type: 'chat:delete'
+  messageId: string
+}
+
 // ============================================================================
 // Chat Messages (Server → Client)
 // ============================================================================
@@ -1328,6 +1341,11 @@ export interface ChatMessage {
 export interface ChatHistory {
   type: 'chat:history'
   messages: Omit<ChatMessage, 'type'>[]
+}
+
+export interface ChatDeleted {
+  type: 'chat:deleted'
+  messageId: string
 }
 
 export interface ChatTypingStatus {
@@ -1360,6 +1378,9 @@ export type ActivityType =
   | 'timer_started'
   | 'timer_stopped'
   | 'table_reset'
+  | 'undo'
+  | 'redo'
+  | 'chat_deleted'
   | 'settings_changed'
 
 export interface ActivityLogEntry {
@@ -1423,6 +1444,8 @@ export type ErrorCode =
   | 'INTERNAL_ERROR'
   | 'PERMISSION_DENIED'
   | 'SPECTATOR_READONLY'
+  | 'NOTHING_TO_UNDO'
+  | 'NOTHING_TO_REDO'
   | 'KICKED'
   | 'BANNED'
 
@@ -1502,8 +1525,11 @@ type ClientMessageBase =
   | TableSnapshotCreate
   | TableSnapshotListRequest
   | TableSnapshotRestore
+  | TableUndo
+  | TableRedo
   | ChatSend
   | ChatTyping
+  | ChatDelete
   | Pong
 
 // All client messages can optionally include a requestId for error correlation
@@ -1593,6 +1619,7 @@ type ServerMessageBase =
   | TableAutosave
   | ChatMessage
   | ChatHistory
+  | ChatDeleted
   | ChatTypingStatus
   | ActivityLogged
   | ActivityHistory
