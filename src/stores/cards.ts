@@ -51,6 +51,16 @@ export const useCardStore = defineStore('cards', () => {
     return map
   }
 
+  const watchIdMap = <T extends { id: number }>(source: Ref<T[]>, target: Ref<Map<number, T>>) => {
+    watch(
+      () => [source.value, source.value.length],
+      () => {
+        target.value = rebuildIdMap(source.value)
+      },
+      { immediate: true },
+    )
+  }
+
   // O(1) lookup Maps - rebuild only on structural array changes
   const cardById = shallowRef(new Map<number, CardData>())
   const stackById = shallowRef(new Map<number, Stack>())
@@ -60,55 +70,13 @@ export const useCardStore = defineStore('cards', () => {
   const dieById = shallowRef(new Map<number, Die>())
   const timerById = shallowRef(new Map<number, Timer>())
 
-  watch(
-    () => cards.value,
-    (value) => {
-      cardById.value = rebuildIdMap(value)
-    },
-    { immediate: true },
-  )
-  watch(
-    () => stacks.value,
-    (value) => {
-      stackById.value = rebuildIdMap(value)
-    },
-    { immediate: true },
-  )
-  watch(
-    () => zones.value,
-    (value) => {
-      zoneById.value = rebuildIdMap(value)
-    },
-    { immediate: true },
-  )
-  watch(
-    () => counters.value,
-    (value) => {
-      counterById.value = rebuildIdMap(value)
-    },
-    { immediate: true },
-  )
-  watch(
-    () => tokens.value,
-    (value) => {
-      tokenById.value = rebuildIdMap(value)
-    },
-    { immediate: true },
-  )
-  watch(
-    () => dice.value,
-    (value) => {
-      dieById.value = rebuildIdMap(value)
-    },
-    { immediate: true },
-  )
-  watch(
-    () => timers.value,
-    (value) => {
-      timerById.value = rebuildIdMap(value)
-    },
-    { immediate: true },
-  )
+  watchIdMap(cards, cardById)
+  watchIdMap(stacks, stackById)
+  watchIdMap(zones, zoneById)
+  watchIdMap(counters, counterById)
+  watchIdMap(tokens, tokenById)
+  watchIdMap(dice, dieById)
+  watchIdMap(timers, timerById)
 
   // Helper functions for O(1) lookups
   const getCardById = (id: number): CardData | undefined => cardById.value.get(id)
