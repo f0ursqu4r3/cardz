@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
+import { ref, nextTick, watch, onMounted, onUnmounted, computed } from 'vue'
 import { Activity, X, ChevronDown } from 'lucide-vue-next'
 import type { ActivityLogEntry } from '../../../shared/types'
 
-const props = defineProps<{
-  entries: ActivityLogEntry[]
-  isOpen: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    entries: ActivityLogEntry[]
+    isOpen: boolean
+    canModerate?: boolean
+  }>(),
+  { canModerate: false },
+)
 
 const emit = defineEmits<{
   'update:isOpen': [value: boolean]
@@ -15,6 +19,19 @@ const emit = defineEmits<{
 const entriesRef = ref<HTMLDivElement | null>(null)
 const unreadCount = ref(0)
 const isAtBottom = ref(true)
+const showModerationOnly = ref(false)
+
+const moderationTypes = new Set([
+  'player_kicked',
+  'player_banned',
+  'player_promoted',
+  'player_demoted',
+])
+
+const filteredEntries = computed(() => {
+  if (!showModerationOnly.value) return props.entries
+  return props.entries.filter((entry) => moderationTypes.has(entry.actionType))
+})
 
 // Track unread entries when panel is closed
 watch(
@@ -103,6 +120,10 @@ const formatActivity = (entry: ActivityLogEntry): string => {
       return `${name} kicked ${data.target || 'a player'}`
     case 'player_banned':
       return `${name} banned ${data.target || 'a player'}`
+    case 'player_promoted':
+      return `${name} promoted ${data.target || 'a player'}`
+    case 'player_demoted':
+      return `${name} demoted ${data.target || 'a player'}`
     default:
       return `${name} performed an action`
   }
@@ -118,6 +139,8 @@ const getActivityColor = (actionType: string): string => {
       return '#f87171' // red
     case 'player_kicked':
     case 'player_banned':
+    case 'player_promoted':
+    case 'player_demoted':
       return '#ef4444' // bright red for moderation actions
     case 'die_rolled':
       return '#fbbf24' // yellow
@@ -172,15 +195,33 @@ onUnmounted(() => {
       <div class="activity__header">
         <Activity :size="16" />
         <span>Activity Log</span>
-        <button class="activity__close" @click="togglePanel">
-          <X :size="16" />
-        </button>
+        <div class="activity__header-right">
+          <div v-if="props.canModerate" class="activity__filters">
+            <button
+              class="activity__filter"
+              :class="{ 'activity__filter--active': !showModerationOnly }"
+              @click="showModerationOnly = false"
+            >
+              All
+            </button>
+            <button
+              class="activity__filter"
+              :class="{ 'activity__filter--active': showModerationOnly }"
+              @click="showModerationOnly = true"
+            >
+              Mod
+            </button>
+          </div>
+          <button class="activity__close" @click="togglePanel">
+            <X :size="16" />
+          </button>
+        </div>
       </div>
 
       <div ref="entriesRef" class="activity__entries" @scroll="handleScroll">
-        <div v-if="entries.length === 0" class="activity__empty">No activity yet</div>
+        <div v-if="filteredEntries.length === 0" class="activity__empty">No activity yet</div>
         <div
-          v-for="entry in entries"
+          v-for="entry in filteredEntries"
           :key="entry.id"
           class="activity__entry"
           :style="{ '--activity-color': getActivityColor(entry.actionType) }"
@@ -283,8 +324,36 @@ onUnmounted(() => {
   font-size: 0.875rem;
 }
 
-.activity__close {
+.activity__header-right {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.activity__filters {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.activity__filter {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.activity__filter--active {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.activity__close {
   display: flex;
   align-items: center;
   justify-content: center;

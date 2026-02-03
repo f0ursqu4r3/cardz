@@ -9,6 +9,7 @@ import type {
   Player,
   ServerMessage,
   TableSettings,
+  TableSnapshotInfo,
   ChatMessage,
   ActivityLogEntry,
 } from '../../../../shared/types'
@@ -25,6 +26,8 @@ export interface RoomStateRefs {
   tableSettings: Ref<TableSettings>
   tableName: Ref<string>
   tableIsPublic: Ref<boolean>
+  snapshots: Ref<TableSnapshotInfo[]>
+  lastAutosaveAt: Ref<number | null>
   chatMessages: Ref<ChatMessage[]>
   typingPlayers: Ref<Map<string, string>>
   activityLog: Ref<ActivityLogEntry[]>
@@ -60,6 +63,10 @@ export function handleRoomMessage(
       playerId.value = message.playerId
       gameState.value = message.state
       players.value = [{ id: message.playerId, name: '', connected: true, color: '#ef4444', role: 'creator' }]
+      handCounts.value.clear()
+      for (const hand of message.state.hands) {
+        handCounts.value.set(hand.playerId, hand.cardIds.length)
+      }
       // Store HMAC-signed session token for secure reconnection
       callbacks.storeSessionToken(message.sessionToken)
       console.log('[ws] room created:', message.roomCode)
@@ -74,6 +81,10 @@ export function handleRoomMessage(
       const ourHand = message.state.hands.find((h) => h.playerId === message.playerId)
       if (ourHand) {
         handCardIds.value = ourHand.cardIds
+      }
+      handCounts.value.clear()
+      for (const hand of message.state.hands) {
+        handCounts.value.set(hand.playerId, hand.cardIds.length)
       }
       // Restore cursor positions from other players
       if (message.cursors) {
@@ -109,6 +120,17 @@ export function handleRoomMessage(
         players.value = [...players.value, message.player]
       }
       console.log('[ws] player reconnected:', message.player.name)
+      return true
+    }
+
+    case 'room:player_disconnected': {
+      players.value = players.value.map((p) =>
+        p.id === message.playerId ? { ...p, connected: false } : p,
+      )
+      const newCursors = new Map(cursors.value)
+      newCursors.delete(message.playerId)
+      cursors.value = newCursors
+      console.log('[ws] player disconnected:', message.playerId)
       return true
     }
 
@@ -199,7 +221,15 @@ export function handleTableMessage(
   message: ServerMessage,
   refs: RoomStateRefs,
 ): boolean {
-  const { gameState, handCardIds, tableSettings, tableName, tableIsPublic } = refs
+  const {
+    gameState,
+    handCardIds,
+    tableSettings,
+    tableName,
+    tableIsPublic,
+    snapshots,
+    lastAutosaveAt,
+  } = refs
 
   switch (message.type) {
     case 'table:reset':
@@ -227,6 +257,23 @@ export function handleTableMessage(
       tableName.value = message.name
       tableIsPublic.value = message.isPublic
       tableSettings.value = message.settings
+      return true
+
+    case 'table:snapshot_list':
+      snapshots.value = message.snapshots
+      return true
+
+    case 'table:snapshot_created':
+      if (!snapshots.value.find((s) => s.id === message.snapshot.id)) {
+        snapshots.value = [message.snapshot, ...snapshots.value]
+      }
+      return true
+
+    case 'table:snapshot_restored':
+      return true
+
+    case 'table:autosave':
+      lastAutosaveAt.value = message.timestamp
       return true
 
     default:

@@ -536,6 +536,9 @@ export function useGameStateSync(config: GameStateSyncConfig) {
       case 'room:player_left':
         cardStore.clearRemoteSelection(message.playerId)
         break
+      case 'room:player_disconnected':
+        cardStore.clearRemoteSelection(message.playerId)
+        break
 
       case 'table:reset':
         // Table was reset - sync the new state (hands are cleared)

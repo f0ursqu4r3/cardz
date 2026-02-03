@@ -160,6 +160,7 @@ function handleMessage(ws: ServerWebSocket<ClientData>, msg: { type: string; [ke
           type: 'room:joined',
           roomCode,
           playerId: ws.data.id,
+          isReconnect: false,
           players: Array.from(room.players.entries()).map(([id, p]) => ({
             id,
             name: p.name,

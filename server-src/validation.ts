@@ -665,6 +665,20 @@ export const TableUpdateNameSchema = z.object({
   name: z.string().min(1).max(50).trim(),
 })
 
+export const TableSnapshotCreateSchema = z.object({
+  type: z.literal('table:snapshot_create'),
+  name: z.string().min(1).max(60).trim().optional(),
+})
+
+export const TableSnapshotListSchema = z.object({
+  type: z.literal('table:snapshot_list'),
+})
+
+export const TableSnapshotRestoreSchema = z.object({
+  type: z.literal('table:snapshot_restore'),
+  snapshotId: z.number().int().positive(),
+})
+
 // ============================================================================
 // Chat Message Schemas (Client → Server)
 // ============================================================================
@@ -760,6 +774,9 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   TableUpdateSettingsSchema,
   TableUpdateVisibilitySchema,
   TableUpdateNameSchema,
+  TableSnapshotCreateSchema,
+  TableSnapshotListSchema,
+  TableSnapshotRestoreSchema,
   ChatSendSchema,
   ChatTypingSchema,
   PongSchema,

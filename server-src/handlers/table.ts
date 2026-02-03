@@ -3,12 +3,45 @@ import type {
   TableUpdateSettings,
   TableUpdateVisibility,
   TableUpdateName,
+  TableSnapshotCreate,
+  TableSnapshotListRequest,
+  TableSnapshotRestore,
 } from '../../shared/types'
 import type { RoomManager } from '../room'
 import type { GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
 import { sanitizeTableName } from '../utils/sanitize'
 import { logTableReset, logSettingsChanged } from '../activity'
+import { createSnapshot, listSnapshots, loadSnapshot } from '../persistence'
+import { GameStateManager } from '../game-state'
+
+function clearLocksInState(state: {
+  cards: { lockedBy: string | null }[]
+  stacks: { lockedBy: string | null }[]
+  counters: { lockedBy: string | null }[]
+  tokens: { lockedBy: string | null }[]
+  dice: { lockedBy: string | null }[]
+  timers: { lockedBy: string | null }[]
+}): void {
+  for (const card of state.cards) {
+    card.lockedBy = null
+  }
+  for (const stack of state.stacks) {
+    stack.lockedBy = null
+  }
+  for (const counter of state.counters) {
+    counter.lockedBy = null
+  }
+  for (const token of state.tokens) {
+    token.lockedBy = null
+  }
+  for (const die of state.dice) {
+    die.lockedBy = null
+  }
+  for (const timer of state.timers) {
+    timer.lockedBy = null
+  }
+}
 
 /**
  * Handle table reset request
@@ -248,4 +281,202 @@ export function handleTableUpdateName(
   })
 
   console.log(`[table:name] Table ${clientData.roomCode} renamed to "${sanitizedName}"`)
+}
+
+/**
+ * Handle table snapshot creation
+ * Only the room creator can create snapshots
+ */
+export function handleTableSnapshotCreate(
+  ws: GenericWebSocket,
+  msg: TableSnapshotCreate,
+  roomManager: RoomManager,
+): void {
+  const clientData = getClientData(ws)
+  if (!clientData.roomCode) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:snapshot_create',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  if (!clientData.playerId || !roomManager.isCreator(clientData.roomCode, clientData.playerId)) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:snapshot_create',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the table creator can create snapshots',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  const room = roomManager.getRoom(clientData.roomCode)
+  if (!room) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:snapshot_create',
+      code: 'NOT_FOUND',
+      message: 'Room not found',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  const snapshotName = msg.name?.trim() || `Snapshot ${new Date().toISOString()}`
+  const snapshot = createSnapshot(
+    room.code,
+    snapshotName,
+    clientData.name || 'Host',
+    room.settings,
+    room.gameState.getState(),
+  )
+
+  if (!snapshot) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:snapshot_create',
+      code: 'INTERNAL_ERROR',
+      message: 'Failed to create snapshot',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  broadcastToRoom(roomManager.getClients(), room.code, {
+    type: 'table:snapshot_created',
+    snapshot,
+  })
+}
+
+/**
+ * Handle snapshot list request
+ */
+export function handleTableSnapshotList(
+  ws: GenericWebSocket,
+  _msg: TableSnapshotListRequest,
+  roomManager: RoomManager,
+): void {
+  const clientData = getClientData(ws)
+  if (!clientData.roomCode) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:snapshot_list',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+    })
+    return
+  }
+
+  const snapshots = listSnapshots(clientData.roomCode)
+  send(ws, {
+    type: 'table:snapshot_list',
+    snapshots,
+  })
+}
+
+/**
+ * Handle snapshot restore
+ * Only the room creator can restore snapshots
+ */
+export function handleTableSnapshotRestore(
+  ws: GenericWebSocket,
+  msg: TableSnapshotRestore,
+  roomManager: RoomManager,
+): void {
+  const clientData = getClientData(ws)
+  if (!clientData.roomCode) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:snapshot_restore',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  if (!clientData.playerId || !roomManager.isCreator(clientData.roomCode, clientData.playerId)) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:snapshot_restore',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the table creator can restore snapshots',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  const room = roomManager.getRoom(clientData.roomCode)
+  if (!room) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:snapshot_restore',
+      code: 'NOT_FOUND',
+      message: 'Room not found',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  const snapshot = loadSnapshot(room.code, msg.snapshotId)
+  if (!snapshot) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:snapshot_restore',
+      code: 'NOT_FOUND',
+      message: 'Snapshot not found',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  clearLocksInState(snapshot.gameState)
+
+  room.gameState = new GameStateManager(snapshot.gameState)
+  room.settings = snapshot.settings
+  room.locks.releaseAll()
+
+  for (const playerId of room.players.keys()) {
+    room.gameState.getOrCreateHand(playerId)
+  }
+
+  roomManager.markDirtyImmediate(room.code)
+
+  broadcastToRoom(roomManager.getClients(), room.code, {
+    type: 'table:settings_updated',
+    settings: room.settings,
+    playerId: clientData.playerId ?? clientData.id,
+  })
+
+  broadcastToRoom(roomManager.getClients(), room.code, {
+    type: 'table:snapshot_restored',
+    snapshot: {
+      id: snapshot.id,
+      name: snapshot.name,
+      createdAt: snapshot.createdAt,
+      createdBy: snapshot.createdBy,
+    },
+  })
+
+  for (const client of roomManager.getClients().values()) {
+    const data = getClientData(client)
+    if (data.roomCode !== room.code || !data.playerId) continue
+    const playerHand = snapshot.gameState.hands.find((h) => h.playerId === data.playerId)
+    const handCounts = snapshot.gameState.hands.map((h) => ({
+      playerId: h.playerId,
+      count: h.cardIds.length,
+    }))
+    send(client, {
+      type: 'state:sync',
+      state: snapshot.gameState,
+      yourHand: playerHand?.cardIds ?? [],
+      handCounts,
+      stateVersion: room.gameState.getVersion(),
+    })
+  }
 }

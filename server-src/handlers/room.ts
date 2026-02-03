@@ -27,6 +27,39 @@ import {
   getActivityHistory,
 } from '../activity'
 
+function broadcastReleasedLocks(
+  clients: Map<string, GenericWebSocket>,
+  roomCode: string,
+  releasedLocks: {
+    cards: number[]
+    stacks: number[]
+    counters: number[]
+    tokens: number[]
+    dice: number[]
+    timers: number[]
+  },
+  excludeSocketId?: string,
+): void {
+  for (const cardId of releasedLocks.cards) {
+    broadcastToRoom(clients, roomCode, { type: 'card:unlocked', cardId }, excludeSocketId)
+  }
+  for (const stackId of releasedLocks.stacks) {
+    broadcastToRoom(clients, roomCode, { type: 'stack:unlocked', stackId }, excludeSocketId)
+  }
+  for (const counterId of releasedLocks.counters) {
+    broadcastToRoom(clients, roomCode, { type: 'counter:unlocked', counterId }, excludeSocketId)
+  }
+  for (const tokenId of releasedLocks.tokens) {
+    broadcastToRoom(clients, roomCode, { type: 'token:unlocked', tokenId }, excludeSocketId)
+  }
+  for (const dieId of releasedLocks.dice) {
+    broadcastToRoom(clients, roomCode, { type: 'die:unlocked', dieId }, excludeSocketId)
+  }
+  for (const timerId of releasedLocks.timers) {
+    broadcastToRoom(clients, roomCode, { type: 'timer:unlocked', timerId }, excludeSocketId)
+  }
+}
+
 export function handleRoomCreate(
   ws: GenericWebSocket,
   msg: RoomCreate,
@@ -40,12 +73,14 @@ export function handleRoomCreate(
 
   // Leave current room if in one
   if (clientData.roomCode && clientData.playerId) {
-    const oldRoom = roomManager.leaveRoom(clientData.playerId, clientData.roomCode)
-    if (oldRoom) {
+    const oldRoomResult = roomManager.leaveRoom(clientData.playerId, clientData.roomCode)
+    if (oldRoomResult) {
+      const { room: oldRoom, releasedLocks } = oldRoomResult
       broadcastToRoom(roomManager.getClients(), oldRoom.code, {
         type: 'room:player_left',
         playerId: clientData.playerId,
       })
+      broadcastReleasedLocks(roomManager.getClients(), oldRoom.code, releasedLocks, clientData.id)
     }
   }
 
@@ -121,12 +156,14 @@ export function handleRoomJoin(
 
   // Leave current room if in one
   if (clientData.roomCode && clientData.playerId) {
-    const oldRoom = roomManager.leaveRoom(clientData.playerId, clientData.roomCode)
-    if (oldRoom) {
+    const oldRoomResult = roomManager.leaveRoom(clientData.playerId, clientData.roomCode)
+    if (oldRoomResult) {
+      const { room: oldRoom, releasedLocks } = oldRoomResult
       broadcastToRoom(roomManager.getClients(), oldRoom.code, {
         type: 'room:player_left',
         playerId: clientData.playerId,
       })
+      broadcastReleasedLocks(roomManager.getClients(), oldRoom.code, releasedLocks, clientData.id)
     }
   }
 
@@ -209,6 +246,7 @@ export function handleRoomJoin(
     state: room.gameState.getState(),
     cursors,
     sessionToken,
+    isReconnect,
   })
 
   // Send table info (name, visibility, settings)
@@ -286,13 +324,15 @@ export function handleRoomLeave(ws: GenericWebSocket, roomManager: RoomManager):
   const playerId = clientData.playerId
   const playerName = clientData.name || 'Player'
 
-  const room = roomManager.leaveRoom(playerId, roomCode)
+  const roomResult = roomManager.leaveRoom(playerId, roomCode)
 
-  if (room) {
+  if (roomResult) {
+    const { room, releasedLocks } = roomResult
     broadcastToRoom(roomManager.getClients(), room.code, {
       type: 'room:player_left',
       playerId,
     })
+    broadcastReleasedLocks(roomManager.getClients(), room.code, releasedLocks, clientData.id)
 
     // Log player left activity
     logPlayerLeft(roomManager.getClients(), roomCode, playerId, playerName)
@@ -308,13 +348,20 @@ export function handleRoomLeave(ws: GenericWebSocket, roomManager: RoomManager):
 export function handleDisconnect(clientData: ClientData, roomManager: RoomManager): void {
   if (!clientData.roomCode || !clientData.playerId) return
 
-  const room = roomManager.disconnectPlayer(clientData.playerId, clientData.roomCode)
+  const disconnectResult = roomManager.disconnectPlayer(clientData.playerId, clientData.roomCode)
 
-  if (room) {
-    broadcastToRoom(roomManager.getClients(), room.code, {
-      type: 'room:player_left',
-      playerId: clientData.playerId,
-    })
+  if (disconnectResult) {
+    const { room, releasedLocks } = disconnectResult
+    broadcastToRoom(
+      roomManager.getClients(),
+      room.code,
+      {
+        type: 'room:player_disconnected',
+        playerId: clientData.playerId,
+      },
+      clientData.id,
+    )
+    broadcastReleasedLocks(roomManager.getClients(), room.code, releasedLocks, clientData.id)
   }
 
   roomManager.removeClient(clientData.id)
@@ -398,8 +445,8 @@ export function handlePlayerKick(
   }
 
   // Kick the player
-  const kickedPlayer = roomManager.kickPlayer(clientData.roomCode, msg.targetPlayerId)
-  if (!kickedPlayer) {
+  const kickResult = roomManager.kickPlayer(clientData.roomCode, msg.targetPlayerId)
+  if (!kickResult) {
     send(ws, {
       type: 'error',
       originalAction: 'player:kick',
@@ -408,6 +455,7 @@ export function handlePlayerKick(
     })
     return
   }
+  const { player: kickedPlayer, releasedLocks } = kickResult
 
   // Get the kicked player's socket and send them a kicked message
   const targetWs = roomManager.getSocketByPlayerId(msg.targetPlayerId)
@@ -429,6 +477,7 @@ export function handlePlayerKick(
     playerName: kickedPlayer.name,
     kickedBy: clientData.name || 'The host',
   })
+  broadcastReleasedLocks(roomManager.getClients(), clientData.roomCode, releasedLocks)
 
   // Log activity
   logPlayerKicked(
@@ -496,7 +545,7 @@ export function handlePlayerBan(
     return
   }
 
-  const { player: bannedPlayer } = result
+  const { player: bannedPlayer, releasedLocks } = result
 
   // Get the banned player's socket and send them a banned message
   const targetWs = roomManager.getSocketByPlayerId(msg.targetPlayerId)
@@ -518,6 +567,7 @@ export function handlePlayerBan(
     playerName: bannedPlayer.name,
     bannedBy: clientData.name || 'The host',
   })
+  broadcastReleasedLocks(roomManager.getClients(), clientData.roomCode, releasedLocks)
 
   // Log activity
   logPlayerBanned(

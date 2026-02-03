@@ -247,6 +247,7 @@ export interface RoomJoined {
   state: GameState
   cursors: { playerId: string; x: number; y: number; state: 'default' | 'grab' | 'grabbing' }[]
   sessionToken: string // HMAC-signed token for reconnection
+  isReconnect: boolean
 }
 
 export interface PlayerJoined {
@@ -256,6 +257,11 @@ export interface PlayerJoined {
 
 export interface PlayerLeft {
   type: 'room:player_left'
+  playerId: string
+}
+
+export interface PlayerDisconnected {
+  type: 'room:player_disconnected'
   playerId: string
 }
 
@@ -352,6 +358,20 @@ export interface TableUpdateName {
   name: string
 }
 
+export interface TableSnapshotCreate {
+  type: 'table:snapshot_create'
+  name?: string
+}
+
+export interface TableSnapshotListRequest {
+  type: 'table:snapshot_list'
+}
+
+export interface TableSnapshotRestore {
+  type: 'table:snapshot_restore'
+  snapshotId: number
+}
+
 // ============================================================================
 // Table Management Messages (Server → Client)
 // ============================================================================
@@ -386,6 +406,33 @@ export interface TableInfo {
   settings: TableSettings
   createdAt: number
   createdBy: string
+}
+
+export interface TableSnapshotInfo {
+  id: number
+  name: string
+  createdAt: number
+  createdBy: string
+}
+
+export interface TableSnapshotListResponse {
+  type: 'table:snapshot_list'
+  snapshots: TableSnapshotInfo[]
+}
+
+export interface TableSnapshotCreated {
+  type: 'table:snapshot_created'
+  snapshot: TableSnapshotInfo
+}
+
+export interface TableSnapshotRestored {
+  type: 'table:snapshot_restored'
+  snapshot: TableSnapshotInfo
+}
+
+export interface TableAutosave {
+  type: 'table:autosave'
+  timestamp: number
 }
 
 // ============================================================================
@@ -1452,6 +1499,9 @@ type ClientMessageBase =
   | TableUpdateSettings
   | TableUpdateVisibility
   | TableUpdateName
+  | TableSnapshotCreate
+  | TableSnapshotListRequest
+  | TableSnapshotRestore
   | ChatSend
   | ChatTyping
   | Pong
@@ -1465,6 +1515,7 @@ type ServerMessageBase =
   | RoomJoined
   | PlayerJoined
   | PlayerLeft
+  | PlayerDisconnected
   | PlayerReconnected
   | PlayerKicked
   | PlayerBanned
@@ -1536,6 +1587,10 @@ type ServerMessageBase =
   | TableVisibilityUpdated
   | TableNameUpdated
   | TableInfo
+  | TableSnapshotListResponse
+  | TableSnapshotCreated
+  | TableSnapshotRestored
+  | TableAutosave
   | ChatMessage
   | ChatHistory
   | ChatTypingStatus

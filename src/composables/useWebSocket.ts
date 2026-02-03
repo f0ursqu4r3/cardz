@@ -5,6 +5,7 @@ import type {
   GameState,
   Player,
   TableSettings,
+  TableSnapshotInfo,
   ChatMessage,
   ActivityLogEntry,
   Pong,
@@ -38,6 +39,8 @@ export interface UseWebSocketReturn {
   // Connection state
   state: Ref<ConnectionState>
   isConnected: Ref<boolean>
+  isReconnecting: Ref<boolean>
+  reconnectAttempts: Ref<number>
   error: Ref<string | null>
 
   // Room state
@@ -58,6 +61,8 @@ export interface UseWebSocketReturn {
   tableSettings: Ref<TableSettings>
   tableName: Ref<string>
   tableIsPublic: Ref<boolean>
+  snapshots: Ref<TableSnapshotInfo[]>
+  lastAutosaveAt: Ref<number | null>
 
   // Moderation
   kickedReason: Ref<string | null>
@@ -75,6 +80,9 @@ export interface UseWebSocketReturn {
   updateTableSettings: (settings: Partial<TableSettings>) => void
   updateTableVisibility: (isPublic: boolean) => void
   updateTableName: (name: string) => void
+  createSnapshot: (name?: string) => void
+  listSnapshots: () => void
+  restoreSnapshot: (snapshotId: number) => void
 
   // Player moderation (creator or moderator)
   kickPlayer: (targetPlayerId: string) => void
@@ -178,6 +186,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
   const error = ref<string | null>(null)
   const ws = shallowRef<WebSocket | null>(null)
   const reconnectAttempts = ref(0)
+  const isReconnecting = ref(false)
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
 
   // Room state
@@ -200,6 +209,8 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
   const tableSettings = ref<TableSettings>({ background: 'green-felt' })
   const tableName = ref<string>('')
   const tableIsPublic = ref<boolean>(false)
+  const snapshots = ref<TableSnapshotInfo[]>([])
+  const lastAutosaveAt = ref<number | null>(null)
 
   // Moderation - set when current player is kicked/banned
   const kickedReason = ref<string | null>(null)
@@ -227,6 +238,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
         console.log('[ws] connected')
         state.value = 'connected'
         reconnectAttempts.value = 0
+        error.value = null
 
         // Auto-rejoin room after reconnect
         if (pendingRoomCode && pendingPlayerName) {
@@ -246,14 +258,23 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
         console.log('[ws] closed', event.code, event.reason)
         state.value = 'disconnected'
         ws.value = null
+        if (playerId.value) {
+          players.value = players.value.map((p) =>
+            p.id === playerId.value ? { ...p, connected: false } : p,
+          )
+        }
 
         // Attempt reconnect if was connected to a room
         if (autoReconnect && roomCode.value && reconnectAttempts.value < maxReconnectAttempts) {
           reconnectAttempts.value++
+          isReconnecting.value = true
           console.log(
             `[ws] reconnecting (attempt ${reconnectAttempts.value}/${maxReconnectAttempts})`,
           )
           reconnectTimeout = setTimeout(connect, reconnectDelay * reconnectAttempts.value)
+        } else if (roomCode.value) {
+          isReconnecting.value = false
+          error.value = 'Connection lost. Unable to reconnect.'
         }
       }
 
@@ -284,6 +305,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
       reconnectTimeout = null
     }
     reconnectAttempts.value = maxReconnectAttempts // Prevent auto-reconnect
+    isReconnecting.value = false
     ws.value?.close()
     ws.value = null
     state.value = 'disconnected'
@@ -300,6 +322,8 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     tableSettings.value = { background: 'green-felt' }
     tableName.value = ''
     tableIsPublic.value = false
+    snapshots.value = []
+    lastAutosaveAt.value = null
     // Clear message handlers to prevent memory leaks from stale closures
     messageHandlers.clear()
   }
@@ -355,6 +379,8 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     tableSettings.value = { background: 'green-felt' }
     tableName.value = ''
     tableIsPublic.value = false
+    snapshots.value = []
+    lastAutosaveAt.value = null
   }
 
   // Table management actions
@@ -372,6 +398,18 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
 
   const updateTableName = (name: string) => {
     send({ type: 'table:update_name', name })
+  }
+
+  const createSnapshot = (name?: string) => {
+    send({ type: 'table:snapshot_create', name })
+  }
+
+  const listSnapshots = () => {
+    send({ type: 'table:snapshot_list' })
+  }
+
+  const restoreSnapshot = (snapshotId: number) => {
+    send({ type: 'table:snapshot_restore', snapshotId })
   }
 
   // Chat
@@ -409,6 +447,16 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
 
   // Message handling
   const handleMessage = (message: ServerMessage) => {
+    if (message.type === 'room:joined') {
+      isReconnecting.value = false
+    }
+    if (message.type === 'room:created') {
+      isReconnecting.value = false
+    }
+    if (message.type === 'room:error') {
+      isReconnecting.value = false
+    }
+
     // Notify all registered handlers
     messageHandlers.forEach((handler) => handler(message))
 
@@ -438,6 +486,8 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
       tableSettings,
       tableName,
       tableIsPublic,
+      snapshots,
+      lastAutosaveAt,
       chatMessages,
       typingPlayers,
       activityLog,
@@ -499,6 +549,8 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
   return {
     state,
     isConnected,
+    isReconnecting,
+    reconnectAttempts,
     error,
     roomCode,
     playerId,
@@ -513,6 +565,8 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     tableSettings,
     tableName,
     tableIsPublic,
+    snapshots,
+    lastAutosaveAt,
     kickedReason,
     connect,
     disconnect,
@@ -524,6 +578,9 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     updateTableSettings,
     updateTableVisibility,
     updateTableName,
+    createSnapshot,
+    listSnapshots,
+    restoreSnapshot,
     kickPlayer,
     banPlayer,
     promotePlayer,

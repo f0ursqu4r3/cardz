@@ -46,6 +46,19 @@ export interface PersistedTable {
   gameState: GameState
 }
 
+export interface TableSnapshotInfo {
+  id: number
+  roomCode: string
+  name: string
+  createdAt: number
+  createdBy: string
+}
+
+export interface TableSnapshot extends TableSnapshotInfo {
+  settings: TableSettings
+  gameState: GameState
+}
+
 // Singleton database instance
 let db: Database | null = null
 
@@ -152,6 +165,24 @@ function getDb(): Database {
   // Create index for loading activity by room
   db.run(`
     CREATE INDEX IF NOT EXISTS idx_activity_room_time ON activity_log (room_code, timestamp DESC)
+  `)
+
+  // Create snapshots table for manual table snapshots
+  db.run(`
+    CREATE TABLE IF NOT EXISTS table_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_code TEXT NOT NULL,
+      name TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      created_by TEXT NOT NULL,
+      settings TEXT NOT NULL,
+      game_state TEXT NOT NULL,
+      FOREIGN KEY (room_code) REFERENCES tables(code) ON DELETE CASCADE
+    )
+  `)
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_snapshots_room_time ON table_snapshots (room_code, created_at DESC)
   `)
 
   console.log(`[persistence] SQLite database initialized at ${DB_PATH}`)
@@ -271,6 +302,118 @@ export function loadTable(code: string): PersistedTable | null {
       settings,
     },
     gameState,
+  }
+}
+
+/**
+ * Create a manual snapshot for a table
+ */
+export function createSnapshot(
+  roomCode: string,
+  name: string,
+  createdBy: string,
+  settings: TableSettings,
+  gameState: GameState,
+): TableSnapshotInfo | null {
+  try {
+    const database = getDb()
+    const createdAt = Date.now()
+
+    const stmt = database.prepare(`
+      INSERT INTO table_snapshots (room_code, name, created_at, created_by, settings, game_state)
+      VALUES ($room_code, $name, $created_at, $created_by, $settings, $game_state)
+    `)
+
+    const result = stmt.run({
+      $room_code: roomCode,
+      $name: name,
+      $created_at: createdAt,
+      $created_by: createdBy,
+      $settings: JSON.stringify(settings),
+      $game_state: JSON.stringify(gameState),
+    })
+
+    const id = Number(result.lastInsertRowid)
+    return { id, roomCode, name, createdAt, createdBy }
+  } catch (err) {
+    console.error(`[persistence] Failed to create snapshot for ${roomCode}:`, err)
+    return null
+  }
+}
+
+/**
+ * List snapshots for a table
+ */
+export function listSnapshots(roomCode: string, limit: number = 20): TableSnapshotInfo[] {
+  try {
+    const database = getDb()
+    const stmt = database.prepare(`
+      SELECT id, room_code, name, created_at, created_by
+      FROM table_snapshots
+      WHERE room_code = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+    `)
+
+    const rows = stmt.all(roomCode, limit) as Array<{
+      id: number
+      room_code: string
+      name: string
+      created_at: number
+      created_by: string
+    }>
+
+    return rows.map((row) => ({
+      id: row.id,
+      roomCode: row.room_code,
+      name: row.name,
+      createdAt: row.created_at,
+      createdBy: row.created_by,
+    }))
+  } catch (err) {
+    console.error(`[persistence] Failed to list snapshots for ${roomCode}:`, err)
+    return []
+  }
+}
+
+/**
+ * Load a snapshot by id for a table
+ */
+export function loadSnapshot(roomCode: string, snapshotId: number): TableSnapshot | null {
+  try {
+    const database = getDb()
+    const stmt = database.prepare(`
+      SELECT id, room_code, name, created_at, created_by, settings, game_state
+      FROM table_snapshots
+      WHERE room_code = ? AND id = ?
+    `)
+
+    const row = stmt.get(roomCode, snapshotId) as
+      | {
+          id: number
+          room_code: string
+          name: string
+          created_at: number
+          created_by: string
+          settings: string
+          game_state: string
+        }
+      | undefined
+
+    if (!row) return null
+
+    return {
+      id: row.id,
+      roomCode: row.room_code,
+      name: row.name,
+      createdAt: row.created_at,
+      createdBy: row.created_by,
+      settings: JSON.parse(row.settings) as TableSettings,
+      gameState: JSON.parse(row.game_state) as GameState,
+    }
+  } catch (err) {
+    console.error(`[persistence] Failed to load snapshot ${snapshotId} for ${roomCode}:`, err)
+    return null
   }
 }
 
@@ -398,6 +541,7 @@ export function startAutoSave(
   code: string,
   getState: () => { metadata: TableMetadata; gameState: GameState } | null,
   intervalMs: number = 30_000,
+  onSaved?: (timestamp: number) => void,
 ): void {
   // Clear existing interval if any
   stopAutoSave(code)
@@ -405,7 +549,9 @@ export function startAutoSave(
   const interval = setInterval(() => {
     const state = getState()
     if (state) {
-      saveTable(code, state.metadata, state.gameState)
+      if (saveTable(code, state.metadata, state.gameState)) {
+        onSaved?.(Date.now())
+      }
     }
   }, intervalMs)
 
@@ -430,6 +576,7 @@ const debouncedSaves = new Map<
     timeout: ReturnType<typeof setTimeout>
     getState: () => { metadata: TableMetadata; gameState: GameState } | null
     actionCount: number
+    onSaved?: (timestamp: number) => void
   }
 >()
 
@@ -447,6 +594,7 @@ const ACTIONS_PER_SAVE = 20
 export function scheduleSave(
   code: string,
   getState: () => { metadata: TableMetadata; gameState: GameState } | null,
+  onSaved?: (timestamp: number) => void,
 ): void {
   // Clear existing debounced save if any
   const existing = debouncedSaves.get(code)
@@ -456,13 +604,16 @@ export function scheduleSave(
 
   // Track action count
   const actionCount = (existing?.actionCount ?? 0) + 1
+  const savedCallback = onSaved ?? existing?.onSaved
 
   // If we've hit the action threshold, save immediately
   if (actionCount >= ACTIONS_PER_SAVE) {
     debouncedSaves.delete(code)
     const state = getState()
     if (state) {
-      saveTable(code, state.metadata, state.gameState)
+      if (saveTable(code, state.metadata, state.gameState)) {
+        savedCallback?.(Date.now())
+      }
     }
     return
   }
@@ -471,11 +622,13 @@ export function scheduleSave(
     debouncedSaves.delete(code)
     const state = getState()
     if (state) {
-      saveTable(code, state.metadata, state.gameState)
+      if (saveTable(code, state.metadata, state.gameState)) {
+        savedCallback?.(Date.now())
+      }
     }
   }, DEBOUNCE_DELAY_MS)
 
-  debouncedSaves.set(code, { timeout, getState, actionCount })
+  debouncedSaves.set(code, { timeout, getState, actionCount, onSaved: savedCallback })
 }
 
 /**
@@ -485,6 +638,7 @@ export function scheduleSave(
 export function saveNow(
   code: string,
   getState: () => { metadata: TableMetadata; gameState: GameState } | null,
+  onSaved?: (timestamp: number) => void,
 ): void {
   // Cancel any pending debounced save
   const existing = debouncedSaves.get(code)
@@ -496,7 +650,9 @@ export function saveNow(
   // Save immediately
   const state = getState()
   if (state) {
-    saveTable(code, state.metadata, state.gameState)
+    if (saveTable(code, state.metadata, state.gameState)) {
+      onSaved?.(Date.now())
+    }
   }
 }
 

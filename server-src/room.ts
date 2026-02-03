@@ -4,6 +4,7 @@ import { PLAYER_COLORS } from '../shared/types'
 import { GameStateManager, createInitialGameState } from './game-state'
 import { LockManager } from './utils/locks'
 import type { GenericWebSocket } from './utils/broadcast'
+import { broadcastToRoom } from './utils/broadcast'
 import {
   saveTable,
   loadTable,
@@ -77,6 +78,30 @@ export class RoomManager {
     this.cleanupInterval = setInterval(() => this.cleanupEmptyRooms(), 60_000)
     // Clean up old persisted tables every hour
     this.persistenceCleanupInterval = setInterval(() => cleanupOldTables(), 60 * 60 * 1000)
+  }
+
+  private clearReleasedLocks(
+    room: Room,
+    released: ReturnType<LockManager['releaseAllForPlayer']>,
+  ): void {
+    for (const cardId of released.cards) {
+      room.gameState.setCardLock(cardId, null)
+    }
+    for (const stackId of released.stacks) {
+      room.gameState.setStackLock(stackId, null)
+    }
+    for (const counterId of released.counters) {
+      room.gameState.setCounterLock(counterId, null)
+    }
+    for (const tokenId of released.tokens) {
+      room.gameState.setTokenLock(tokenId, null)
+    }
+    for (const dieId of released.dice) {
+      room.gameState.setDieLock(dieId, null)
+    }
+    for (const timerId of released.timers) {
+      room.gameState.setTimerLock(timerId, null)
+    }
   }
 
   /**
@@ -222,7 +247,9 @@ export class RoomManager {
     const room = this.rooms.get(roomCode)
     if (!room) return
 
-    scheduleSave(roomCode, () => {
+    scheduleSave(
+      roomCode,
+      () => {
       const r = this.rooms.get(roomCode)
       if (!r) return null
       return {
@@ -240,7 +267,14 @@ export class RoomManager {
         },
         gameState: r.gameState.getState(),
       }
-    })
+      },
+      (timestamp) => {
+        broadcastToRoom(this.clients, roomCode, {
+          type: 'table:autosave',
+          timestamp,
+        })
+      },
+    )
   }
 
   /**
@@ -251,7 +285,9 @@ export class RoomManager {
     const room = this.rooms.get(roomCode)
     if (!room) return
 
-    saveNow(roomCode, () => {
+    saveNow(
+      roomCode,
+      () => {
       const r = this.rooms.get(roomCode)
       if (!r) return null
       return {
@@ -269,7 +305,14 @@ export class RoomManager {
         },
         gameState: r.gameState.getState(),
       }
-    })
+      },
+      (timestamp) => {
+        broadcastToRoom(this.clients, roomCode, {
+          type: 'table:autosave',
+          timestamp,
+        })
+      },
+    )
   }
 
   /**
@@ -368,25 +411,35 @@ export class RoomManager {
     )
 
     // Start auto-saving this room
-    startAutoSave(code, () => {
-      const r = this.rooms.get(code)
-      if (!r) return null
-      return {
-        metadata: {
-          code: r.code,
-          name: r.name,
-          isPublic: r.isPublic,
-          maxPlayers: r.maxPlayers,
-          createdAt: r.createdAt,
-          updatedAt: Date.now(),
-          createdBy: r.createdBy,
-          creatorPlayerId: r.creatorPlayerId,
-          moderatorPlayerIds: Array.from(r.moderatorPlayerIds),
-          settings: r.settings,
-        },
-        gameState: r.gameState.getState(),
-      }
-    })
+    startAutoSave(
+      code,
+      () => {
+        const r = this.rooms.get(code)
+        if (!r) return null
+        return {
+          metadata: {
+            code: r.code,
+            name: r.name,
+            isPublic: r.isPublic,
+            maxPlayers: r.maxPlayers,
+            createdAt: r.createdAt,
+            updatedAt: Date.now(),
+            createdBy: r.createdBy,
+            creatorPlayerId: r.creatorPlayerId,
+            moderatorPlayerIds: Array.from(r.moderatorPlayerIds),
+            settings: r.settings,
+          },
+          gameState: r.gameState.getState(),
+        }
+      },
+      30_000,
+      (timestamp) => {
+        broadcastToRoom(this.clients, code, {
+          type: 'table:autosave',
+          timestamp,
+        })
+      },
+    )
 
     return { room, playerId }
   }
@@ -507,25 +560,35 @@ export class RoomManager {
     }
 
     // Start auto-saving
-    startAutoSave(roomCode, () => {
-      const r = this.rooms.get(roomCode)
-      if (!r) return null
-      return {
-        metadata: {
-          code: r.code,
-          name: r.name,
-          isPublic: r.isPublic,
-          maxPlayers: r.maxPlayers,
-          createdAt: r.createdAt,
-          updatedAt: Date.now(),
-          createdBy: r.createdBy,
-          creatorPlayerId: r.creatorPlayerId,
-          moderatorPlayerIds: Array.from(r.moderatorPlayerIds),
-          settings: r.settings,
-        },
-        gameState: r.gameState.getState(),
-      }
-    })
+    startAutoSave(
+      roomCode,
+      () => {
+        const r = this.rooms.get(roomCode)
+        if (!r) return null
+        return {
+          metadata: {
+            code: r.code,
+            name: r.name,
+            isPublic: r.isPublic,
+            maxPlayers: r.maxPlayers,
+            createdAt: r.createdAt,
+            updatedAt: Date.now(),
+            createdBy: r.createdBy,
+            creatorPlayerId: r.creatorPlayerId,
+            moderatorPlayerIds: Array.from(r.moderatorPlayerIds),
+            settings: r.settings,
+          },
+          gameState: r.gameState.getState(),
+        }
+      },
+      30_000,
+      (timestamp) => {
+        broadcastToRoom(this.clients, roomCode, {
+          type: 'table:autosave',
+          timestamp,
+        })
+      },
+    )
 
     console.log(`[room:load] Loaded persisted table ${roomCode}`)
     return { room, player, isReconnect: false, loaded: true, playerId }
@@ -679,7 +742,10 @@ export class RoomManager {
    * Kick a player from a room (they can rejoin)
    * @returns The kicked player info or null if not found
    */
-  kickPlayer(roomCode: string, playerId: string): Player | null {
+  kickPlayer(
+    roomCode: string,
+    playerId: string,
+  ): { player: Player; releasedLocks: ReturnType<LockManager['releaseAllForPlayer']> } | null {
     const room = this.rooms.get(roomCode)
     if (!room) return null
 
@@ -687,7 +753,8 @@ export class RoomManager {
     if (!player) return null
 
     // Release all locks held by this player
-    room.locks.releaseAllForPlayer(playerId)
+    const releasedLocks = room.locks.releaseAllForPlayer(playerId)
+    this.clearReleasedLocks(room, releasedLocks)
 
     // Return cards from hand to table
     room.gameState.removePlayer(playerId)
@@ -703,14 +770,23 @@ export class RoomManager {
     }
     this.playerToSocket.delete(playerId)
 
-    return player
+    return { player, releasedLocks }
   }
 
   /**
    * Ban a player from a room (they cannot rejoin)
    * @returns The banned player and their device ID, or null if not found
    */
-  banPlayer(roomCode: string, playerId: string): { player: Player; deviceId: string | undefined } | null {
+  banPlayer(
+    roomCode: string,
+    playerId: string,
+  ):
+    | {
+        player: Player
+        deviceId: string | undefined
+        releasedLocks: ReturnType<LockManager['releaseAllForPlayer']>
+      }
+    | null {
     const room = this.rooms.get(roomCode)
     if (!room) return null
 
@@ -725,9 +801,10 @@ export class RoomManager {
     }
 
     // Use kick logic to remove the player
-    this.kickPlayer(roomCode, playerId)
+    const kickResult = this.kickPlayer(roomCode, playerId)
+    if (!kickResult) return null
 
-    return { player, deviceId }
+    return { player: kickResult.player, deviceId, releasedLocks: kickResult.releasedLocks }
   }
 
   /**
@@ -742,7 +819,10 @@ export class RoomManager {
   /**
    * Remove a player from their room
    */
-  leaveRoom(playerId: string, roomCode: string): Room | null {
+  leaveRoom(
+    playerId: string,
+    roomCode: string,
+  ): { room: Room; releasedLocks: ReturnType<LockManager['releaseAllForPlayer']> } | null {
     const room = this.rooms.get(roomCode)
     if (!room) return null
 
@@ -750,7 +830,8 @@ export class RoomManager {
     if (!player) return null
 
     // Release all locks held by this player
-    room.locks.releaseAllForPlayer(playerId)
+    const releasedLocks = room.locks.releaseAllForPlayer(playerId)
+    this.clearReleasedLocks(room, releasedLocks)
 
     // Return cards from hand to table
     room.gameState.removePlayer(playerId)
@@ -765,7 +846,7 @@ export class RoomManager {
       return null
     }
 
-    return room
+    return { room, releasedLocks }
   }
 
   /**
@@ -825,7 +906,10 @@ export class RoomManager {
   /**
    * Mark a player as disconnected (but keep their data for reconnection)
    */
-  disconnectPlayer(playerId: string, roomCode: string): Room | null {
+  disconnectPlayer(
+    playerId: string,
+    roomCode: string,
+  ): { room: Room; releasedLocks: ReturnType<LockManager['releaseAllForPlayer']> } | null {
     const room = this.rooms.get(roomCode)
     if (!room) return null
 
@@ -833,12 +917,14 @@ export class RoomManager {
     if (player) {
       player.connected = false
       // Release locks but keep hand
-      room.locks.releaseAllForPlayer(playerId)
+      const releasedLocks = room.locks.releaseAllForPlayer(playerId)
+      this.clearReleasedLocks(room, releasedLocks)
       // Remove cursor position
       room.cursors.delete(playerId)
+      return { room, releasedLocks }
     }
 
-    return room
+    return null
   }
 
   /**

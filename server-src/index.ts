@@ -57,6 +57,9 @@ import {
   handleTableUpdateSettings,
   handleTableUpdateVisibility,
   handleTableUpdateName,
+  handleTableSnapshotCreate,
+  handleTableSnapshotList,
+  handleTableSnapshotRestore,
 } from './handlers/table'
 import {
   handleCounterCreate,
@@ -905,6 +908,15 @@ const server = Bun.serve<ClientData>({
             break
           case 'table:update_name':
             handleTableUpdateName(socket, msg, roomManager)
+            break
+          case 'table:snapshot_create':
+            handleTableSnapshotCreate(socket, msg, roomManager)
+            break
+          case 'table:snapshot_list':
+            handleTableSnapshotList(socket, msg, roomManager)
+            break
+          case 'table:snapshot_restore':
+            handleTableSnapshotRestore(socket, msg, roomManager)
             break
 
           // Player moderation

@@ -78,6 +78,7 @@ const showChat = ref(false)
 const showActivity = ref(false)
 const showInstructions = ref(false)
 const editingZoneId = ref<number | null>(null)
+const requestToPlaySent = ref(false)
 
 // Get current player's color for cursor
 const playerColor = computed(() => {
@@ -132,6 +133,44 @@ const isModerator = computed(() => {
   return player?.role === 'moderator'
 })
 
+const isSpectator = computed(() => {
+  const player = ws.players.value.find((p) => p.id === ws.playerId.value)
+  return player?.role === 'spectator'
+})
+
+const lastSpectatorNoticeAt = ref(0)
+const showSpectatorNotice = (message = 'Spectators are view-only. Request to play to interact.') => {
+  const now = Date.now()
+  if (now - lastSpectatorNoticeAt.value < 2000) return
+  lastSpectatorNoticeAt.value = now
+  toast.info(message)
+}
+
+const canInteract = () => {
+  if (!isSpectator.value) return true
+  showSpectatorNotice()
+  return false
+}
+
+const canManageSnapshots = computed(() => isCreator.value)
+
+const hasConnectedOnce = ref(false)
+watch(
+  () => ws.isConnected.value,
+  (connected) => {
+    if (connected) {
+      hasConnectedOnce.value = true
+    }
+  },
+  { immediate: true },
+)
+
+const connectionStatusLabel = computed(() => {
+  if (ws.isConnected.value) return 'Connected'
+  if (ws.isReconnecting.value) return 'Reconnecting...'
+  return hasConnectedOnce.value ? 'Disconnected' : 'Connecting...'
+})
+
 // Colors used by other players (for color selection in edit mode)
 const usedColors = computed(() => {
   return new Set(
@@ -140,6 +179,16 @@ const usedColors = computed(() => {
       .map((p) => p.color)
   )
 })
+
+const connectedPlayersCount = computed(
+  () => ws.players.value.filter((p) => p.connected).length,
+)
+const totalPlayersCount = computed(() => ws.players.value.length)
+const playersCountLabel = computed(() =>
+  connectedPlayersCount.value === totalPlayersCount.value
+    ? `${connectedPlayersCount.value}`
+    : `${connectedPlayersCount.value}/${totalPlayersCount.value}`,
+)
 
 // Custom cursor based on player color (sets up global style via side effect)
 const cursor = useCursor(playerColor)
@@ -177,6 +226,19 @@ const remoteThrow = useRemoteThrow((id) => cardStore.getCardById(id))
 
 // Radial context menu
 const radialMenu = useRadialMenu()
+
+watch(
+  () => isSpectator.value,
+  (spectating) => {
+    if (spectating) {
+      radialMenu.close()
+      cardStore.clearSelection()
+      cardStore.clearDieSelection()
+    } else {
+      requestToPlaySent.value = false
+    }
+  },
+)
 
 // Activity tracking for sync throttling
 let lastActivityTime = Date.now()
@@ -252,6 +314,29 @@ watch(
   },
 )
 
+watch(
+  () => showSettings.value,
+  (open) => {
+    if (open && ws.isConnected.value) {
+      ws.listSnapshots()
+    }
+  },
+)
+
+const reconnectToastShown = ref(false)
+watch(
+  () => ws.isReconnecting.value,
+  (reconnecting) => {
+    if (reconnecting && !reconnectToastShown.value) {
+      reconnectToastShown.value = true
+      toast.info('Connection lost. Reconnecting...')
+    }
+    if (!reconnecting) {
+      reconnectToastShown.value = false
+    }
+  },
+)
+
 // Initialize card display helpers
 const cardDisplayHelpers = useCardDisplayHelpers({
   cardStore,
@@ -288,6 +373,26 @@ const {
   onCanvasRightClick,
   onHandCardRightClick,
 } = contextMenu
+
+const onCardRightClickGuarded = (event: MouseEvent, index: number) => {
+  if (!canInteract()) return
+  onCardRightClick(event, index)
+}
+
+const onZoneRightClickGuarded = (event: MouseEvent, zoneId: number) => {
+  if (!canInteract()) return
+  onZoneRightClick(event, zoneId)
+}
+
+const onCanvasRightClickGuarded = (event: MouseEvent) => {
+  if (!canInteract()) return
+  onCanvasRightClick(event)
+}
+
+const onHandCardRightClickGuarded = (event: MouseEvent) => {
+  if (!canInteract()) return
+  onHandCardRightClick(event)
+}
 
 // Initialize radial menu actions
 const radialMenuActions = useRadialMenuActions({
@@ -458,6 +563,7 @@ const isZoneDragging = (zoneId: number): boolean => {
 }
 
 const addZone = () => {
+  if (!canInteract()) return
   const bounds = viewport.getVisibleBounds()
   const centerX = bounds.x + bounds.width / 2 - ZONE_DEFAULT_WIDTH / 2
   const centerY = bounds.y + bounds.height / 2 - ZONE_DEFAULT_HEIGHT / 2
@@ -475,6 +581,7 @@ const addZone = () => {
 }
 
 const onZoneUpdate = (zoneId: number, updates: Record<string, unknown>) => {
+  if (!canInteract()) return
   trackActivity()
   ws.send({
     type: 'zone:update',
@@ -484,6 +591,7 @@ const onZoneUpdate = (zoneId: number, updates: Record<string, unknown>) => {
 }
 
 const onZoneDelete = (zoneId: number) => {
+  if (!canInteract()) return
   trackActivity()
   ws.send({ type: 'zone:delete', zoneId })
   editingZoneId.value = null
@@ -491,6 +599,7 @@ const onZoneDelete = (zoneId: number) => {
 
 // Entity creation handlers
 const addCounter = () => {
+  if (!canInteract()) return
   const bounds = viewport.getVisibleBounds()
   const centerX = bounds.x + bounds.width / 2 - 40
   const centerY = bounds.y + bounds.height / 2 - 30
@@ -508,6 +617,7 @@ const addCounter = () => {
 }
 
 const onCounterIncrement = (counterId: number, delta: number) => {
+  if (!canInteract()) return
   trackActivity()
   ws.send({
     type: 'counter:increment',
@@ -517,6 +627,7 @@ const onCounterIncrement = (counterId: number, delta: number) => {
 }
 
 const onCounterUpdate = (counterId: number, updates: Record<string, unknown>) => {
+  if (!canInteract()) return
   trackActivity()
   cardStore.updateCounterFromServer(
     counterId,
@@ -530,6 +641,7 @@ const onCounterUpdate = (counterId: number, updates: Record<string, unknown>) =>
 }
 
 const onCounterDelete = (counterId: number) => {
+  if (!canInteract()) return
   trackActivity()
   ws.send({
     type: 'counter:delete',
@@ -538,6 +650,7 @@ const onCounterDelete = (counterId: number) => {
 }
 
 const addColorToken = () => {
+  if (!canInteract()) return
   const bounds = viewport.getVisibleBounds()
   const centerX = bounds.x + bounds.width / 2
   const centerY = bounds.y + bounds.height / 2
@@ -555,6 +668,7 @@ const addColorToken = () => {
 }
 
 const onTokenUpdate = (tokenId: number, updates: Record<string, unknown>) => {
+  if (!canInteract()) return
   trackActivity()
   cardStore.updateTokenFromServer(
     tokenId,
@@ -568,6 +682,7 @@ const onTokenUpdate = (tokenId: number, updates: Record<string, unknown>) => {
 }
 
 const onTokenDelete = (tokenId: number) => {
+  if (!canInteract()) return
   trackActivity()
   ws.send({
     type: 'token:delete',
@@ -576,6 +691,7 @@ const onTokenDelete = (tokenId: number) => {
 }
 
 const addDie = () => {
+  if (!canInteract()) return
   const bounds = viewport.getVisibleBounds()
   const centerX = bounds.x + bounds.width / 2
   const centerY = bounds.y + bounds.height / 2
@@ -591,6 +707,7 @@ const addDie = () => {
 }
 
 const onDieRoll = (dieId: number) => {
+  if (!canInteract()) return
   trackActivity()
   cardStore.setDieRolling(dieId, true)
   ws.send({
@@ -600,6 +717,7 @@ const onDieRoll = (dieId: number) => {
 }
 
 const onDieUpdate = (dieId: number, updates: Record<string, unknown>) => {
+  if (!canInteract()) return
   trackActivity()
   cardStore.updateDieFromServer(
     dieId,
@@ -613,6 +731,7 @@ const onDieUpdate = (dieId: number, updates: Record<string, unknown>) => {
 }
 
 const onDieDelete = (dieId: number) => {
+  if (!canInteract()) return
   trackActivity()
   ws.send({
     type: 'die:delete',
@@ -621,6 +740,7 @@ const onDieDelete = (dieId: number) => {
 }
 
 const addTimer = (mode: 'countdown' | 'stopwatch' = 'countdown') => {
+  if (!canInteract()) return
   const bounds = viewport.getVisibleBounds()
   const centerX = bounds.x + bounds.width / 2
   const centerY = bounds.y + bounds.height / 2
@@ -636,6 +756,7 @@ const addTimer = (mode: 'countdown' | 'stopwatch' = 'countdown') => {
 }
 
 const onTimerStart = (timerId: number) => {
+  if (!canInteract()) return
   trackActivity()
   ws.send({
     type: 'timer:start',
@@ -644,6 +765,7 @@ const onTimerStart = (timerId: number) => {
 }
 
 const onTimerPause = (timerId: number) => {
+  if (!canInteract()) return
   trackActivity()
   ws.send({
     type: 'timer:pause',
@@ -652,6 +774,7 @@ const onTimerPause = (timerId: number) => {
 }
 
 const onTimerReset = (timerId: number) => {
+  if (!canInteract()) return
   trackActivity()
   ws.send({
     type: 'timer:reset',
@@ -660,6 +783,7 @@ const onTimerReset = (timerId: number) => {
 }
 
 const onTimerUpdate = (timerId: number, updates: Record<string, unknown>) => {
+  if (!canInteract()) return
   trackActivity()
   cardStore.updateTimerFromServer(
     timerId,
@@ -673,6 +797,7 @@ const onTimerUpdate = (timerId: number, updates: Record<string, unknown>) => {
 }
 
 const onTimerDelete = (timerId: number) => {
+  if (!canInteract()) return
   trackActivity()
   ws.send({
     type: 'timer:delete',
@@ -730,20 +855,57 @@ const canvasBackgroundStyle = computed(() => {
 
 // Table settings handlers
 const handleSettingsUpdate = (settings: Partial<TableSettings>) => {
+  if (!canInteract()) return
   ws.updateTableSettings(settings)
 }
 
 const handleVisibilityUpdate = (isPublic: boolean) => {
+  if (!canInteract()) return
   ws.updateTableVisibility(isPublic)
 }
 
 const handleNameUpdate = (name: string) => {
+  if (!canInteract()) return
   ws.updateTableName(name)
 }
 
 const handleTableReset = () => {
+  if (!canInteract()) return
   ws.resetTable()
   showSettings.value = false
+}
+
+const handleSnapshotCreate = (name?: string) => {
+  if (!canManageSnapshots.value) {
+    toast.error('Only the table creator can create snapshots')
+    return
+  }
+  ws.createSnapshot(name)
+}
+
+const handleSnapshotRestore = (snapshotId: number) => {
+  if (!canManageSnapshots.value) {
+    toast.error('Only the table creator can restore snapshots')
+    return
+  }
+  ws.restoreSnapshot(snapshotId)
+}
+
+const requestToPlay = () => {
+  if (!isSpectator.value) return
+  if (!ws.isConnected.value) {
+    toast.error('Not connected yet')
+    return
+  }
+  if (requestToPlaySent.value) {
+    toast.info('Request already sent')
+    return
+  }
+  ws.sendChat('Requesting to join as a player.')
+  requestToPlaySent.value = true
+  setTimeout(() => {
+    requestToPlaySent.value = false
+  }, 30_000)
 }
 
 // Copy room code to clipboard
@@ -883,13 +1045,34 @@ const INACTIVITY_THRESHOLD = 5_000 // Only sync after 5 seconds of inactivity
 let syncInterval: ReturnType<typeof setInterval> | null = null
 
 // Handle player join/leave notifications
-const handlePlayerEvents = (message: { type: string; player?: { name: string }; playerId?: string; playerName?: string; kickedBy?: string; bannedBy?: string }) => {
+const handlePlayerEvents = (message: {
+  type: string
+  player?: { name: string }
+  playerId?: string
+  playerName?: string
+  kickedBy?: string
+  bannedBy?: string
+  isReconnect?: boolean
+  snapshot?: { name: string }
+}) => {
   switch (message.type) {
+    case 'room:joined':
+      if (message.isReconnect) {
+        toast.success('Reconnected')
+      }
+      break
     case 'room:player_joined':
       if (message.player) {
         toast.info(`${message.player.name} joined the table`)
       }
       break
+    case 'room:player_disconnected': {
+      const disconnectedPlayer = ws.players.value.find((p) => p.id === message.playerId)
+      if (disconnectedPlayer) {
+        toast.info(`${disconnectedPlayer.name} disconnected`)
+      }
+      break
+    }
     case 'room:player_reconnected':
       if (message.player) {
         toast.info(`${message.player.name} reconnected`)
@@ -913,6 +1096,11 @@ const handlePlayerEvents = (message: { type: string; player?: { name: string }; 
       if (message.playerId !== ws.playerId.value && message.playerName) {
         toast.info(`${message.playerName} was banned by ${message.bannedBy}`)
       }
+      break
+    case 'table:snapshot_restored':
+      toast.success(
+        message.snapshot?.name ? `Snapshot restored: ${message.snapshot.name}` : 'Snapshot restored',
+      )
       break
   }
 }
@@ -972,7 +1160,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="table-view" :class="cursorClass" @contextmenu.prevent>
+  <div
+    class="table-view"
+    :class="[cursorClass, { 'table-view--spectator': isSpectator }]"
+    @contextmenu.prevent
+  >
     <!-- Header bar -->
     <header class="table-header">
       <div class="table-header__left">
@@ -1002,11 +1194,11 @@ onBeforeUnmount(() => {
           <button
             class="table-header__players"
             :class="{ 'table-header__players--active': showPlayers }"
-            :title="`${ws.players.value.length} player(s) connected`"
+            :title="`${connectedPlayersCount} connected / ${totalPlayersCount} total`"
             @click="showPlayers = !showPlayers"
           >
             <Users :size="16" />
-            <span>{{ ws.players.value.length }}</span>
+            <span>{{ playersCountLabel }}</span>
           </button>
           <PlayersPanel
             v-if="showPlayers"
@@ -1025,6 +1217,16 @@ onBeforeUnmount(() => {
             @update-player="ws.updatePlayer"
           />
         </div>
+        <div v-if="isSpectator" class="table-header__spectator">
+          <span class="table-header__spectator-label">Spectating</span>
+          <button
+            class="table-header__spectator-button"
+            :disabled="requestToPlaySent || !ws.isConnected.value"
+            @click="requestToPlay"
+          >
+            {{ requestToPlaySent ? 'Request sent' : 'Request to play' }}
+          </button>
+        </div>
         <button
           class="table-header__settings"
           :class="{ 'table-header__settings--active': showSettings }"
@@ -1035,8 +1237,11 @@ onBeforeUnmount(() => {
         </button>
         <div
           class="table-header__status"
-          :class="{ 'table-header__status--connected': ws.isConnected.value }"
-          :title="ws.isConnected.value ? 'Connected' : 'Connecting...'"
+          :class="{
+            'table-header__status--connected': ws.isConnected.value,
+            'table-header__status--reconnecting': ws.isReconnecting.value,
+          }"
+          :title="connectionStatusLabel"
         >
           <Wifi v-if="ws.isConnected.value" :size="16" />
           <WifiOff v-else :size="16" />
@@ -1048,10 +1253,15 @@ onBeforeUnmount(() => {
           :settings="ws.tableSettings.value"
           :is-public="ws.tableIsPublic.value"
           :table-name="ws.tableName.value || tableName"
+          :snapshots="ws.snapshots.value"
+          :last-autosave-at="ws.lastAutosaveAt.value"
+          :can-manage-snapshots="canManageSnapshots"
           @update:settings="handleSettingsUpdate"
           @update:visibility="handleVisibilityUpdate"
           @update:name="handleNameUpdate"
           @reset="handleTableReset"
+          @snapshot:create="handleSnapshotCreate"
+          @snapshot:restore="handleSnapshotRestore"
           @close="showSettings = false"
         />
       </div>
@@ -1067,7 +1277,7 @@ onBeforeUnmount(() => {
       @pointermove="onCanvasPointerMove"
       @pointerup="onCanvasPointerUp"
       @pointercancel="onCanvasPointerUp"
-      @contextmenu="onCanvasRightClick"
+      @contextmenu="onCanvasRightClickGuarded"
     >
       <!-- Table UI (fixed position, not affected by pan/zoom) -->
       <div class="table-ui">
@@ -1110,7 +1320,7 @@ onBeforeUnmount(() => {
           @pointerdown="interaction.onZonePointerDown($event, zone.id)"
           @pointermove="interaction.onZonePointerMove"
           @pointerup="interaction.onZonePointerUp"
-          @contextmenu="onZoneRightClick($event, zone.id)"
+          @contextmenu="onZoneRightClickGuarded($event, zone.id)"
           @zone:update="onZoneUpdate"
           @zone:delete="onZoneDelete"
           @settings:close="editingZoneId = null"
@@ -1229,7 +1439,7 @@ onBeforeUnmount(() => {
           @pointermove="interaction.onCardPointerMove"
           @pointerup="onPointerUp"
           @pointercancel="onPointerUp"
-          @contextmenu="onCardRightClick($event, index)"
+          @contextmenu="onCardRightClickGuarded($event, index)"
           @dblclick="interaction.onCardDoubleClick($event, index)"
         />
 
@@ -1280,7 +1490,7 @@ onBeforeUnmount(() => {
         :is-drop-target="interaction.isOverHand.value"
         :space-held="spaceHeld"
         @card-pointer-up="onPointerUp"
-        @card-context-menu="onHandCardRightClick"
+        @card-context-menu="onHandCardRightClickGuarded"
       />
 
       <!-- Selection count indicator -->
@@ -1296,6 +1506,7 @@ onBeforeUnmount(() => {
     <div v-if="ws.isConnected.value" class="panels-container-top-left">
       <ActivityPanel
         :entries="ws.activityLog.value"
+        :can-moderate="isCreator || isModerator"
         v-model:is-open="showActivity"
       />
     </div>
@@ -1333,6 +1544,24 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   background: #0a0a12;
+}
+
+.table-view--spectator .world {
+  pointer-events: none;
+}
+
+.table-view--spectator :deep(.hand),
+.table-view--spectator :deep(.table-ui__add-panel),
+.table-view--spectator :deep(.radial-menu) {
+  pointer-events: none;
+}
+
+.table-view--spectator :deep(.hand) {
+  opacity: 0.6;
+}
+
+.table-view--spectator :deep(.table-ui__add-panel) {
+  opacity: 0.5;
 }
 
 .table-header {
@@ -1463,6 +1692,47 @@ onBeforeUnmount(() => {
   border-color: rgba(255, 255, 255, 0.25);
 }
 
+.table-header__spectator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+}
+
+.table-header__spectator-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(253, 224, 71, 0.95);
+}
+
+.table-header__spectator-button {
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  border: none;
+  background: rgba(253, 224, 71, 0.9);
+  color: #1f1300;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.table-header__spectator-button:hover:enabled {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(253, 224, 71, 0.2);
+}
+
+.table-header__spectator-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+}
+
 .table-header__settings {
   display: flex;
   align-items: center;
@@ -1495,6 +1765,10 @@ onBeforeUnmount(() => {
 
 .table-header__status--connected {
   color: #22c55e;
+}
+
+.table-header__status--reconnecting {
+  color: #f59e0b;
 }
 
 .canvas {

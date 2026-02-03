@@ -17,6 +17,9 @@ const props = defineProps<{
   settings: TableSettings
   isPublic: boolean
   tableName: string
+  snapshots: { id: number; name: string; createdAt: number; createdBy: string }[]
+  lastAutosaveAt: number | null
+  canManageSnapshots: boolean
 }>()
 
 const emit = defineEmits<{
@@ -24,6 +27,8 @@ const emit = defineEmits<{
   'update:visibility': [isPublic: boolean]
   'update:name': [name: string]
   reset: []
+  'snapshot:create': [name?: string]
+  'snapshot:restore': [snapshotId: number]
   close: []
 }>()
 
@@ -117,6 +122,27 @@ const confirmReset = () => {
     emit('reset')
   }
 }
+
+const createSnapshot = () => {
+  const name = prompt('Snapshot name (optional):')?.trim()
+  emit('snapshot:create', name || undefined)
+}
+
+const restoreSnapshot = (snapshotId: number, snapshotName: string) => {
+  if (confirm(`Restore snapshot "${snapshotName}"? This will overwrite the current table state.`)) {
+    emit('snapshot:restore', snapshotId)
+  }
+}
+
+const formatAutosave = (timestamp: number | null): string => {
+  if (!timestamp) return 'Not saved yet'
+  const diffMs = Date.now() - timestamp
+  if (diffMs < 10_000) return 'Just now'
+  const diffMin = Math.floor(diffMs / 60_000)
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.floor(diffMin / 60)
+  return `${diffHr}h ago`
+}
 </script>
 
 <template>
@@ -200,6 +226,47 @@ const confirmReset = () => {
           <div class="settings-bg-preview" :style="{ background: bg.preview }" />
           <span>{{ bg.name }}</span>
         </button>
+      </div>
+
+      <!-- Autosave -->
+      <div class="settings-row">
+        <div class="settings-label-group">
+          <RotateCcw :size="16" />
+          <span class="settings-label">Autosave</span>
+        </div>
+        <span class="settings-value">{{ formatAutosave(lastAutosaveAt) }}</span>
+      </div>
+
+      <!-- Snapshots -->
+      <div class="settings-divider" />
+
+      <div class="settings-row settings-row--snapshots">
+        <span class="settings-label">Snapshots</span>
+        <button
+          class="settings-snapshot-save"
+          :disabled="!canManageSnapshots"
+          @click="createSnapshot"
+        >
+          Save Snapshot
+        </button>
+      </div>
+      <div class="settings-snapshots-list">
+        <div v-if="snapshots.length === 0" class="settings-snapshot-empty">No snapshots yet</div>
+        <div v-for="snapshot in snapshots" :key="snapshot.id" class="settings-snapshot-item">
+          <div class="settings-snapshot-info">
+            <span class="settings-snapshot-name">{{ snapshot.name }}</span>
+            <span class="settings-snapshot-meta">
+              {{ new Date(snapshot.createdAt).toLocaleString() }} • {{ snapshot.createdBy }}
+            </span>
+          </div>
+          <button
+            class="settings-snapshot-restore"
+            :disabled="!canManageSnapshots"
+            @click="restoreSnapshot(snapshot.id, snapshot.name)"
+          >
+            Restore
+          </button>
+        </div>
       </div>
 
       <!-- Reset Table -->
@@ -448,6 +515,93 @@ const confirmReset = () => {
   color: #666;
   text-align: center;
   margin: 0;
+}
+
+.settings-row--snapshots {
+  align-items: center;
+}
+
+.settings-snapshot-save {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.settings-snapshot-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-snapshot-save:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.settings-snapshots-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-snapshot-empty {
+  font-size: 12px;
+  color: #888;
+}
+
+.settings-snapshot-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-snapshot-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-snapshot-name {
+  font-size: 12px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.settings-snapshot-meta {
+  font-size: 10px;
+  color: #888;
+}
+
+.settings-snapshot-restore {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.settings-snapshot-restore:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-snapshot-restore:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* Name editing styles */
