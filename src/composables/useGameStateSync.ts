@@ -235,9 +235,40 @@ export function useGameStateSync(config: GameStateSyncConfig) {
         break
 
       case 'zone:updated':
-        // For our own zone updates, we already have correct local state
-        // Only update for remote player changes
-        if (message.playerId !== ws.playerId.value) {
+        // For our own zone updates, avoid overwriting active drag/resizes unless
+        // non-positional fields changed (lock/visibility/layout/etc).
+        const isSelf = message.playerId === ws.playerId.value
+        let shouldApply = !isSelf
+
+        if (isSelf) {
+          const localZone = cardStore.getZoneById(message.zoneId)
+          if (!localZone) {
+            shouldApply = true
+          } else {
+            const remote = message.zone
+            const cardSettingsChanged =
+              (localZone.cardSettings?.cardScale ?? null) !==
+                (remote.cardSettings?.cardScale ?? null) ||
+              (localZone.cardSettings?.cardSpacing ?? null) !==
+                (remote.cardSettings?.cardSpacing ?? null) ||
+              (localZone.cardSettings?.randomOffset ?? null) !==
+                (remote.cardSettings?.randomOffset ?? null) ||
+              (localZone.cardSettings?.randomRotation ?? null) !==
+                (remote.cardSettings?.randomRotation ?? null)
+
+            shouldApply =
+              localZone.label !== remote.label ||
+              localZone.faceUp !== remote.faceUp ||
+              localZone.locked !== remote.locked ||
+              localZone.visibility !== remote.visibility ||
+              localZone.ownerId !== remote.ownerId ||
+              localZone.layout !== remote.layout ||
+              localZone.stackId !== remote.stackId ||
+              cardSettingsChanged
+          }
+        }
+
+        if (shouldApply) {
           cardStore.updateZoneFromServer(message.zoneId, message.zone)
           if (message.stackUpdate) {
             cardStore.updateStackFromServer(message.stackUpdate.stackId, {
