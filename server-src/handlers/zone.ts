@@ -18,10 +18,23 @@ export function handleZoneCreate(
   clients: Map<string, GenericWebSocket>,
 ): void {
   const clientData = getClientData(ws)
+  const playerId = clientData.playerId
+  if (!playerId) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'zone:create',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+      requestId: msg.requestId,
+    })
+    return
+  }
   const { gameState } = room
 
   // Sanitize user-provided label to prevent XSS
   const sanitizedLabel = sanitizeZoneLabel(msg.label)
+  const visibility = msg.visibility ?? 'public'
+  const ownerId = visibility === 'owner' ? playerId : null
 
   const zone = gameState.createZone(
     msg.x,
@@ -30,8 +43,8 @@ export function handleZoneCreate(
     msg.height,
     sanitizedLabel,
     msg.faceUp,
-    msg.visibility ?? 'public',
-    msg.ownerId ?? null,
+    visibility,
+    ownerId,
     msg.layout ?? 'stack',
     msg.cardSettings ?? { cardScale: 1.0, cardSpacing: 0.5 },
   )
@@ -59,6 +72,17 @@ export function handleZoneUpdate(
   clients: Map<string, GenericWebSocket>,
 ): void {
   const clientData = getClientData(ws)
+  const playerId = clientData.playerId
+  if (!playerId) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'zone:update',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+      requestId: msg.requestId,
+    })
+    return
+  }
   const { gameState } = room
 
   const zone = gameState.getZone(msg.zoneId)
@@ -87,10 +111,44 @@ export function handleZoneUpdate(
     return
   }
 
+  const wantsOwnershipUpdate =
+    msg.updates.visibility !== undefined || msg.updates.ownerId !== undefined
+  if (wantsOwnershipUpdate) {
+    const isCreator = room.creatorPlayerId === playerId
+    const isOwner = zone.ownerId === playerId
+    if (!isCreator && !isOwner) {
+      send(ws, {
+        type: 'error',
+        originalAction: 'zone:update',
+        code: 'PERMISSION_DENIED',
+        message: 'Only the zone owner or table creator can change visibility',
+        requestId: msg.requestId,
+      })
+      return
+    }
+    if (!isCreator && msg.updates.ownerId !== undefined) {
+      send(ws, {
+        type: 'error',
+        originalAction: 'zone:update',
+        code: 'PERMISSION_DENIED',
+        message: 'Only the table creator can reassign zone ownership',
+        requestId: msg.requestId,
+      })
+      return
+    }
+  }
+
   // Sanitize label if present in updates to prevent XSS
   const sanitizedUpdates = { ...msg.updates }
   if (sanitizedUpdates.label !== undefined) {
     sanitizedUpdates.label = sanitizeZoneLabel(sanitizedUpdates.label)
+  }
+  if (sanitizedUpdates.visibility === 'owner') {
+    if (sanitizedUpdates.ownerId === undefined) {
+      sanitizedUpdates.ownerId = zone.ownerId ?? playerId
+    }
+  } else if (sanitizedUpdates.visibility !== undefined) {
+    sanitizedUpdates.ownerId = null
   }
 
   const result = gameState.updateZone(msg.zoneId, sanitizedUpdates)

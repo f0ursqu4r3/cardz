@@ -65,9 +65,12 @@ export function sendToPlayer(
   playerId: string,
   message: ServerMessage,
 ): void {
-  const ws = clients.get(playerId)
-  if (ws) {
-    send(ws, message)
+  for (const ws of clients.values()) {
+    const clientData = getClientData(ws)
+    if (clientData.playerId === playerId) {
+      send(ws, message)
+      return
+    }
   }
 }
 
@@ -88,7 +91,7 @@ export function broadcastSplit(
   for (const [id, ws] of clients) {
     const clientData = getClientData(ws)
     if (clientData.roomCode === roomCode) {
-      ws.send(id === ownerId ? ownerData : otherData)
+      ws.send(clientData.playerId === ownerId ? ownerData : otherData)
     }
   }
 }

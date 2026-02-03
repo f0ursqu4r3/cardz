@@ -10,6 +10,7 @@ export function handleCardMove(
   clients: Map<string, GenericWebSocket>,
 ): void {
   const clientData = getClientData(ws)
+  const playerId = clientData.playerId
   const { locks, gameState } = room
 
   // Check if card exists first
@@ -93,11 +94,11 @@ export function handleCardLock(
 
   if (card.ownerId !== null) {
     // If the card is in our own hand, just acknowledge (handles race condition)
-    if (card.ownerId === clientData.id) {
+    if (playerId && card.ownerId === playerId) {
       send(ws, {
         type: 'card:locked',
         cardId: msg.cardId,
-        playerId: clientData.playerId ?? clientData.id,
+        playerId: playerId ?? clientData.id,
       })
       return
     }
@@ -185,7 +186,7 @@ export function handleCardFlip(
   }
 
   // Check if card is in another player's hand
-  if (card.ownerId !== null && card.ownerId !== clientData.id) {
+  if (card.ownerId !== null && card.ownerId !== playerId) {
     send(ws, {
       type: 'error',
       originalAction: 'card:flip',

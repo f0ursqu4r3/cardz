@@ -1,5 +1,5 @@
 import { STACK_MAX_VISUAL_DEPTH } from './../types/index'
-import { computed, ref, type Ref } from 'vue'
+import { computed, ref, shallowRef, watch, type Ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { CardData, Stack, Zone, Counter, Token, Die, DieValue, Timer, TimerMode, TimerStatus } from '@/types'
 import {
@@ -43,62 +43,72 @@ export const useCardStore = defineStore('cards', () => {
   let nextTimerId = 1
   let zCounter = 100
 
-  // O(1) lookup Maps - avoids O(n) array.find() calls
-  const cardById = computed(() => {
-    const map = new Map<number, CardData>()
-    for (const card of cards.value) {
-      map.set(card.id, card)
+  const rebuildIdMap = <T extends { id: number }>(items: T[]) => {
+    const map = new Map<number, T>()
+    for (const item of items) {
+      map.set(item.id, item)
     }
     return map
-  })
+  }
 
-  const stackById = computed(() => {
-    const map = new Map<number, Stack>()
-    for (const stack of stacks.value) {
-      map.set(stack.id, stack)
-    }
-    return map
-  })
+  // O(1) lookup Maps - rebuild only on structural array changes
+  const cardById = shallowRef(new Map<number, CardData>())
+  const stackById = shallowRef(new Map<number, Stack>())
+  const zoneById = shallowRef(new Map<number, Zone>())
+  const counterById = shallowRef(new Map<number, Counter>())
+  const tokenById = shallowRef(new Map<number, Token>())
+  const dieById = shallowRef(new Map<number, Die>())
+  const timerById = shallowRef(new Map<number, Timer>())
 
-  const zoneById = computed(() => {
-    const map = new Map<number, Zone>()
-    for (const zone of zones.value) {
-      map.set(zone.id, zone)
-    }
-    return map
-  })
-
-  const counterById = computed(() => {
-    const map = new Map<number, Counter>()
-    for (const counter of counters.value) {
-      map.set(counter.id, counter)
-    }
-    return map
-  })
-
-  const tokenById = computed(() => {
-    const map = new Map<number, Token>()
-    for (const token of tokens.value) {
-      map.set(token.id, token)
-    }
-    return map
-  })
-
-  const dieById = computed(() => {
-    const map = new Map<number, Die>()
-    for (const die of dice.value) {
-      map.set(die.id, die)
-    }
-    return map
-  })
-
-  const timerById = computed(() => {
-    const map = new Map<number, Timer>()
-    for (const timer of timers.value) {
-      map.set(timer.id, timer)
-    }
-    return map
-  })
+  watch(
+    () => cards.value,
+    (value) => {
+      cardById.value = rebuildIdMap(value)
+    },
+    { immediate: true },
+  )
+  watch(
+    () => stacks.value,
+    (value) => {
+      stackById.value = rebuildIdMap(value)
+    },
+    { immediate: true },
+  )
+  watch(
+    () => zones.value,
+    (value) => {
+      zoneById.value = rebuildIdMap(value)
+    },
+    { immediate: true },
+  )
+  watch(
+    () => counters.value,
+    (value) => {
+      counterById.value = rebuildIdMap(value)
+    },
+    { immediate: true },
+  )
+  watch(
+    () => tokens.value,
+    (value) => {
+      tokenById.value = rebuildIdMap(value)
+    },
+    { immediate: true },
+  )
+  watch(
+    () => dice.value,
+    (value) => {
+      dieById.value = rebuildIdMap(value)
+    },
+    { immediate: true },
+  )
+  watch(
+    () => timers.value,
+    (value) => {
+      timerById.value = rebuildIdMap(value)
+    },
+    { immediate: true },
+  )
 
   // Helper functions for O(1) lookups
   const getCardById = (id: number): CardData | undefined => cardById.value.get(id)

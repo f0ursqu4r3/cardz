@@ -78,6 +78,8 @@ export function createInitialGameState(): GameState {
  */
 export class GameStateManager {
   private state: GameState
+  private cardById: Map<number, CardState>
+  private stackById: Map<number, StackState>
 
   constructor(initialState?: GameState) {
     if (!initialState) {
@@ -111,6 +113,8 @@ export class GameStateManager {
       }
       this.state.zCounter = maxZ
     }
+    this.cardById = new Map(this.state.cards.map((card) => [card.id, card]))
+    this.stackById = new Map(this.state.stacks.map((stack) => [stack.id, stack]))
   }
 
   getState(): GameState {
@@ -136,7 +140,7 @@ export class GameStateManager {
   // ============================================================================
 
   getCard(cardId: number): CardState | undefined {
-    return this.state.cards.find((c) => c.id === cardId)
+    return this.cardById.get(cardId)
   }
 
   moveCard(cardId: number, x: number, y: number): { card: CardState; z: number } | null {
@@ -173,7 +177,17 @@ export class GameStateManager {
   // ============================================================================
 
   getStack(stackId: number): StackState | undefined {
-    return this.state.stacks.find((s) => s.id === stackId)
+    return this.stackById.get(stackId)
+  }
+
+  private addStack(stack: StackState): void {
+    this.state.stacks.push(stack)
+    this.stackById.set(stack.id, stack)
+  }
+
+  private removeStack(stackId: number): void {
+    this.state.stacks = this.state.stacks.filter((s) => s.id !== stackId)
+    this.stackById.delete(stackId)
   }
 
   createStack(
@@ -195,7 +209,7 @@ export class GameStateManager {
       lockedBy: null,
     }
 
-    this.state.stacks.push(stack)
+    this.addStack(stack)
 
     // Update card positions
     const cardUpdates: { cardId: number; x: number; y: number; z: number }[] = []
@@ -321,7 +335,7 @@ export class GameStateManager {
           zone.stackId = null
         }
       }
-      this.state.stacks = this.state.stacks.filter((s) => s.id !== stackId)
+      this.removeStack(stackId)
       this.incrementVersion()
       return { stackId, stackDeleted: true }
     }
@@ -365,7 +379,7 @@ export class GameStateManager {
     }
 
     // Delete source stack
-    this.state.stacks = this.state.stacks.filter((s) => s.id !== sourceStackId)
+    this.removeStack(sourceStackId)
 
     this.incrementVersion()
     return { targetStack, cardUpdates }
@@ -593,7 +607,7 @@ export class GameStateManager {
         convertedStack = { stackId: stack.id, anchorX: stack.anchorX, anchorY: stack.anchorY }
       } else if (stack) {
         // Empty stack, just delete it
-        this.state.stacks = this.state.stacks.filter((s) => s.id !== zone.stackId)
+        this.removeStack(zone.stackId)
       }
     }
 
@@ -797,7 +811,7 @@ export class GameStateManager {
     }
 
     // Delete the stack
-    this.state.stacks = this.state.stacks.filter((s) => s.id !== stackId)
+    this.removeStack(stackId)
 
     this.incrementVersion()
     return { cardIds, newHand: hand.cardIds }

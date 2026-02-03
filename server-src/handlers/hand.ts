@@ -10,6 +10,17 @@ export function handleHandAdd(
   clients: Map<string, GenericWebSocket>,
 ): void {
   const clientData = getClientData(ws)
+  const playerId = clientData.playerId
+  if (!playerId) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'hand:add',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+      requestId: msg.requestId,
+    })
+    return
+  }
   const { locks, gameState } = room
 
   const card = gameState.getCard(msg.cardId)
@@ -27,12 +38,12 @@ export function handleHandAdd(
   // Check if already owned
   if (card.ownerId !== null) {
     // If it's already in our hand, just acknowledge (handles race condition)
-    if (card.ownerId === clientData.id) {
-      const handCount = gameState.getHandCount(clientData.id)
+    if (card.ownerId === playerId) {
+      const handCount = gameState.getHandCount(playerId)
       broadcastSplit(
         clients,
         room.code,
-        clientData.id,
+        playerId,
         {
           type: 'hand:card_added',
           cardId: msg.cardId,
@@ -40,7 +51,7 @@ export function handleHandAdd(
         },
         {
           type: 'hand:card_added_other',
-          playerId: clientData.playerId ?? clientData.id,
+          playerId,
           cardId: msg.cardId,
           handCount,
         },
@@ -73,16 +84,16 @@ export function handleHandAdd(
   // Release card lock if we held it
   locks.unlockCard(msg.cardId, clientData.id)
 
-  const result = gameState.addCardToHand(clientData.id, msg.cardId)
+  const result = gameState.addCardToHand(playerId, msg.cardId)
   if (!result) return
 
-  const handCount = gameState.getHandCount(clientData.id)
+  const handCount = gameState.getHandCount(playerId)
 
   // Send full info to owner, limited info to others
   broadcastSplit(
     clients,
     room.code,
-    clientData.id,
+    playerId,
     {
       type: 'hand:card_added',
       cardId: msg.cardId,
@@ -90,7 +101,7 @@ export function handleHandAdd(
     },
     {
       type: 'hand:card_added_other',
-      playerId: clientData.playerId ?? clientData.id,
+      playerId,
       cardId: msg.cardId,
       handCount,
     },
@@ -104,10 +115,21 @@ export function handleHandRemove(
   clients: Map<string, GenericWebSocket>,
 ): void {
   const clientData = getClientData(ws)
+  const playerId = clientData.playerId
+  if (!playerId) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'hand:remove',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+      requestId: msg.requestId,
+    })
+    return
+  }
   const { gameState } = room
 
   const card = gameState.getCard(msg.cardId)
-  if (!card || card.ownerId !== clientData.id) {
+  if (!card || card.ownerId !== playerId) {
     send(ws, {
       type: 'error',
       originalAction: 'hand:remove',
@@ -118,22 +140,33 @@ export function handleHandRemove(
     return
   }
 
-  const result = gameState.removeCardFromHand(clientData.id, msg.cardId, msg.x, msg.y, msg.faceUp)
+  const result = gameState.removeCardFromHand(playerId, msg.cardId, msg.x, msg.y, msg.faceUp)
   if (!result) return
 
   // Card is now visible to everyone
   broadcastToRoom(clients, room.code, {
     type: 'hand:card_removed',
-    playerId: clientData.playerId ?? clientData.id,
+    playerId,
     cardState: result,
   })
 }
 
 export function handleHandReorder(ws: GenericWebSocket, msg: HandReorder, room: Room): void {
   const clientData = getClientData(ws)
+  const playerId = clientData.playerId
+  if (!playerId) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'hand:reorder',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+      requestId: msg.requestId,
+    })
+    return
+  }
   const { gameState } = room
 
-  const newOrder = gameState.reorderHand(clientData.id, msg.fromIndex, msg.toIndex)
+  const newOrder = gameState.reorderHand(playerId, msg.fromIndex, msg.toIndex)
   if (!newOrder) {
     send(ws, {
       type: 'error',
@@ -159,6 +192,17 @@ export function handleHandAddStack(
   clients: Map<string, GenericWebSocket>,
 ): void {
   const clientData = getClientData(ws)
+  const playerId = clientData.playerId
+  if (!playerId) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'hand:add_stack',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+      requestId: msg.requestId,
+    })
+    return
+  }
   const { locks, gameState } = room
 
   const stack = gameState.getStack(msg.stackId)
@@ -189,16 +233,16 @@ export function handleHandAddStack(
   // Release stack lock
   locks.unlockStack(msg.stackId, clientData.id)
 
-  const result = gameState.addStackToHand(clientData.id, msg.stackId)
+  const result = gameState.addStackToHand(playerId, msg.stackId)
   if (!result) return
 
-  const handCount = gameState.getHandCount(clientData.id)
+  const handCount = gameState.getHandCount(playerId)
 
   // Send full info to owner, limited info to others
   broadcastSplit(
     clients,
     room.code,
-    clientData.id,
+    playerId,
     {
       type: 'hand:stack_added',
       cardIds: result.cardIds,
@@ -206,7 +250,7 @@ export function handleHandAddStack(
     },
     {
       type: 'hand:stack_added_other',
-      playerId: clientData.playerId ?? clientData.id,
+      playerId,
       cardIds: result.cardIds,
       stackDeleted: msg.stackId,
       handCount,
