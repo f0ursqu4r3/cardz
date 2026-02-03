@@ -52,7 +52,7 @@ export const useCardStore = defineStore('cards', () => {
       () => {
         target.value = rebuildIdMap(source.value)
       },
-      { immediate: true },
+      { immediate: true, flush: 'sync' },
     )
   }
 
@@ -637,12 +637,12 @@ export const useCardStore = defineStore('cards', () => {
     if (draggingStackId !== null && draggingStackId === card.stackId) {
       const stack = stackById.value.get(draggingStackId)
       const pos = stack ? stack.cardIds.indexOf(card.id) : 0
-      return 12000 + pos
+      return 2000 + pos
     }
 
     // Active single card being dragged
     if (activeIndex === index) {
-      return 11000
+      return 1900
     }
 
     // Check if card is locked by another player (card-level or stack-level lock)
@@ -656,7 +656,7 @@ export const useCardStore = defineStore('cards', () => {
       const stack =
         card.stackId !== null ? stackById.value.get(card.stackId) ?? null : null
       const pos = stack ? stack.cardIds.indexOf(card.id) : 0
-      return 10000 + pos
+      return 1800 + pos
     }
 
     // Cards in stacks: use stack id + position within stack

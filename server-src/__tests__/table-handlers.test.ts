@@ -64,7 +64,12 @@ describe('handleTableReset', () => {
 
   test('non-creator cannot reset the table', () => {
     // Create a room as Alice (creator)
-    const { room } = roomManager.createRoom('socket1', 'Alice', undefined, 'Test Table')
+    const { room, playerId: aliceId } = roomManager.createRoom(
+      'socket1',
+      'Alice',
+      undefined,
+      'Test Table',
+    )
     const roomCode = room.code
 
     // Join room as Bob (member)

@@ -78,10 +78,15 @@ export function useViewport(canvasRef: Ref<HTMLElement | null>) {
     zoom.value = newZoom
   }
 
-  // Handle wheel events (always zoom)
+  // Handle wheel events (pan by default, zoom with modifiers)
   const onWheel = (event: WheelEvent) => {
     event.preventDefault()
-    zoomAt(event.clientX, event.clientY, event.deltaY)
+    if (event.ctrlKey || event.metaKey) {
+      zoomAt(event.clientX, event.clientY, event.deltaY)
+      return
+    }
+    panX.value -= event.deltaX
+    panY.value -= event.deltaY
   }
 
   // Start panning (middle mouse or space+drag)

@@ -8,7 +8,7 @@ import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'bun:tes
 import type { ServerWebSocket } from 'bun'
 
 // Test server setup
-let server: ReturnType<typeof Bun.serve>
+let server: ReturnType<typeof Bun.serve> | undefined
 let testPort: number
 
 interface ClientData {
@@ -75,6 +75,28 @@ function createTestServer(port: number) {
     },
   })
 }
+
+async function canBindPort(): Promise<boolean> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const port = 20000 + Math.floor(Math.random() * 20000)
+    try {
+      const probe = Bun.serve({
+        port,
+        fetch() {
+          return new Response('ok')
+        },
+      })
+      probe.stop()
+      return true
+    } catch {
+      // Try another port.
+    }
+  }
+  return false
+}
+
+const socketsAvailable = await canBindPort()
+const describeSockets = describe.skipIf(!socketsAvailable)
 
 function handleMessage(ws: ServerWebSocket<ClientData>, msg: { type: string; [key: string]: unknown }) {
   switch (msg.type) {
@@ -241,17 +263,30 @@ async function createClient(port: number): Promise<{
   })
 }
 
-describe('WebSocket Integration Tests', () => {
+describeSockets('WebSocket Integration Tests', () => {
   beforeAll(async () => {
-    // Find an available port
-    testPort = 9100 + Math.floor(Math.random() * 100)
-    server = createTestServer(testPort)
+    let lastError: unknown
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const port = 20000 + Math.floor(Math.random() * 20000)
+      try {
+        server = createTestServer(port)
+        testPort = server.port
+        break
+      } catch (err) {
+        lastError = err
+      }
+    }
+
+    if (!server) {
+      throw lastError instanceof Error ? lastError : new Error('Failed to start test server')
+    }
+
     // Wait for server to be ready
     await Bun.sleep(100)
   })
 
   afterAll(() => {
-    server.stop()
+    server?.stop()
     rooms.clear()
   })
 

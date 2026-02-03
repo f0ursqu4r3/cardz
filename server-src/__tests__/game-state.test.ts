@@ -101,7 +101,7 @@ describe('GameStateManager', () => {
       manager.removeCardFromStack(0)
       manager.removeCardFromStack(1)
 
-      manager.createStack([0, 1], 500, 400)
+      const result = manager.createStack([0, 1], 500, 400)
 
       expect(result.stack.cardIds).toEqual([0, 1])
       expect(result.stack.anchorX).toBe(500)

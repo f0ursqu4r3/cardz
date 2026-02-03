@@ -8,7 +8,7 @@ import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
  */
 
 // Test server configuration
-const TEST_PORT = 9999
+let testPort = 9999
 let serverProcess: ReturnType<typeof Bun.spawn> | null = null
 
 // Helper to create a WebSocket client
@@ -21,7 +21,7 @@ function createClient(): Promise<{
 }> {
   return new Promise((resolve, reject) => {
     const messages: unknown[] = []
-    const ws = new WebSocket(`ws://localhost:${TEST_PORT}`)
+    const ws = new WebSocket(`ws://localhost:${testPort}`)
 
     const waitForMessage = (
       predicate: (msg: unknown) => boolean,
@@ -73,21 +73,70 @@ function createClient(): Promise<{
 // Helper to wait for a short time
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-describe('E2E Multiplayer Scenarios', () => {
-  beforeAll(async () => {
-    // Start a test server
-    serverProcess = Bun.spawn(['bun', 'run', 'server-src/index.ts'], {
-      env: {
-        ...process.env,
-        PORT: String(TEST_PORT),
-        NODE_ENV: 'test',
-      },
-      stdout: 'pipe',
-      stderr: 'pipe',
-    })
+async function waitForServer(port: number, timeoutMs = 5000): Promise<boolean> {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res = await fetch(`http://localhost:${port}/health`)
+      if (res.ok) return true
+    } catch {
+      // ignore and retry
+    }
+    await wait(100)
+  }
+  return false
+}
 
-    // Wait for server to be ready
-    await wait(1000)
+async function canBindPort(): Promise<boolean> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const port = 20000 + Math.floor(Math.random() * 20000)
+    try {
+      const probe = Bun.serve({
+        port,
+        fetch() {
+          return new Response('ok')
+        },
+      })
+      probe.stop()
+      return true
+    } catch {
+      // Try another port.
+    }
+  }
+  return false
+}
+
+const socketsAvailable = await canBindPort()
+const describeSockets = describe.skipIf(!socketsAvailable)
+
+describeSockets('E2E Multiplayer Scenarios', () => {
+  beforeAll(async () => {
+    let lastError: unknown
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const port = 20000 + Math.floor(Math.random() * 20000)
+      testPort = port
+
+      serverProcess = Bun.spawn(['bun', 'run', 'server-src/index.ts'], {
+        env: {
+          ...process.env,
+          PORT: String(port),
+          NODE_ENV: 'test',
+        },
+        stdout: 'pipe',
+        stderr: 'pipe',
+      })
+
+      const ready = await waitForServer(port, 5000)
+      if (ready) {
+        return
+      }
+
+      lastError = new Error(`Server did not start on port ${port}`)
+      serverProcess.kill()
+      serverProcess = null
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('Failed to start test server')
   })
 
   afterAll(() => {
