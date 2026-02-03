@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { ref, type Ref } from 'vue'
 import { useViewport } from '@/composables/useViewport'
 import { createMockElement, createMockWheelEvent } from '../test-utils'

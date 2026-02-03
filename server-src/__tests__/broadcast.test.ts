@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from 'bun:test'
+import { describe, test, expect } from 'bun:test'
 import type { GenericWebSocket, ClientData } from '../utils/broadcast'
 
 // We need to test the broadcast functions, but they require mock WebSockets

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ZoneComp from '@/components/ZoneComp.vue'
@@ -281,7 +281,6 @@ describe('ZoneComp', () => {
       const wrapper = createWrapper(zone)
 
       const zoneEl = wrapper.find('.zone')
-      const style = zoneEl.attributes('style')
 
       // Zone should be positioned
       expect(zoneEl.exists()).toBe(true)

@@ -8,7 +8,6 @@ import type {
   StackState,
   TimerMode,
   TimerState,
-  TimerStatus,
   TokenShape,
   TokenSize,
   TokenSprite,
@@ -674,7 +673,7 @@ export class GameStateManager {
     // Create zone stack if needed
     if (zone.stackId === null) {
       // Create stack with all cards at once
-      const { stack, cardUpdates } = this.createStack(cardIds, centerX, centerY, 'zone', zoneId)
+      const { stack } = this.createStack(cardIds, centerX, centerY, 'zone', zoneId)
       zone.stackId = stack.id
       stackCreated = true
 

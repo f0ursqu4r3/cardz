@@ -68,7 +68,7 @@ export class HeartbeatManager {
   /**
    * Record a pong response from a client
    */
-  receivePong(clientId: string, timestamp: number): void {
+  receivePong(clientId: string, _timestamp: number): void {
     const state = this.clients.get(clientId)
     if (state) {
       state.lastPong = Date.now()

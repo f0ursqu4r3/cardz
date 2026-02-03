@@ -5,7 +5,7 @@ import { useHover } from '@/composables/useHover'
 import { useShake } from '@/composables/useShake'
 import { useCardPhysics } from '@/composables/useCardPhysics'
 import type { DragTarget, Zone } from '@/types'
-import { CARD_BACK_COL, CARD_BACK_ROW, CARD_W, CARD_H, CURSOR_THROTTLE_MS } from '@/types'
+import { CARD_BACK_COL, CARD_BACK_ROW, CURSOR_THROTTLE_MS } from '@/types'
 import type { ClientMessage } from '../../shared/types'
 import { getDropIndexInZone } from '@/utils/zoneLayouts'
 
@@ -248,13 +248,11 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
 
       // Check if this stack belongs to a zone with a non-stack layout
       let canPickAnyCard = false
-      let zoneId: number | undefined
       if (stack.kind === 'zone' && stack.zoneId !== undefined) {
         const zone = cardStore.getZoneById(stack.zoneId!)
         if (zone && zone.layout !== 'stack') {
           // Non-stack layouts allow picking any visible card
           canPickAnyCard = true
-          zoneId = zone.id
 
           // Track zone source for potential reordering
           const cardIndex = stack.cardIds.indexOf(card.id)

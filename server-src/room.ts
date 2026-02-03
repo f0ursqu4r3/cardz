@@ -3,20 +3,17 @@ import type { Player, TableSettings, TableBackground } from '../shared/types'
 import { PLAYER_COLORS } from '../shared/types'
 import { GameStateManager, createInitialGameState } from './game-state'
 import { LockManager } from './utils/locks'
-import type { ClientData, GenericWebSocket } from './utils/broadcast'
+import type { GenericWebSocket } from './utils/broadcast'
 import {
   saveTable,
   loadTable,
-  deleteTable,
   startAutoSave,
   stopAutoSave,
   cleanupOldTables,
-  getDefaultSettings,
   scheduleSave,
   saveNow,
   cancelScheduledSave,
   flushPendingSaves,
-  type TableMetadata,
 } from './persistence'
 
 /**
@@ -753,7 +750,7 @@ export class RoomManager {
     if (!player) return null
 
     // Release all locks held by this player
-    const released = room.locks.releaseAllForPlayer(playerId)
+    room.locks.releaseAllForPlayer(playerId)
 
     // Return cards from hand to table
     room.gameState.removePlayer(playerId)

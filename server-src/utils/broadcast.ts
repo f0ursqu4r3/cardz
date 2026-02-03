@@ -47,34 +47,6 @@ export function broadcastToRoom(
 }
 
 /**
- * Broadcast a message to all clients in a room including the sender
- */
-export function broadcastToRoomAll(
-  clients: Map<string, GenericWebSocket>,
-  roomCode: string,
-  message: ServerMessage,
-): void {
-  broadcastToRoom(clients, roomCode, message, undefined)
-}
-
-/**
- * Send a message to a specific player by ID
- */
-export function sendToPlayer(
-  clients: Map<string, GenericWebSocket>,
-  playerId: string,
-  message: ServerMessage,
-): void {
-  for (const ws of clients.values()) {
-    const clientData = getClientData(ws)
-    if (clientData.playerId === playerId) {
-      send(ws, message)
-      return
-    }
-  }
-}
-
-/**
  * Broadcast different messages to different recipients
  * Useful for hand actions where owner sees full info, others see limited info
  */
@@ -88,7 +60,7 @@ export function broadcastSplit(
   const ownerData = JSON.stringify(ownerMessage)
   const otherData = JSON.stringify(otherMessage)
 
-  for (const [id, ws] of clients) {
+  for (const ws of clients.values()) {
     const clientData = getClientData(ws)
     if (clientData.roomCode === roomCode) {
       ws.send(clientData.playerId === ownerId ? ownerData : otherData)

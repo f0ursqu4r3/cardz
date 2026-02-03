@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed } from 'vue'
 import { useEntitySelection, type ExternalSelectionState } from '@/composables/useEntitySelection'
 import type { Die } from '@/types'
 

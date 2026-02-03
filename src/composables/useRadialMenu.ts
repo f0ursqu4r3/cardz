@@ -27,7 +27,7 @@ export function useRadialMenu() {
       case 'card':
         return getCardMenuItems(target.value)
       case 'stack':
-        return getStackMenuItems(target.value)
+        return getStackMenuItems()
       case 'zone':
         return getZoneMenuItems(target.value)
       case 'selection':
@@ -76,7 +76,7 @@ export function useRadialMenu() {
     return items
   }
 
-  function getStackMenuItems(t: Extract<RadialMenuTarget, { type: 'stack' }>): RadialMenuItem[] {
+  function getStackMenuItems(): RadialMenuItem[] {
     return [
       {
         id: 'flip-stack',

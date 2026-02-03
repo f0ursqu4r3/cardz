@@ -1,4 +1,4 @@
-import { computed, type ComputedRef, type Ref } from 'vue'
+import { computed, type Ref } from 'vue'
 import type { useCardStore } from '@/stores/cards'
 import type { useCardInteraction } from './useCardInteraction'
 import type { Player } from '../../shared/types'

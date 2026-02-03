@@ -1,4 +1,4 @@
-import { ref, reactive } from 'vue'
+import { reactive } from 'vue'
 import type { CardData } from '@/types'
 import { CARD_W, CARD_H, STACK_HOVER_MS } from '@/types'
 

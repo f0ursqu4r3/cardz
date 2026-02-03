@@ -263,7 +263,7 @@ export function handleStateSyncMessage(
   message: ServerMessage,
   refs: RoomStateRefs,
 ): boolean {
-  const { gameState, handCardIds, handCounts, playerId } = refs
+  const { gameState, handCardIds, handCounts } = refs
 
   switch (message.type) {
     case 'state:sync': {

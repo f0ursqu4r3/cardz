@@ -96,19 +96,6 @@ export function logPlayerSpectating(
 }
 
 /**
- * Helper to log card placed on table
- */
-export function logCardPlaced(
-  clients: Map<string, GenericWebSocket>,
-  roomCode: string,
-  playerId: string,
-  playerName: string,
-  cardCount: number = 1,
-): void {
-  logActivity(clients, roomCode, playerId, playerName, 'card_placed', { count: cardCount })
-}
-
-/**
  * Helper to log stack created
  */
 export function logStackCreated(

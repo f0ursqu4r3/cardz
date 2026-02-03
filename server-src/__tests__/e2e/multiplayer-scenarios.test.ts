@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'bun:test'
+import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
 
 /**
  * E2E Multiplayer Scenario Tests
@@ -236,7 +236,7 @@ describe('E2E Multiplayer Scenarios', () => {
         // First, we need to move cards out of the initial stack
         // Get state to understand initial positions
         player1.send({ type: 'state:request' })
-        const state = (await player1.waitForMessage((m: any) => m.type === 'state:sync')) as any
+        await player1.waitForMessage((m: any) => m.type === 'state:sync')
 
         // Find two loose cards (not in a stack) or remove from stack first
         // For simplicity, let's remove two cards from the initial stack

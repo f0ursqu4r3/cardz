@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { ref } from 'vue'
 import { useEntityManager, useAllEntityManagers } from '@/composables/useEntityManager'
-import type { Counter, Token, Die, Timer } from '@/types'
+import type { Counter, Die } from '@/types'
 import type { Player } from '../../../shared/types'
 
 // Mock viewport

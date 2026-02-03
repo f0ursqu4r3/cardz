@@ -936,7 +936,7 @@ const server = Bun.serve<ClientData>({
       }
     },
 
-    close(ws, code, reason) {
+    close(ws, code, _reason) {
       const clientData = ws.data
       console.log(`[disconnect] ${clientData.id} (code: ${code})`)
 

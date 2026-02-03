@@ -95,13 +95,6 @@ export function trackChatMessage(): void {
 }
 
 /**
- * Track entity creation (dice, counters, tokens, timers)
- */
-export function trackEntityCreated(entityType: 'die' | 'counter' | 'token' | 'timer'): void {
-  recordMetric(`${entityType}_created`, 1)
-}
-
-/**
  * Get current server statistics
  */
 export function getStats(): ServerStats {
@@ -141,14 +134,5 @@ export function getStats(): ServerStats {
     // Timestamps
     serverStartedAt,
     statsGeneratedAt: Date.now(),
-  }
-}
-
-/**
- * Record peak players (call periodically or on shutdown)
- */
-export function recordDailyPeak(): void {
-  if (peakPlayersToday > 0) {
-    recordMetric('peak_players_daily', peakPlayersToday)
   }
 }

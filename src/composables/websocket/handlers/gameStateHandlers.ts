@@ -7,9 +7,6 @@ import type { Ref } from 'vue'
 import type {
   GameState,
   ServerMessage,
-  CardState,
-  StackState,
-  ZoneState,
 } from '../../../../shared/types'
 
 export interface GameStateRefs {

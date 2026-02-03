@@ -101,7 +101,7 @@ describe('GameStateManager', () => {
       manager.removeCardFromStack(0)
       manager.removeCardFromStack(1)
 
-      const result = manager.createStack([0, 1], 500, 400)
+      manager.createStack([0, 1], 500, 400)
 
       expect(result.stack.cardIds).toEqual([0, 1])
       expect(result.stack.anchorX).toBe(500)
@@ -113,7 +113,7 @@ describe('GameStateManager', () => {
       const initialStack = manager.getStack(0)
       const initialCardCount = initialStack?.cardIds.length ?? 0
 
-      const result = manager.createStack([0, 1], 500, 400)
+      manager.createStack([0, 1], 500, 400)
 
       // Original stack should have 2 fewer cards
       const updatedStack = manager.getStack(0)

@@ -12,7 +12,7 @@ import type {
   StackReorder,
 } from '../../shared/types'
 import type { Room } from '../room'
-import type { ClientData, GenericWebSocket } from '../utils/broadcast'
+import type { GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom, broadcastToViewport, getClientData } from '../utils/broadcast'
 import { logStackCreated, logStackShuffled, logStackFlipped } from '../activity'
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, watch, onMounted, onUnmounted, computed } from 'vue'
+import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { Activity, X, ChevronDown } from 'lucide-vue-next'
 import type { ActivityLogEntry } from '../../../shared/types'
 

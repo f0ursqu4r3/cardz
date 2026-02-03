@@ -1,4 +1,3 @@
-import { STACK_MAX_VISUAL_DEPTH } from './../types/index'
 import { computed, ref, shallowRef, watch, type Ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { CardData, Stack, Zone, Counter, Token, Die, DieValue, Timer, TimerMode, TimerStatus } from '@/types'
@@ -37,10 +36,6 @@ export const useCardStore = defineStore('cards', () => {
 
   let nextStackId = 1
   let nextZoneId = 1
-  let nextCounterId = 1
-  let nextTokenId = 1
-  let nextDieId = 1
-  let nextTimerId = 1
   let zCounter = 100
 
   const rebuildIdMap = <T extends { id: number }>(items: T[]) => {
@@ -1083,10 +1078,6 @@ export const useCardStore = defineStore('cards', () => {
     // Update counters to prevent ID conflicts
     nextStackId = state.nextStackId
     nextZoneId = state.nextZoneId
-    nextCounterId = state.nextCounterId ?? 1
-    nextTokenId = state.nextTokenId ?? 1
-    nextDieId = state.nextDieId ?? 1
-    nextTimerId = state.nextTimerId ?? 1
     zCounter = state.zCounter
 
     // Recalculate card positions based on zone layouts

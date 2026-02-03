@@ -1,13 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useCardStore } from '@/stores/cards'
-import {
-  setupPinia,
-  createMockCard,
-  createMockStack,
-  createMockZone,
-  resetIdCounters,
-} from '../test-utils'
-import { CARD_W, CARD_H, ZONE_MIN_WIDTH, ZONE_MIN_HEIGHT } from '@/types'
+import { setupPinia, resetIdCounters } from '../test-utils'
+import { ZONE_MIN_WIDTH, ZONE_MIN_HEIGHT } from '@/types'
 
 describe('cards store', () => {
   beforeEach(() => {
