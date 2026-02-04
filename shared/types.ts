@@ -191,6 +191,7 @@ export interface RoomJoin {
   sessionId?: string // For reconnection after refresh
   deviceId?: string // Persistent device identifier
   asSpectator?: boolean // Join as view-only spectator
+  inviteToken?: string // Invite token for invite-only tables
 }
 
 export interface RoomLeave {
@@ -301,7 +302,7 @@ export interface PlayerUpdated {
 
 export interface RoomError {
   type: 'room:error'
-  code: 'NOT_FOUND' | 'FULL' | 'INVALID_CODE' | 'BANNED'
+  code: 'NOT_FOUND' | 'FULL' | 'INVALID_CODE' | 'BANNED' | 'INVITE_REQUIRED'
   message: string
 }
 
@@ -331,8 +332,14 @@ export type TableBackground =
   | 'wood-dark'
   | 'slate'
 
+export type TableJoinPolicy = 'open' | 'spectators-only' | 'invite-only'
+
+export type TablePermissionsPreset = 'standard' | 'host-only'
+
 export interface TableSettings {
   background: TableBackground
+  joinPolicy: TableJoinPolicy
+  permissionsPreset: TablePermissionsPreset
 }
 
 // ============================================================================
@@ -380,6 +387,10 @@ export interface TableRedo {
   type: 'table:redo'
 }
 
+export interface TableInviteRegenerate {
+  type: 'table:invite_regenerate'
+}
+
 // ============================================================================
 // Table Management Messages (Server → Client)
 // ============================================================================
@@ -414,6 +425,11 @@ export interface TableInfo {
   settings: TableSettings
   createdAt: number
   createdBy: string
+}
+
+export interface TableInviteToken {
+  type: 'table:invite_token'
+  token: string
 }
 
 export interface TableSnapshotInfo {
@@ -1527,6 +1543,7 @@ type ClientMessageBase =
   | TableSnapshotRestore
   | TableUndo
   | TableRedo
+  | TableInviteRegenerate
   | ChatSend
   | ChatTyping
   | ChatDelete
@@ -1617,6 +1634,7 @@ type ServerMessageBase =
   | TableSnapshotCreated
   | TableSnapshotRestored
   | TableAutosave
+  | TableInviteToken
   | ChatMessage
   | ChatHistory
   | ChatDeleted

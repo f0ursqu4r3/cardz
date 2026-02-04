@@ -356,6 +356,7 @@ export const useCardStore = defineStore('cards', () => {
   const updateAllStacks = () => {
     for (let i = stacks.value.length - 1; i >= 0; i--) {
       const stack = stacks.value[i]
+      if (!stack) continue
       if (stack.cardIds.length === 0) {
         stacks.value.splice(i, 1)
         unregisterItem(stackById, stack.id)

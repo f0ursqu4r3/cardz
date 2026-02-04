@@ -8,6 +8,7 @@ import type {
   TableSnapshotRestore,
   TableUndo,
   TableRedo,
+  TableInviteRegenerate,
 } from '../../shared/types'
 import type { RoomManager, Room } from '../room'
 import type { GenericWebSocket } from '../utils/broadcast'
@@ -173,6 +174,8 @@ export function handleTableUpdateSettings(
     return
   }
 
+  roomManager.markDirty(clientData.roomCode)
+
   // Broadcast settings update to all players
   broadcastToRoom(roomManager.getClients(), clientData.roomCode, {
     type: 'table:settings_updated',
@@ -187,6 +190,64 @@ export function handleTableUpdateSettings(
   console.log(
     `[table:settings] Table ${clientData.roomCode} settings updated by ${clientData.name}`,
   )
+}
+
+/**
+ * Handle invite token regeneration
+ * Only the room creator can regenerate tokens
+ */
+export function handleTableInviteRegenerate(
+  ws: GenericWebSocket,
+  msg: TableInviteRegenerate,
+  roomManager: RoomManager,
+): void {
+  const clientData = getClientData(ws)
+  if (!clientData.roomCode) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:invite_regenerate',
+      code: 'INVALID_ACTION',
+      message: 'Not in a room',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  if (!clientData.playerId || !roomManager.isCreator(clientData.roomCode, clientData.playerId)) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:invite_regenerate',
+      code: 'PERMISSION_DENIED',
+      message: 'Only the table creator can regenerate invite links',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  const token = roomManager.regenerateInviteToken(clientData.roomCode)
+  if (!token) {
+    send(ws, {
+      type: 'error',
+      originalAction: 'table:invite_regenerate',
+      code: 'NOT_FOUND',
+      message: 'Room not found',
+      requestId: msg.requestId,
+    })
+    return
+  }
+
+  const room = roomManager.getRoom(clientData.roomCode)
+  if (!room) return
+
+  for (const wsClient of roomManager.getClients().values()) {
+    const data = getClientData(wsClient)
+    if (data.roomCode === room.code && data.playerId === room.creatorPlayerId) {
+      send(wsClient, {
+        type: 'table:invite_token',
+        token,
+      })
+    }
+  }
 }
 
 /**

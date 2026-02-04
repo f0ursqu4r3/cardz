@@ -28,6 +28,7 @@ export interface RoomStateRefs {
   tableIsPublic: Ref<boolean>
   snapshots: Ref<TableSnapshotInfo[]>
   lastAutosaveAt: Ref<number | null>
+  inviteToken: Ref<string | null>
   chatMessages: Ref<ChatMessage[]>
   typingPlayers: Ref<Map<string, string>>
   activityLog: Ref<ActivityLogEntry[]>
@@ -229,6 +230,7 @@ export function handleTableMessage(
     tableIsPublic,
     snapshots,
     lastAutosaveAt,
+    inviteToken,
   } = refs
 
   switch (message.type) {
@@ -257,6 +259,11 @@ export function handleTableMessage(
       tableName.value = message.name
       tableIsPublic.value = message.isPublic
       tableSettings.value = message.settings
+      inviteToken.value = null
+      return true
+
+    case 'table:invite_token':
+      inviteToken.value = message.token
       return true
 
     case 'table:snapshot_list':

@@ -19,6 +19,7 @@ onMounted(() => {
 })
 
 const joinCode = ref('')
+const inviteToken = ref('')
 const tableName = ref('')
 const isPublic = ref(false)
 
@@ -44,9 +45,14 @@ const joinTable = () => {
   if (!playerName.value.trim()) {
     playerName.value = 'Player'
   }
+  const query: Record<string, string> = {}
+  if (inviteToken.value.trim()) {
+    query.invite = inviteToken.value.trim()
+  }
   router.push({
     name: 'table',
     params: { code: joinCode.value.toUpperCase() },
+    query: Object.keys(query).length > 0 ? query : undefined,
   })
 }
 
@@ -137,6 +143,13 @@ const browseTables = () => {
                 placeholder="Room Code"
                 maxlength="6"
                 class="landing__code-input"
+                @keyup.enter="joinTable"
+              />
+              <input
+                v-model="inviteToken"
+                type="text"
+                placeholder="Invite Token (optional)"
+                class="landing__invite-input"
                 @keyup.enter="joinTable"
               />
               <button
@@ -404,6 +417,7 @@ const browseTables = () => {
   display: flex;
   align-items: stretch;
   gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .landing__join .landing__btn--secondary {
@@ -413,7 +427,7 @@ const browseTables = () => {
 }
 
 .landing__code-input {
-  flex: 1;
+  flex: 1 1 160px;
   min-width: 0;
   padding: 0.75rem 1rem;
   border-radius: 8px;
@@ -424,6 +438,28 @@ const browseTables = () => {
   text-transform: uppercase;
   letter-spacing: 0.1em;
   box-sizing: border-box;
+}
+
+.landing__invite-input {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+.landing__invite-input:focus {
+  outline: none;
+  border-color: #e94560;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.landing__invite-input::placeholder {
+  color: #666;
 }
 
 .landing__code-input:focus {

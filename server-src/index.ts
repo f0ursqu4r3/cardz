@@ -63,6 +63,7 @@ import {
   handleTableSnapshotRestore,
   handleTableUndo,
   handleTableRedo,
+  handleTableInviteRegenerate,
 } from './handlers/table'
 import {
   handleCounterCreate,
@@ -592,6 +593,23 @@ const server = Bun.serve<ClientData>({
           return
         }
 
+        const readOnlyAllowedActions = [...spectatorAllowedActions, 'player:update']
+        if (
+          clientData.playerId &&
+          room.settings.permissionsPreset === 'host-only' &&
+          !roomManager.isCreatorOrModerator(clientData.roomCode, clientData.playerId) &&
+          !readOnlyAllowedActions.includes(msg.type)
+        ) {
+          send(socket, {
+            type: 'error',
+            originalAction: msg.type,
+            code: 'PERMISSION_DENIED',
+            message: 'Only the table creator or moderators can perform this action',
+            requestId,
+          })
+          return
+        }
+
         const undoActorId = clientData.playerId ?? clientData.id
         const undoable = UNDOABLE_ACTIONS.has(msg.type)
         const beforeManager = undoable ? room.gameState : null
@@ -1008,6 +1026,9 @@ const server = Bun.serve<ClientData>({
             break
           case 'table:redo':
             handleTableRedo(socket, msg, roomManager)
+            break
+          case 'table:invite_regenerate':
+            handleTableInviteRegenerate(socket, msg, roomManager)
             break
 
           // Player moderation

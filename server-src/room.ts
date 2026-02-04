@@ -52,6 +52,7 @@ export interface Room {
   createdBy: string
   creatorPlayerId: string // Stable player ID of the creator (for role persistence)
   moderatorPlayerIds: Set<string> // Player IDs with moderator role (persisted across sessions)
+  inviteToken: string
   settings: TableSettings
   bannedDevices: Set<string> // Device IDs that are banned from this room
   undoStack: GameState[]
@@ -421,7 +422,13 @@ export class RoomManager {
       role: 'creator',
     }
 
-    const settings: TableSettings = { background: 'green-felt' }
+    const settings: TableSettings = {
+      background: 'green-felt',
+      joinPolicy: 'open',
+      permissionsPreset: 'standard',
+    }
+
+    const inviteToken = nanoid(10)
 
     const room: Room = {
       code,
@@ -436,6 +443,7 @@ export class RoomManager {
       createdBy: playerName,
       creatorPlayerId: playerId,
       moderatorPlayerIds: new Set(),
+      inviteToken,
       settings,
       bannedDevices: new Set(),
       undoStack: [],
@@ -471,6 +479,7 @@ export class RoomManager {
         createdBy: room.createdBy,
         creatorPlayerId: room.creatorPlayerId,
         moderatorPlayerIds: [],
+        inviteToken: room.inviteToken,
         settings: room.settings,
       },
       room.gameState.getState(),
@@ -493,6 +502,7 @@ export class RoomManager {
             createdBy: r.createdBy,
             creatorPlayerId: r.creatorPlayerId,
             moderatorPlayerIds: Array.from(r.moderatorPlayerIds),
+            inviteToken: r.inviteToken,
             settings: r.settings,
           },
           gameState: r.gameState.getState(),
@@ -528,15 +538,26 @@ export class RoomManager {
     stablePlayerId?: string,
     asSpectator?: boolean,
     deviceId?: string,
+    inviteToken?: string,
     preferredColor?: string,
   ):
     | { room: Room; player: Player; isReconnect: boolean; loaded: boolean; playerId: string }
-    | { error: 'NOT_FOUND' | 'FULL' | 'BANNED' } {
+    | { error: 'NOT_FOUND' | 'FULL' | 'BANNED' | 'INVITE_REQUIRED' } {
     // Check if room is already in memory
     const existingRoom = this.rooms.get(roomCode)
     if (existingRoom) {
       // Use normal join flow
-      const result = this.joinRoom(roomCode, socketId, playerName, sessionId, stablePlayerId, asSpectator, deviceId, preferredColor)
+      const result = this.joinRoom(
+        roomCode,
+        socketId,
+        playerName,
+        sessionId,
+        stablePlayerId,
+        asSpectator,
+        deviceId,
+        inviteToken,
+        preferredColor,
+      )
       if ('error' in result) return result
       return { ...result, loaded: false }
     }
@@ -546,6 +567,22 @@ export class RoomManager {
     if (!persisted) {
       return { error: 'NOT_FOUND' }
     }
+
+    // Apply join policy (may force spectator or require invite)
+    const policyResult = this.applyJoinPolicy({
+      joinPolicy: persisted.metadata.settings?.joinPolicy ?? 'open',
+      inviteToken,
+      expectedInviteToken: persisted.metadata.inviteToken,
+      asSpectator,
+      stablePlayerId,
+      creatorPlayerId: persisted.metadata.creatorPlayerId,
+      moderatorPlayerIds: persisted.metadata.moderatorPlayerIds || [],
+    })
+    if (policyResult.error) {
+      return { error: policyResult.error }
+    }
+
+    asSpectator = policyResult.asSpectator
 
     // Generate a stable player ID for the first person to load this persisted room
     const playerId = stablePlayerId || nanoid()
@@ -588,6 +625,14 @@ export class RoomManager {
       role,
     }
 
+    const resolvedInviteToken = persisted.metadata.inviteToken ?? nanoid(10)
+    const settings: TableSettings =
+      persisted.metadata.settings ?? {
+        background: 'green-felt',
+        joinPolicy: 'open',
+        permissionsPreset: 'standard',
+      }
+
     const room: Room = {
       code: persisted.metadata.code,
       name: persisted.metadata.name,
@@ -601,7 +646,8 @@ export class RoomManager {
       createdBy: persisted.metadata.createdBy,
       creatorPlayerId: creatorPlayerId, // Use computed value (handles legacy tables)
       moderatorPlayerIds: new Set(persisted.metadata.moderatorPlayerIds || []),
-      settings: persisted.metadata.settings || { background: 'green-felt' },
+      inviteToken: resolvedInviteToken,
+      settings,
       bannedDevices: new Set(),
       undoStack: [],
       redoStack: [],
@@ -609,6 +655,10 @@ export class RoomManager {
     }
 
     this.rooms.set(roomCode, room)
+
+    if (!persisted.metadata.inviteToken) {
+      this.markDirtyImmediate(roomCode)
+    }
 
     // Update socket mapping
     this.updateSocketMapping(socketId, playerId)
@@ -645,6 +695,7 @@ export class RoomManager {
             createdBy: r.createdBy,
             creatorPlayerId: r.creatorPlayerId,
             moderatorPlayerIds: Array.from(r.moderatorPlayerIds),
+            inviteToken: r.inviteToken,
             settings: r.settings,
           },
           gameState: r.gameState.getState(),
@@ -673,6 +724,57 @@ export class RoomManager {
     return player?.role === 'spectator'
   }
 
+  private isPrivilegedJoin(
+    stablePlayerId: string | undefined,
+    creatorPlayerId: string,
+    moderatorPlayerIds: Set<string> | string[],
+  ): boolean {
+    if (!stablePlayerId) return false
+    if (stablePlayerId === creatorPlayerId) return true
+    return moderatorPlayerIds instanceof Set
+      ? moderatorPlayerIds.has(stablePlayerId)
+      : moderatorPlayerIds.includes(stablePlayerId)
+  }
+
+  private applyJoinPolicy(params: {
+    joinPolicy: TableSettings['joinPolicy']
+    inviteToken?: string
+    expectedInviteToken?: string
+    asSpectator?: boolean
+    stablePlayerId?: string
+    creatorPlayerId: string
+    moderatorPlayerIds: Set<string> | string[]
+  }): { asSpectator: boolean; error?: 'INVITE_REQUIRED' } {
+    const {
+      joinPolicy,
+      inviteToken: resolvedInviteToken,
+      expectedInviteToken,
+      asSpectator,
+      stablePlayerId,
+      creatorPlayerId,
+      moderatorPlayerIds,
+    } = params
+
+    let nextAsSpectator = !!asSpectator
+    const isPrivileged = this.isPrivilegedJoin(
+      stablePlayerId,
+      creatorPlayerId,
+      moderatorPlayerIds,
+    )
+
+    if (joinPolicy === 'spectators-only' && !isPrivileged) {
+      nextAsSpectator = true
+    }
+
+    if (joinPolicy === 'invite-only' && !isPrivileged) {
+      if (!inviteToken || inviteToken !== expectedInviteToken) {
+        return { asSpectator: nextAsSpectator, error: 'INVITE_REQUIRED' }
+      }
+    }
+
+    return { asSpectator: nextAsSpectator }
+  }
+
   /**
    * Join an existing room
    * @param roomCode - The room code to join
@@ -691,8 +793,11 @@ export class RoomManager {
     stablePlayerId?: string,
     asSpectator?: boolean,
     deviceId?: string,
+    inviteToken?: string,
     preferredColor?: string,
-  ): { room: Room; player: Player; isReconnect: boolean; playerId: string } | { error: 'NOT_FOUND' | 'FULL' | 'BANNED' } {
+  ):
+    | { room: Room; player: Player; isReconnect: boolean; playerId: string }
+    | { error: 'NOT_FOUND' | 'FULL' | 'BANNED' | 'INVITE_REQUIRED' } {
     const room = this.rooms.get(roomCode)
     if (!room) {
       return { error: 'NOT_FOUND' }
@@ -731,6 +836,21 @@ export class RoomManager {
         return { room, player: existingPlayer, isReconnect: true, playerId: stablePlayerId }
       }
     }
+
+    // Apply join policy (may force spectator or require invite)
+    const policyResult = this.applyJoinPolicy({
+      joinPolicy: room.settings.joinPolicy,
+      inviteToken,
+      expectedInviteToken: room.inviteToken,
+      asSpectator,
+      stablePlayerId,
+      creatorPlayerId: room.creatorPlayerId,
+      moderatorPlayerIds: room.moderatorPlayerIds,
+    })
+    if (policyResult.error) {
+      return { error: policyResult.error }
+    }
+    asSpectator = policyResult.asSpectator
 
     // Count non-spectator players for the limit check
     const playerCount = [...room.players.values()].filter((p) => p.role !== 'spectator').length
@@ -947,6 +1067,7 @@ export class RoomManager {
             createdBy: room.createdBy,
             creatorPlayerId: room.creatorPlayerId,
             moderatorPlayerIds: Array.from(room.moderatorPlayerIds),
+            inviteToken: room.inviteToken,
             settings: room.settings,
           },
           room.gameState.getState(),
@@ -1110,6 +1231,18 @@ export class RoomManager {
   }
 
   /**
+   * Regenerate table invite token
+   */
+  regenerateInviteToken(roomCode: string): string | null {
+    const room = this.rooms.get(roomCode)
+    if (!room) return null
+
+    room.inviteToken = nanoid(10)
+    this.markDirtyImmediate(roomCode)
+    return room.inviteToken
+  }
+
+  /**
    * Update room visibility
    */
   updateVisibility(roomCode: string, isPublic: boolean): boolean {
@@ -1155,6 +1288,7 @@ export class RoomManager {
             createdBy: room.createdBy,
             creatorPlayerId: room.creatorPlayerId,
             moderatorPlayerIds: Array.from(room.moderatorPlayerIds),
+            inviteToken: room.inviteToken,
             settings: room.settings,
           },
           room.gameState.getState(),
@@ -1208,6 +1342,7 @@ export class RoomManager {
           createdBy: room.createdBy,
           creatorPlayerId: room.creatorPlayerId,
           moderatorPlayerIds: Array.from(room.moderatorPlayerIds),
+          inviteToken: room.inviteToken,
           settings: room.settings,
         },
         room.gameState.getState(),

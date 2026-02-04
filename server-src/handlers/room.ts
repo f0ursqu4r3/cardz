@@ -127,6 +127,19 @@ export function handleRoomCreate(
     createdBy: room.createdBy,
   })
 
+  if (player.role === 'creator') {
+    send(ws, {
+      type: 'table:invite_token',
+      token: room.inviteToken,
+    })
+  }
+
+  // Send invite token to creator
+  send(ws, {
+    type: 'table:invite_token',
+    token: room.inviteToken,
+  })
+
   // Send chat history (room might have persisted messages from previous session)
   const chatHistory = loadChatMessages(room.code)
   if (chatHistory.length > 0) {
@@ -190,6 +203,7 @@ export function handleRoomJoin(
     verifiedPlayerId, // stable player ID from verified token
     msg.asSpectator, // join as spectator
     msg.deviceId, // for kick/ban tracking
+    msg.inviteToken,
     msg.preferredColor,
   )
 
@@ -204,6 +218,9 @@ export function handleRoomJoin(
         break
       case 'BANNED':
         message = 'You are banned from this room'
+        break
+      case 'INVITE_REQUIRED':
+        message = 'Invite link required to join this table'
         break
       default:
         message = 'Cannot join room'

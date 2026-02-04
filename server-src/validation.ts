@@ -160,6 +160,7 @@ export const RoomJoinSchema = z.object({
   sessionId: z.string().optional(),
   deviceId: z.string().uuid().optional(),
   asSpectator: z.boolean().optional(),
+  inviteToken: z.string().optional(),
 })
 
 export const RoomLeaveSchema = z.object({
@@ -640,8 +641,14 @@ export const TableBackgroundSchema = z.enum([
   'slate',
 ])
 
+export const TableJoinPolicySchema = z.enum(['open', 'spectators-only', 'invite-only'])
+
+export const TablePermissionsPresetSchema = z.enum(['standard', 'host-only'])
+
 export const TableSettingsSchema = z.object({
   background: TableBackgroundSchema,
+  joinPolicy: TableJoinPolicySchema,
+  permissionsPreset: TablePermissionsPresetSchema,
 })
 
 export const TableResetSchema = z.object({
@@ -652,6 +659,8 @@ export const TableUpdateSettingsSchema = z.object({
   type: z.literal('table:update_settings'),
   settings: z.object({
     background: TableBackgroundSchema.optional(),
+    joinPolicy: TableJoinPolicySchema.optional(),
+    permissionsPreset: TablePermissionsPresetSchema.optional(),
   }),
 })
 
@@ -685,6 +694,10 @@ export const TableUndoSchema = z.object({
 
 export const TableRedoSchema = z.object({
   type: z.literal('table:redo'),
+})
+
+export const TableInviteRegenerateSchema = z.object({
+  type: z.literal('table:invite_regenerate'),
 })
 
 // ============================================================================
@@ -792,6 +805,7 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   TableSnapshotRestoreSchema,
   TableUndoSchema,
   TableRedoSchema,
+  TableInviteRegenerateSchema,
   ChatSendSchema,
   ChatTypingSchema,
   ChatDeleteSchema,

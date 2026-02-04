@@ -9,13 +9,23 @@ import {
   Sparkles,
   Globe,
   Lock,
+  KeyRound,
+  Users,
+  EyeClosed,
+  Shield,
+  UserCog,
   Palette,
   ChevronDown,
   X,
   Pencil,
   Check,
 } from 'lucide-vue-next'
-import type { TableSettings, TableBackground } from '../../../shared/types'
+import type {
+  TableSettings,
+  TableBackground,
+  TableJoinPolicy,
+  TablePermissionsPreset,
+} from '../../../shared/types'
 
 const props = defineProps<{
   settings: TableSettings
@@ -25,6 +35,9 @@ const props = defineProps<{
   lastAutosaveAt: number | null
   canManageSnapshots: boolean
   canUndoRedo: boolean
+  canManageAccess?: boolean
+  inviteLink?: string | null
+  inviteToken?: string | null
   performanceSettings: {
     lowLatencyDrag: boolean
     reduceEffects: boolean
@@ -41,12 +54,14 @@ const emit = defineEmits<{
   undo: []
   redo: []
   'update:performance': [settings: { lowLatencyDrag?: boolean; reduceEffects?: boolean }]
+  'invite:regenerate': []
   close: []
 }>()
 
 const showBackgroundPicker = ref(false)
 const isEditingName = ref(false)
 const editedName = ref('')
+const inviteCopied = ref(false)
 
 // Sync editedName when props change or when starting to edit
 watch(
@@ -118,6 +133,8 @@ const currentBackground = computed(() => {
   return backgrounds.find((b) => b.id === props.settings.background) ?? backgrounds[0]
 })
 
+const canManageAccess = computed(() => props.canManageAccess ?? false)
+
 const selectBackground = (bg: TableBackground) => {
   emit('update:settings', { background: bg })
   showBackgroundPicker.value = false
@@ -125,6 +142,38 @@ const selectBackground = (bg: TableBackground) => {
 
 const toggleVisibility = () => {
   emit('update:visibility', !props.isPublic)
+}
+
+const updateJoinPolicy = (policy: TableJoinPolicy) => {
+  emit('update:settings', { joinPolicy: policy })
+}
+
+const updatePermissionsPreset = (preset: TablePermissionsPreset) => {
+  emit('update:settings', { permissionsPreset: preset })
+}
+
+const copyInviteLink = async () => {
+  if (!props.inviteLink) return
+  try {
+    await navigator.clipboard.writeText(props.inviteLink)
+  } catch {
+    const textarea = document.createElement('textarea')
+    textarea.value = props.inviteLink
+    textarea.style.position = 'fixed'
+    textarea.style.top = '-9999px'
+    document.body.appendChild(textarea)
+    textarea.focus()
+    textarea.select()
+    try {
+      document.execCommand('copy')
+    } finally {
+      document.body.removeChild(textarea)
+    }
+  }
+  inviteCopied.value = true
+  window.setTimeout(() => {
+    inviteCopied.value = false
+  }, 1500)
 }
 
 const confirmReset = () => {
@@ -207,6 +256,112 @@ const formatAutosave = (timestamp: number | null): string => {
           <div class="settings-toggle-switch">
             <div class="settings-toggle-knob" />
           </div>
+        </div>
+      </div>
+
+      <!-- Access Controls -->
+      <div class="settings-section">
+        <div class="settings-section-title">
+          <Lock :size="14" />
+          <span>Table Access</span>
+        </div>
+        <div class="settings-options">
+          <button
+            class="settings-option"
+            :class="{
+              'settings-option--active': settings.joinPolicy === 'open',
+              'settings-option--disabled': !canManageAccess,
+            }"
+            :disabled="!canManageAccess"
+            @click="updateJoinPolicy('open')"
+          >
+            <Users :size="14" />
+            Open
+          </button>
+          <button
+            class="settings-option"
+            :class="{
+              'settings-option--active': settings.joinPolicy === 'spectators-only',
+              'settings-option--disabled': !canManageAccess,
+            }"
+            :disabled="!canManageAccess"
+            @click="updateJoinPolicy('spectators-only')"
+          >
+            <EyeClosed :size="14" />
+            Spectators
+          </button>
+          <button
+            class="settings-option"
+            :class="{
+              'settings-option--active': settings.joinPolicy === 'invite-only',
+              'settings-option--disabled': !canManageAccess,
+            }"
+            :disabled="!canManageAccess"
+            @click="updateJoinPolicy('invite-only')"
+          >
+            <KeyRound :size="14" />
+            Invite-only
+          </button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">
+          <UserCog :size="14" />
+          <span>Permissions</span>
+        </div>
+        <div class="settings-options">
+          <button
+            class="settings-option"
+            :class="{
+              'settings-option--active': settings.permissionsPreset === 'standard',
+              'settings-option--disabled': !canManageAccess,
+            }"
+            :disabled="!canManageAccess"
+            @click="updatePermissionsPreset('standard')"
+          >
+            <Users :size="14" />
+            Everyone
+          </button>
+          <button
+            class="settings-option"
+            :class="{
+              'settings-option--active': settings.permissionsPreset === 'host-only',
+              'settings-option--disabled': !canManageAccess,
+            }"
+            :disabled="!canManageAccess"
+            @click="updatePermissionsPreset('host-only')"
+          >
+            <Shield :size="14" />
+            Hosts only
+          </button>
+        </div>
+      </div>
+
+      <div v-if="settings.joinPolicy === 'invite-only'" class="settings-invite">
+        <div class="settings-invite-row">
+          <span class="settings-label">Invite link</span>
+          <button class="settings-invite-copy" @click="copyInviteLink" :disabled="!inviteLink">
+            {{ inviteCopied ? 'Copied' : 'Copy' }}
+          </button>
+        </div>
+        <div class="settings-invite-link">
+          <span class="settings-invite-text">
+            {{
+              inviteLink ||
+              (canManageAccess ? 'Generating link...' : 'Invite link available to the table creator.')
+            }}
+          </span>
+        </div>
+        <div class="settings-invite-row settings-invite-row--actions">
+          <button
+            class="settings-invite-regenerate"
+            :disabled="!canManageAccess"
+            @click="$emit('invite:regenerate')"
+          >
+            Regenerate
+          </button>
+          <span v-if="inviteToken" class="settings-invite-token">Token: {{ inviteToken }}</span>
         </div>
       </div>
 
@@ -516,6 +671,137 @@ const formatAutosave = (timestamp: number | null): string => {
   padding: 8px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 6px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 0;
+}
+
+.settings-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #b6b6c5;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.settings-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.settings-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #d0d0dd;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.settings-option:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.settings-option--active {
+  border-color: rgba(34, 197, 94, 0.6);
+  background: rgba(34, 197, 94, 0.15);
+  color: #fff;
+}
+
+.settings-option--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-invite {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.settings-invite-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-invite-link {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.4);
+  font-size: 11px;
+  color: #d6d6e2;
+  word-break: break-all;
+}
+
+.settings-invite-copy {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.settings-invite-copy:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-invite-copy:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.settings-invite-row--actions {
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.settings-invite-regenerate {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.settings-invite-regenerate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-invite-regenerate:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.25);
+  color: #fff;
+}
+
+.settings-invite-token {
+  font-size: 11px;
+  color: #9ca3af;
+  font-family: 'Monaco', 'Menlo', monospace;
 }
 
 .settings-bg-option {

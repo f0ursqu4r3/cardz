@@ -77,6 +77,11 @@ const routeRoomCode = computed(() => (route.params.code as string)?.toUpperCase(
 const tableName = computed(() => (route.query.tableName as string) || '')
 const isPublicTable = computed(() => route.query.public === 'true')
 const isNewTable = computed(() => route.name === 'table-new')
+const inviteToken = computed(() => (route.query.invite as string) || '')
+const inviteLink = computed(() => {
+  if (!ws.roomCode.value || !ws.inviteToken.value) return ''
+  return `${window.location.origin}/table/${ws.roomCode.value}?invite=${ws.inviteToken.value}`
+})
 
 // WebSocket connection
 const ws = useWebSocket()
@@ -148,6 +153,13 @@ const isSpectator = computed(() => {
   return player?.role === 'spectator'
 })
 
+const isReadOnly = computed(() => {
+  if (isSpectator.value) return true
+  return (
+    ws.tableSettings.value.permissionsPreset === 'host-only' && !isCreator.value && !isModerator.value
+  )
+})
+
 const canUndoRedo = computed(() => isCreator.value || isModerator.value)
 
 const lastSpectatorNoticeAt = ref(0)
@@ -159,8 +171,12 @@ const showSpectatorNotice = (message = 'Spectators are view-only. Request to pla
 }
 
 const canInteract = () => {
-  if (!isSpectator.value) return true
-  showSpectatorNotice()
+  if (!isReadOnly.value) return true
+  if (isSpectator.value) {
+    showSpectatorNotice()
+  } else {
+    toast.info('Only the table creator or moderators can interact right now.')
+  }
   return false
 }
 
@@ -401,9 +417,9 @@ const onCanvasRightClickGuarded = (event: MouseEvent) => {
   onCanvasRightClick(event)
 }
 
-const onHandCardRightClickGuarded = (event: MouseEvent) => {
+const onHandCardRightClickGuarded = (event: MouseEvent, cardId: number) => {
   if (!canInteract()) return
-  onHandCardRightClick(event)
+  onHandCardRightClick(event, cardId)
 }
 
 // Initialize radial menu actions
@@ -1166,6 +1182,7 @@ const getPinchMetrics = () => {
   const points = Array.from(touchPointers.values())
   if (points.length < 2) return null
   const [p1, p2] = points
+  if (!p1 || !p2) return null
   const distance = Math.hypot(p2.x - p1.x, p2.y - p1.y)
   const centerX = (p1.x + p2.x) / 2
   const centerY = (p1.y + p2.y) / 2
@@ -1387,7 +1404,12 @@ onMounted(() => {
             preferredColor: profile.preferredColor.value,
           })
         } else if (routeRoomCode.value) {
-          ws.joinRoom(routeRoomCode.value, playerName.value, profile.preferredColor.value)
+          ws.joinRoom(
+            routeRoomCode.value,
+            playerName.value,
+            profile.preferredColor.value,
+            inviteToken.value || undefined,
+          )
         }
         unwatch()
       }
@@ -1520,6 +1542,9 @@ onBeforeUnmount(() => {
           :last-autosave-at="ws.lastAutosaveAt.value"
           :can-manage-snapshots="canManageSnapshots"
           :can-undo-redo="canUndoRedo"
+          :can-manage-access="isCreator"
+          :invite-link="inviteLink"
+          :invite-token="ws.inviteToken.value"
           :performance-settings="performance.settings.value"
           @update:settings="handleSettingsUpdate"
           @update:visibility="handleVisibilityUpdate"
@@ -1530,6 +1555,7 @@ onBeforeUnmount(() => {
           @redo="handleRedo"
           @snapshot:create="handleSnapshotCreate"
           @snapshot:restore="handleSnapshotRestore"
+          @invite:regenerate="ws.regenerateInviteToken"
           @close="showSettings = false"
         />
       </div>

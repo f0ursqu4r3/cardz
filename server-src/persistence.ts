@@ -18,13 +18,20 @@ export interface TableMetadata {
   createdBy: string // Player name who created the table
   creatorPlayerId: string // Stable player ID of the creator (for role persistence)
   moderatorPlayerIds: string[] // Player IDs with moderator role (persisted across sessions)
+  inviteToken?: string
   settings: TableSettings
 }
 
 export interface TableSettings {
   background: TableBackground
+  joinPolicy: TableJoinPolicy
+  permissionsPreset: TablePermissionsPreset
   music: TableMusic | null
 }
+
+export type TableJoinPolicy = 'open' | 'spectators-only' | 'invite-only'
+
+export type TablePermissionsPreset = 'standard' | 'host-only'
 
 export type TableBackground =
   | 'green-felt' // Default
@@ -90,6 +97,7 @@ function getDb(): Database {
       updated_at INTEGER NOT NULL,
       created_by TEXT NOT NULL,
       creator_player_id TEXT,
+      invite_token TEXT,
       settings TEXT NOT NULL,
       game_state TEXT NOT NULL
     )
@@ -105,6 +113,13 @@ function getDb(): Database {
   // Migration: add moderator_player_ids column if it doesn't exist
   try {
     db.run(`ALTER TABLE tables ADD COLUMN moderator_player_ids TEXT`)
+  } catch {
+    // Column already exists, ignore
+  }
+
+  // Migration: add invite_token column if it doesn't exist
+  try {
+    db.run(`ALTER TABLE tables ADD COLUMN invite_token TEXT`)
   } catch {
     // Column already exists, ignore
   }
@@ -199,13 +214,14 @@ export function saveTable(code: string, metadata: TableMetadata, gameState: Game
     const now = Date.now()
 
     const stmt = database.prepare(`
-      INSERT INTO tables (code, name, is_public, max_players, created_at, updated_at, created_by, creator_player_id, moderator_player_ids, settings, game_state)
-      VALUES ($code, $name, $is_public, $max_players, $created_at, $updated_at, $created_by, $creator_player_id, $moderator_player_ids, $settings, $game_state)
+      INSERT INTO tables (code, name, is_public, max_players, created_at, updated_at, created_by, creator_player_id, invite_token, moderator_player_ids, settings, game_state)
+      VALUES ($code, $name, $is_public, $max_players, $created_at, $updated_at, $created_by, $creator_player_id, $invite_token, $moderator_player_ids, $settings, $game_state)
       ON CONFLICT(code) DO UPDATE SET
         name = $name,
         is_public = $is_public,
         max_players = $max_players,
         updated_at = $updated_at,
+        invite_token = $invite_token,
         moderator_player_ids = $moderator_player_ids,
         settings = $settings,
         game_state = $game_state
@@ -220,6 +236,7 @@ export function saveTable(code: string, metadata: TableMetadata, gameState: Game
       $updated_at: now,
       $created_by: metadata.createdBy,
       $creator_player_id: metadata.creatorPlayerId,
+      $invite_token: metadata.inviteToken ?? null,
       $moderator_player_ids: JSON.stringify(metadata.moderatorPlayerIds || []),
       $settings: JSON.stringify(metadata.settings),
       $game_state: JSON.stringify(gameState),
@@ -240,7 +257,7 @@ export function loadTable(code: string): PersistedTable | null {
   const database = getDb()
 
   const stmt = database.prepare(`
-    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, creator_player_id, moderator_player_ids, settings, game_state
+    SELECT code, name, is_public, max_players, created_at, updated_at, created_by, creator_player_id, invite_token, moderator_player_ids, settings, game_state
     FROM tables
     WHERE code = ?
   `)
@@ -254,6 +271,7 @@ export function loadTable(code: string): PersistedTable | null {
     updated_at: number
     created_by: string
     creator_player_id: string | null
+    invite_token: string | null
     moderator_player_ids: string | null
     settings: string
     game_state: string
@@ -265,7 +283,7 @@ export function loadTable(code: string): PersistedTable | null {
 
   let settings: TableSettings
   try {
-    settings = JSON.parse(row.settings)
+    settings = normalizeSettings(JSON.parse(row.settings))
   } catch (err) {
     console.warn(`[persistence] Failed to parse settings for table ${code}, using defaults:`, err)
     settings = getDefaultSettings()
@@ -298,6 +316,7 @@ export function loadTable(code: string): PersistedTable | null {
       updatedAt: row.updated_at,
       createdBy: row.created_by,
       creatorPlayerId: row.creator_player_id ?? '', // Empty string for legacy tables
+      inviteToken: row.invite_token ?? undefined,
       moderatorPlayerIds,
       settings,
     },
@@ -408,7 +427,7 @@ export function loadSnapshot(roomCode: string, snapshotId: number): TableSnapsho
       name: row.name,
       createdAt: row.created_at,
       createdBy: row.created_by,
-      settings: JSON.parse(row.settings) as TableSettings,
+      settings: normalizeSettings(JSON.parse(row.settings)),
       gameState: JSON.parse(row.game_state) as GameState,
     }
   } catch (err) {
@@ -467,7 +486,7 @@ export function listTables(): TableMetadata[] {
   return rows.map((row) => {
     let settings: TableSettings
     try {
-      settings = JSON.parse(row.settings)
+      settings = normalizeSettings(JSON.parse(row.settings))
     } catch (err) {
       console.warn(`[persistence] Failed to parse settings for table ${row.code}, using defaults:`, err)
       settings = getDefaultSettings()
@@ -503,7 +522,16 @@ export function listTables(): TableMetadata[] {
 export function getDefaultSettings(): TableSettings {
   return {
     background: 'green-felt',
+    joinPolicy: 'open',
+    permissionsPreset: 'standard',
     music: null,
+  }
+}
+
+export function normalizeSettings(settings?: Partial<TableSettings> | null): TableSettings {
+  return {
+    ...getDefaultSettings(),
+    ...(settings ?? {}),
   }
 }
 
@@ -516,6 +544,7 @@ export function createTableMetadata(
   createdBy: string,
   creatorPlayerId: string,
   isPublic: boolean = false,
+  inviteToken?: string,
 ): TableMetadata {
   return {
     code,
@@ -527,6 +556,7 @@ export function createTableMetadata(
     createdBy,
     creatorPlayerId,
     moderatorPlayerIds: [],
+    inviteToken,
     settings: getDefaultSettings(),
   }
 }
@@ -744,7 +774,7 @@ export function searchTables(query: string, publicOnly: boolean = true): TableMe
   return rows.map((row) => {
     let settings: TableSettings
     try {
-      settings = JSON.parse(row.settings)
+      settings = normalizeSettings(JSON.parse(row.settings))
     } catch (err) {
       console.warn(`[persistence] Failed to parse settings for table ${row.code}, using defaults:`, err)
       settings = getDefaultSettings()

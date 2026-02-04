@@ -63,6 +63,7 @@ export interface UseWebSocketReturn {
   tableIsPublic: Ref<boolean>
   snapshots: Ref<TableSnapshotInfo[]>
   lastAutosaveAt: Ref<number | null>
+  inviteToken: Ref<string | null>
 
   // Moderation
   kickedReason: Ref<string | null>
@@ -71,7 +72,12 @@ export interface UseWebSocketReturn {
   connect: () => void
   disconnect: () => void
   createRoom: (playerName: string, options?: { tableName?: string; isPublic?: boolean; preferredColor?: string }) => void
-  joinRoom: (roomCode: string, playerName: string, preferredColor?: string) => void
+  joinRoom: (
+    roomCode: string,
+    playerName: string,
+    preferredColor?: string,
+    inviteToken?: string,
+  ) => void
   leaveRoom: () => void
   send: (message: ClientMessage) => void
 
@@ -85,6 +91,7 @@ export interface UseWebSocketReturn {
   restoreSnapshot: (snapshotId: number) => void
   undoTable: () => void
   redoTable: () => void
+  regenerateInviteToken: () => void
 
   // Player moderation (creator or moderator)
   kickPlayer: (targetPlayerId: string) => void
@@ -209,11 +216,16 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
   const activityLog = ref<ActivityLogEntry[]>([])
 
   // Table settings
-  const tableSettings = ref<TableSettings>({ background: 'green-felt' })
+  const tableSettings = ref<TableSettings>({
+    background: 'green-felt',
+    joinPolicy: 'open',
+    permissionsPreset: 'standard',
+  })
   const tableName = ref<string>('')
   const tableIsPublic = ref<boolean>(false)
   const snapshots = ref<TableSnapshotInfo[]>([])
   const lastAutosaveAt = ref<number | null>(null)
+  const inviteToken = ref<string | null>(null)
 
   // Moderation - set when current player is kicked/banned
   const kickedReason = ref<string | null>(null)
@@ -322,7 +334,12 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     chatMessages.value = []
     typingPlayers.value.clear()
     activityLog.value = []
-    tableSettings.value = { background: 'green-felt' }
+    inviteToken.value = null
+    tableSettings.value = {
+      background: 'green-felt',
+      joinPolicy: 'open',
+      permissionsPreset: 'standard',
+    }
     tableName.value = ''
     tableIsPublic.value = false
     snapshots.value = []
@@ -353,7 +370,12 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     })
   }
 
-  const joinRoom = (code: string, playerName: string, preferredColor?: string) => {
+  const joinRoom = (
+    code: string,
+    playerName: string,
+    preferredColor?: string,
+    inviteToken?: string,
+  ) => {
     const sessionId = getSessionToken() // Use stored HMAC token if available
     console.log('[ws] joining room:', code, sessionId ? '(with session)' : '(new session)')
     send({
@@ -361,6 +383,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
       roomCode: code.toUpperCase(),
       playerName,
       preferredColor,
+      inviteToken,
       sessionId,
       deviceId: getOrCreateDeviceId(),
     })
@@ -379,7 +402,11 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     chatMessages.value = []
     typingPlayers.value.clear()
     activityLog.value = []
-    tableSettings.value = { background: 'green-felt' }
+    tableSettings.value = {
+      background: 'green-felt',
+      joinPolicy: 'open',
+      permissionsPreset: 'standard',
+    }
     tableName.value = ''
     tableIsPublic.value = false
     snapshots.value = []
@@ -421,6 +448,10 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
 
   const redoTable = () => {
     send({ type: 'table:redo' })
+  }
+
+  const regenerateInviteToken = () => {
+    send({ type: 'table:invite_regenerate' })
   }
 
   // Chat
@@ -504,6 +535,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
       tableIsPublic,
       snapshots,
       lastAutosaveAt,
+      inviteToken,
       chatMessages,
       typingPlayers,
       activityLog,
@@ -583,6 +615,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     tableIsPublic,
     snapshots,
     lastAutosaveAt,
+    inviteToken,
     kickedReason,
     connect,
     disconnect,
@@ -599,6 +632,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     restoreSnapshot,
     undoTable,
     redoTable,
+    regenerateInviteToken,
     kickPlayer,
     banPlayer,
     promotePlayer,
