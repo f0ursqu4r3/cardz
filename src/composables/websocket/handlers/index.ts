@@ -15,6 +15,7 @@ export {
   handleRoomMessage,
   handleTableMessage,
   handleCursorMessage,
+  handleSelectionBoxMessage,
   handleStateSyncMessage,
   handleChatMessage,
   handleErrorMessage,

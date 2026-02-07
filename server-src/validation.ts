@@ -604,6 +604,18 @@ export const SelectionUpdateSchema = z.object({
   cardIds: z.array(z.number().int().nonnegative()),
 })
 
+export const SelectionBoxUpdateSchema = z.object({
+  type: z.literal('selection:box_update'),
+  box: z
+    .object({
+      x: z.number(),
+      y: z.number(),
+      width: z.number(),
+      height: z.number(),
+    })
+    .nullable(),
+})
+
 // ============================================================================
 // Viewport Message Schemas (Client → Server)
 // ============================================================================
@@ -794,6 +806,7 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   SelectionStackSchema,
   CursorUpdateSchema,
   SelectionUpdateSchema,
+  SelectionBoxUpdateSchema,
   ViewportUpdateSchema,
   StateRequestSchema,
   TableResetSchema,

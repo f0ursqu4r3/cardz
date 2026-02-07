@@ -8,6 +8,7 @@ const props = defineProps<{
   counter: Counter
   isDragging: boolean
   isLockedByOther: boolean
+  isSelected: boolean
   lockColor?: string
 }>()
 
@@ -87,6 +88,7 @@ defineExpose({ openModal })
     :class="{
       'counter--dragging': isDragging,
       'counter--locked': isLockedByOther,
+      'counter--selected': isSelected,
     }"
     :style="{
       transform: `translate3d(${counter.x}px, ${counter.y}px, 0)`,
@@ -230,6 +232,10 @@ defineExpose({ openModal })
     left var(--transition-fast),
     top var(--transition-fast),
     box-shadow var(--transition-normal);
+}
+
+.counter--selected {
+  box-shadow: 0 0 0 2px #3b82f6, 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .counter__label {

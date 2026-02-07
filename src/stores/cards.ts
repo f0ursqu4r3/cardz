@@ -29,6 +29,10 @@ export const useCardStore = defineStore('cards', () => {
   const remoteSelections = ref<Map<string, { cardIds: Set<number>; color: string }>>(new Map())
   // Dice selection
   const selectedDieIds = ref<Set<number>>(new Set())
+  // Token, counter, timer selection
+  const selectedTokenIds = ref<Set<number>>(new Set())
+  const selectedCounterIds = ref<Set<number>>(new Set())
+  const selectedTimerIds = ref<Set<number>>(new Set())
   const handCardIds = ref<number[]>([])
   const shufflingStackId = ref<number | null>(null)
   // Cards currently playing flip animation
@@ -900,6 +904,79 @@ export const useCardStore = defineStore('cards', () => {
 
   const getSelectedDieIds = () => Array.from(selectedDieIds.value)
 
+  // Token selection management
+  const isTokenSelected = (tokenId: number) => selectedTokenIds.value.has(tokenId)
+  const toggleTokenSelect = (tokenId: number) => {
+    if (selectedTokenIds.value.has(tokenId)) {
+      selectedTokenIds.value.delete(tokenId)
+    } else {
+      selectedTokenIds.value.add(tokenId)
+    }
+  }
+  const clearTokenSelection = () => { selectedTokenIds.value.clear() }
+
+  // Counter selection management
+  const isCounterSelected = (counterId: number) => selectedCounterIds.value.has(counterId)
+  const toggleCounterSelect = (counterId: number) => {
+    if (selectedCounterIds.value.has(counterId)) {
+      selectedCounterIds.value.delete(counterId)
+    } else {
+      selectedCounterIds.value.add(counterId)
+    }
+  }
+  const clearCounterSelection = () => { selectedCounterIds.value.clear() }
+
+  // Timer selection management
+  const isTimerSelected = (timerId: number) => selectedTimerIds.value.has(timerId)
+  const toggleTimerSelect = (timerId: number) => {
+    if (selectedTimerIds.value.has(timerId)) {
+      selectedTimerIds.value.delete(timerId)
+    } else {
+      selectedTimerIds.value.add(timerId)
+    }
+  }
+  const clearTimerSelection = () => { selectedTimerIds.value.clear() }
+
+  // Unified selection helpers
+  const clearAllSelections = () => {
+    clearSelection()
+    clearDieSelection()
+    clearTokenSelection()
+    clearCounterSelection()
+    clearTimerSelection()
+  }
+
+  const hasAnySelection = computed(
+    () =>
+      hasSelection.value ||
+      hasDieSelection.value ||
+      selectedTokenIds.value.size > 0 ||
+      selectedCounterIds.value.size > 0 ||
+      selectedTimerIds.value.size > 0,
+  )
+
+  // Bulk selection setters (for marquee selection)
+  const selectCardIds = (ids: number[]) => {
+    ids.forEach((id) => {
+      const card = cardById.value.get(id)
+      if (card && card.stackId === null) {
+        selectedIds.value.add(id)
+      }
+    })
+  }
+  const selectDieIds = (ids: number[]) => {
+    ids.forEach((id) => selectedDieIds.value.add(id))
+  }
+  const selectTokenIds = (ids: number[]) => {
+    ids.forEach((id) => selectedTokenIds.value.add(id))
+  }
+  const selectCounterIds = (ids: number[]) => {
+    ids.forEach((id) => selectedCounterIds.value.add(id))
+  }
+  const selectTimerIds = (ids: number[]) => {
+    ids.forEach((id) => selectedTimerIds.value.add(id))
+  }
+
   // Merge source stack into target stack
   const mergeStacks = (sourceStackId: number, targetStackId: number): boolean => {
     if (sourceStackId === targetStackId) return false
@@ -1244,6 +1321,7 @@ export const useCardStore = defineStore('cards', () => {
 
   // Remove a counter
   const removeCounter = (counterId: number) => {
+    selectedCounterIds.value.delete(counterId)
     removeItemById(counters.value, counterById, counterId)
   }
 
@@ -1292,6 +1370,7 @@ export const useCardStore = defineStore('cards', () => {
 
   // Remove a token
   const removeToken = (tokenId: number) => {
+    selectedTokenIds.value.delete(tokenId)
     removeItemById(tokens.value, tokenById, tokenId)
   }
 
@@ -1337,6 +1416,7 @@ export const useCardStore = defineStore('cards', () => {
 
   // Remove a die
   const removeDie = (dieId: number) => {
+    selectedDieIds.value.delete(dieId)
     removeItemById(dice.value, dieById, dieId)
   }
 
@@ -1394,6 +1474,7 @@ export const useCardStore = defineStore('cards', () => {
 
   // Remove a timer
   const removeTimer = (timerId: number) => {
+    selectedTimerIds.value.delete(timerId)
     removeItemById(timers.value, timerById, timerId)
   }
 
@@ -1480,6 +1561,29 @@ export const useCardStore = defineStore('cards', () => {
     hasDieSelection,
     dieSelectionCount,
     getSelectedDieIds,
+    // Token selection
+    selectedTokenIds,
+    isTokenSelected,
+    toggleTokenSelect,
+    clearTokenSelection,
+    // Counter selection
+    selectedCounterIds,
+    isCounterSelected,
+    toggleCounterSelect,
+    clearCounterSelection,
+    // Timer selection
+    selectedTimerIds,
+    isTimerSelected,
+    toggleTimerSelect,
+    clearTimerSelection,
+    // Unified selection
+    clearAllSelections,
+    hasAnySelection,
+    selectCardIds,
+    selectDieIds,
+    selectTokenIds,
+    selectCounterIds,
+    selectTimerIds,
     mergeStacks,
     shuffleStack,
     reorderStack,

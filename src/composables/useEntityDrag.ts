@@ -37,6 +37,10 @@ export interface EntityDragConfig<T extends DraggableEntity> {
   onCursorMove?: (worldX: number, worldY: number) => void
   /** Optional callback when shake gesture is detected (for dice rolling) */
   onShake?: (entityId: number) => void
+  /** Optional callback to move co-selected entities during drag */
+  onSelectionDragMove?: (entityId: number, deltaX: number, deltaY: number) => void
+  /** Optional callback when drag ends (for co-selected entity final updates) */
+  onSelectionDragEnd?: (entityId: number) => void
 }
 
 // Shake detection constants (using screen coordinates for consistency)
@@ -64,6 +68,8 @@ export function useEntityDrag<T extends DraggableEntity>(config: EntityDragConfi
     setCursor,
     onCursorMove,
     onShake,
+    onSelectionDragMove,
+    onSelectionDragEnd,
   } = config
 
   // Drag state
@@ -193,9 +199,18 @@ export function useEntityDrag<T extends DraggableEntity>(config: EntityDragConfi
     const newX = worldPos.x - dragOffset.value.x
     const newY = worldPos.y - dragOffset.value.y
 
+    // Calculate delta from previous position
+    const deltaX = newX - entity.x
+    const deltaY = newY - entity.y
+
     // Update local position immediately for smooth dragging
     entity.x = newX
     entity.y = newY
+
+    // Move co-selected entities by the same delta
+    if (onSelectionDragMove && (deltaX !== 0 || deltaY !== 0)) {
+      onSelectionDragMove(draggingId.value, deltaX, deltaY)
+    }
 
     // Check for shake gesture (for dice rolling) - use screen coordinates
     if (onShake && detectShake(event.clientX, event.clientY)) {
@@ -238,6 +253,9 @@ export function useEntityDrag<T extends DraggableEntity>(config: EntityDragConfi
         updates: { x: entity.x, y: entity.y },
       } as ClientMessage)
     }
+
+    // Send final updates for co-selected entities
+    onSelectionDragEnd?.(entityId)
 
     // Unlock the entity
     sendMessage({

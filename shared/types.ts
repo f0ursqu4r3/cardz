@@ -1309,6 +1309,22 @@ export interface SelectionUpdated {
 }
 
 // ============================================================================
+// Selection Box Messages (for showing other players' marquee selection)
+// ============================================================================
+
+export interface SelectionBoxUpdate extends BaseClientMessage {
+  type: 'selection:box_update'
+  box: { x: number; y: number; width: number; height: number } | null
+}
+
+export interface SelectionBoxUpdated {
+  type: 'selection:box_updated'
+  playerId: string
+  playerColor: string
+  box: { x: number; y: number; width: number; height: number } | null
+}
+
+// ============================================================================
 // State Sync Messages
 // ============================================================================
 
@@ -1550,6 +1566,7 @@ type ClientMessageBase =
   | SelectionStack
   | CursorUpdate
   | SelectionUpdate
+  | SelectionBoxUpdate
   | ViewportUpdate
   | StateRequest
   | TableReset
@@ -1640,6 +1657,7 @@ type ServerMessageBase =
   | SelectionStacked
   | CursorUpdated
   | SelectionUpdated
+  | SelectionBoxUpdated
   | StateSync
   | StateDelta
   | ActionError

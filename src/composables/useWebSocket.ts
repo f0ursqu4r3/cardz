@@ -18,6 +18,7 @@ import {
   handleRoomMessage,
   handleTableMessage,
   handleCursorMessage,
+  handleSelectionBoxMessage,
   handleStateSyncMessage,
   handleChatMessage,
   handleErrorMessage,
@@ -53,6 +54,9 @@ export interface UseWebSocketReturn {
   handCardIds: Ref<number[]>
   handCounts: Ref<Map<string, number>>
   cursors: Ref<Map<string, { x: number; y: number; state: 'default' | 'grab' | 'grabbing' }>>
+  selectionBoxes: Ref<
+    Map<string, { box: { x: number; y: number; width: number; height: number }; color: string }>
+  >
   chatMessages: Ref<ChatMessage[]>
   typingPlayers: Ref<Map<string, string>> // playerId -> playerName
   activityLog: Ref<ActivityLogEntry[]>
@@ -211,6 +215,9 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
   const cursors = ref<
     Map<string, { x: number; y: number; state: 'default' | 'grab' | 'grabbing' }>
   >(new Map())
+  const selectionBoxes = ref<
+    Map<string, { box: { x: number; y: number; width: number; height: number }; color: string }>
+  >(new Map())
   const chatMessages = ref<ChatMessage[]>([])
   const typingPlayers = ref<Map<string, string>>(new Map())
   const activityLog = ref<ActivityLogEntry[]>([])
@@ -331,6 +338,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     handCardIds.value = []
     handCounts.value.clear()
     cursors.value.clear()
+    selectionBoxes.value.clear()
     chatMessages.value = []
     typingPlayers.value.clear()
     activityLog.value = []
@@ -399,6 +407,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     handCardIds.value = []
     handCounts.value.clear()
     cursors.value.clear()
+    selectionBoxes.value.clear()
     chatMessages.value = []
     typingPlayers.value.clear()
     activityLog.value = []
@@ -529,6 +538,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
       handCardIds,
       handCounts,
       cursors,
+      selectionBoxes,
       error,
       tableSettings,
       tableName,
@@ -567,6 +577,9 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
 
     // Cursor events
     if (handleCursorMessage(message, roomStateRefs)) return
+
+    // Selection box events
+    if (handleSelectionBoxMessage(message, roomStateRefs)) return
 
     // State sync
     if (handleStateSyncMessage(message, roomStateRefs)) return
@@ -607,6 +620,7 @@ export function useWebSocket(options: WebSocketOptions = {}): UseWebSocketReturn
     handCardIds,
     handCounts,
     cursors,
+    selectionBoxes,
     chatMessages,
     typingPlayers,
     activityLog,

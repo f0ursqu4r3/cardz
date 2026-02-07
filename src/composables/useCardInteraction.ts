@@ -18,6 +18,10 @@ interface CardInteractionOptions {
   playerId?: Ref<string | null>
   /** Optional callback to broadcast cursor position during drag */
   onCursorMove?: (worldX: number, worldY: number) => void
+  /** Callback when card selection drag moves (for moving co-selected non-card entities) */
+  onSelectionDragMove?: (deltaX: number, deltaY: number) => void
+  /** Callback when card selection drag ends (for sending co-selected entity final positions) */
+  onSelectionDragEnd?: () => void
 }
 
 export function useCardInteraction(options: CardInteractionOptions = {}) {
@@ -37,6 +41,7 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
   // Track selection start positions for smooth dragging
   const selectionStartPositions = ref<Map<number, { x: number; y: number }>>(new Map())
   const selectionDragStart = ref<{ x: number; y: number } | null>(null)
+  let lastSelectionDelta = { x: 0, y: 0 }
 
   // Track when dragging over hand zone
   const isOverHand = ref(false)
@@ -171,6 +176,14 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
           card.y = startPos.y + deltaY
         }
       })
+
+      // Compute incremental delta for co-selected non-card entities
+      const incrX = deltaX - lastSelectionDelta.x
+      const incrY = deltaY - lastSelectionDelta.y
+      lastSelectionDelta = { x: deltaX, y: deltaY }
+      if (incrX !== 0 || incrY !== 0) {
+        options.onSelectionDragMove?.(incrX, incrY)
+      }
       return
     }
 
@@ -381,6 +394,7 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       event.stopPropagation() // Prevent canvas from clearing selection
       const { x, y } = drag.getPending()
       selectionDragStart.value = { x, y }
+      lastSelectionDelta = { x: 0, y: 0 }
       startSelectionDrag(index)
       return
     }
@@ -804,8 +818,12 @@ export function useCardInteraction(options: CardInteractionOptions = {}) {
       // Note: We don't unlock selected cards - the selection persists until explicitly cleared
       // Other players see the selection via the remote-selected styling
 
+      // Send final updates for co-selected non-card entities
+      options.onSelectionDragEnd?.()
+
       selectionStartPositions.value.clear()
       selectionDragStart.value = null
+      lastSelectionDelta = { x: 0, y: 0 }
       shake.reset()
     }
     // Handle hand card drop (delegate to handler)

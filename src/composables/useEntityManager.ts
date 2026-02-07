@@ -39,6 +39,10 @@ export interface EntityManagerConfig<T extends EntityType> {
   supportsSelection?: boolean
   /** External selection state (e.g., from card store) */
   externalSelectionState?: ExternalSelectionState
+  /** Callback to move co-selected entities during drag */
+  onSelectionDragMove?: (entityId: number, deltaX: number, deltaY: number) => void
+  /** Callback when drag ends (for co-selected entity final updates) */
+  onSelectionDragEnd?: (entityId: number) => void
 }
 
 /**
@@ -63,6 +67,8 @@ export function useEntityManager<T extends EntityType>(config: EntityManagerConf
     getContextMenuData,
     supportsSelection = false,
     externalSelectionState,
+    onSelectionDragMove,
+    onSelectionDragEnd,
   } = config
 
   // Initialize drag handler
@@ -77,6 +83,8 @@ export function useEntityManager<T extends EntityType>(config: EntityManagerConf
     setCursor,
     onCursorMove,
     onShake,
+    onSelectionDragMove,
+    onSelectionDragEnd,
   })
 
   // Initialize selection handler (if supported)
@@ -232,6 +240,95 @@ export function useAllEntityManagers(config: AllEntityManagersConfig) {
     dieSelectionState,
   } = config
 
+  // Shared selection drag: move all selected entities by delta (excluding the one being dragged)
+  const moveCoSelected = (
+    excludeType: string,
+    excludeId: number,
+    deltaX: number,
+    deltaY: number,
+  ) => {
+    // Move selected cards
+    if (excludeType !== 'card') {
+      cardStore.moveSelection(deltaX, deltaY)
+    }
+    // Move selected counters
+    for (const id of cardStore.selectedCounterIds) {
+      if (excludeType === 'counter' && id === excludeId) continue
+      const c = cardStore.getCounterById(id)
+      if (c) { c.x += deltaX; c.y += deltaY }
+    }
+    // Move selected tokens
+    for (const id of cardStore.selectedTokenIds) {
+      if (excludeType === 'token' && id === excludeId) continue
+      const t = cardStore.getTokenById(id)
+      if (t) { t.x += deltaX; t.y += deltaY }
+    }
+    // Move selected dice
+    for (const id of cardStore.selectedDieIds) {
+      if (excludeType === 'die' && id === excludeId) continue
+      const d = cardStore.getDieById(id)
+      if (d) { d.x += deltaX; d.y += deltaY }
+    }
+    // Move selected timers
+    for (const id of cardStore.selectedTimerIds) {
+      if (excludeType === 'timer' && id === excludeId) continue
+      const t = cardStore.getTimerById(id)
+      if (t) { t.x += deltaX; t.y += deltaY }
+    }
+  }
+
+  // Send final position updates for co-selected entities on drag end
+  const sendCoSelectedFinalPositions = (excludeType: string, excludeId: number) => {
+    for (const id of cardStore.selectedCounterIds) {
+      if (excludeType === 'counter' && id === excludeId) continue
+      const c = cardStore.getCounterById(id)
+      if (c) sendMessage({ type: 'counter:update', counterId: id, updates: { x: c.x, y: c.y } })
+    }
+    for (const id of cardStore.selectedTokenIds) {
+      if (excludeType === 'token' && id === excludeId) continue
+      const t = cardStore.getTokenById(id)
+      if (t) sendMessage({ type: 'token:update', tokenId: id, updates: { x: t.x, y: t.y } })
+    }
+    for (const id of cardStore.selectedDieIds) {
+      if (excludeType === 'die' && id === excludeId) continue
+      const d = cardStore.getDieById(id)
+      if (d) sendMessage({ type: 'die:update', dieId: id, updates: { x: d.x, y: d.y } })
+    }
+    for (const id of cardStore.selectedTimerIds) {
+      if (excludeType === 'timer' && id === excludeId) continue
+      const t = cardStore.getTimerById(id)
+      if (t) sendMessage({ type: 'timer:update', timerId: id, updates: { x: t.x, y: t.y } })
+    }
+    // Cards are handled separately by useCardInteraction's selection drag
+    // but we need to send updates for cards selected via marquee
+    for (const id of cardStore.getSelectedIds()) {
+      if (excludeType === 'card') continue
+      const card = cardStore.cards.find((c) => c.id === id)
+      if (card) sendMessage({ type: 'card:move', cardId: id, x: card.x, y: card.y })
+    }
+  }
+
+  const isEntitySelected = (type: string, id: number): boolean => {
+    switch (type) {
+      case 'counter': return cardStore.isCounterSelected(id)
+      case 'token': return cardStore.isTokenSelected(id)
+      case 'die': return cardStore.isDieSelected(id)
+      case 'timer': return cardStore.isTimerSelected(id)
+      default: return false
+    }
+  }
+
+  const makeSelectionCallbacks = (type: string) => ({
+    onSelectionDragMove: (entityId: number, deltaX: number, deltaY: number) => {
+      if (!isEntitySelected(type, entityId)) return
+      moveCoSelected(type, entityId, deltaX, deltaY)
+    },
+    onSelectionDragEnd: (entityId: number) => {
+      if (!isEntitySelected(type, entityId)) return
+      sendCoSelectedFinalPositions(type, entityId)
+    },
+  })
+
   const counter = useEntityManager({
     entityType: 'counter',
     getEntityById: cardStore.getCounterById,
@@ -244,6 +341,7 @@ export function useAllEntityManagers(config: AllEntityManagersConfig) {
     setCursor,
     onCursorMove,
     getContextMenuData: (counter) => ({ value: counter.value }),
+    ...makeSelectionCallbacks('counter'),
   })
 
   const token = useEntityManager({
@@ -258,6 +356,7 @@ export function useAllEntityManagers(config: AllEntityManagersConfig) {
     setCursor,
     onCursorMove,
     getContextMenuData: (token) => ({ kind: token.kind }),
+    ...makeSelectionCallbacks('token'),
   })
 
   const die = useEntityManager({
@@ -275,6 +374,7 @@ export function useAllEntityManagers(config: AllEntityManagersConfig) {
     getContextMenuData: (die) => ({ value: die.value }),
     supportsSelection: true,
     externalSelectionState: dieSelectionState,
+    ...makeSelectionCallbacks('die'),
   })
 
   const timer = useEntityManager({
@@ -289,6 +389,7 @@ export function useAllEntityManagers(config: AllEntityManagersConfig) {
     setCursor,
     onCursorMove,
     getContextMenuData: (timer) => ({ status: timer.status, mode: timer.mode }),
+    ...makeSelectionCallbacks('timer'),
   })
 
   return { counter, token, die, timer }

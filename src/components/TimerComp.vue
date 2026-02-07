@@ -7,6 +7,7 @@ const props = defineProps<{
   timer: Timer
   isDragging: boolean
   isLockedByOther: boolean
+  isSelected: boolean
   lockColor?: string
 }>()
 
@@ -264,6 +265,7 @@ defineExpose({ openModal })
     :class="{
       'timer--dragging': isDragging,
       'timer--locked': isLockedByOther,
+      'timer--selected': isSelected,
       'timer--alarming': isAlarming,
       [statusClass]: true,
     }"
@@ -419,6 +421,10 @@ defineExpose({ openModal })
   border-radius: 12px;
   box-shadow: 0 0 12px 2px var(--lock-color, #888);
   pointer-events: none;
+}
+
+.timer--selected {
+  box-shadow: 0 0 0 2px #3b82f6, 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .timer--running {

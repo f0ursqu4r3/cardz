@@ -8,6 +8,7 @@ const props = defineProps<{
   token: Token
   isDragging: boolean
   isLockedByOther: boolean
+  isSelected: boolean
   lockColor?: string
 }>()
 
@@ -81,6 +82,7 @@ defineExpose({ openModal })
     :class="{
       'token--dragging': isDragging,
       'token--locked': isLockedByOther,
+      'token--selected': isSelected,
     }"
     :style="{
       transform: `translate3d(${token.x - tokenSize / 2}px, ${token.y - tokenSize / 2}px, 0)`,
@@ -299,6 +301,11 @@ defineExpose({ openModal })
   box-shadow: var(--shadow-glow);
   --glow-color: var(--lock-color, #888);
   pointer-events: none;
+}
+
+.token--selected {
+  box-shadow: 0 0 0 2px #3b82f6, 0 4px 12px rgba(59, 130, 246, 0.3);
+  border-radius: var(--radius-full);
 }
 
 /* Color token shapes */

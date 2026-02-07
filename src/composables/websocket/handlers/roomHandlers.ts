@@ -22,6 +22,9 @@ export interface RoomStateRefs {
   handCardIds: Ref<number[]>
   handCounts: Ref<Map<string, number>>
   cursors: Ref<Map<string, { x: number; y: number; state: 'default' | 'grab' | 'grabbing' }>>
+  selectionBoxes: Ref<
+    Map<string, { box: { x: number; y: number; width: number; height: number }; color: string }>
+  >
   error: Ref<string | null>
   tableSettings: Ref<TableSettings>
   tableName: Ref<string>
@@ -131,6 +134,9 @@ export function handleRoomMessage(
       const newCursors = new Map(cursors.value)
       newCursors.delete(message.playerId)
       cursors.value = newCursors
+      const newBoxes = new Map(refs.selectionBoxes.value)
+      newBoxes.delete(message.playerId)
+      refs.selectionBoxes.value = newBoxes
       console.log('[ws] player disconnected:', message.playerId)
       return true
     }
@@ -140,6 +146,9 @@ export function handleRoomMessage(
       const newCursors = new Map(cursors.value)
       newCursors.delete(message.playerId)
       cursors.value = newCursors
+      const newBoxesLeft = new Map(refs.selectionBoxes.value)
+      newBoxesLeft.delete(message.playerId)
+      refs.selectionBoxes.value = newBoxesLeft
       handCounts.value.delete(message.playerId)
       console.log('[ws] player left:', message.playerId)
       return true
@@ -157,6 +166,9 @@ export function handleRoomMessage(
       const newCursors = new Map(cursors.value)
       newCursors.delete(message.playerId)
       cursors.value = newCursors
+      const newBoxesKick = new Map(refs.selectionBoxes.value)
+      newBoxesKick.delete(message.playerId)
+      refs.selectionBoxes.value = newBoxesKick
       handCounts.value.delete(message.playerId)
       console.log('[ws] player kicked:', message.playerName, 'by', message.kickedBy)
       return true
@@ -174,6 +186,9 @@ export function handleRoomMessage(
       const newCursors = new Map(cursors.value)
       newCursors.delete(message.playerId)
       cursors.value = newCursors
+      const newBoxesBan = new Map(refs.selectionBoxes.value)
+      newBoxesBan.delete(message.playerId)
+      refs.selectionBoxes.value = newBoxesBan
       handCounts.value.delete(message.playerId)
       console.log('[ws] player banned:', message.playerName, 'by', message.bannedBy)
       return true
@@ -302,6 +317,30 @@ export function handleCursorMessage(
       const newCursors = new Map(cursors.value)
       newCursors.set(message.playerId, { x: message.x, y: message.y, state: message.state })
       cursors.value = newCursors
+      return true
+    }
+
+    default:
+      return false
+  }
+}
+
+/**
+ * Handle selection box update messages
+ */
+export function handleSelectionBoxMessage(
+  message: ServerMessage,
+  refs: RoomStateRefs,
+): boolean {
+  switch (message.type) {
+    case 'selection:box_updated': {
+      const newBoxes = new Map(refs.selectionBoxes.value)
+      if (message.box) {
+        newBoxes.set(message.playerId, { box: message.box, color: message.playerColor })
+      } else {
+        newBoxes.delete(message.playerId)
+      }
+      refs.selectionBoxes.value = newBoxes
       return true
     }
 

@@ -26,6 +26,7 @@ import { useCursor } from '@/composables/useCursor'
 import { useRemoteThrow } from '@/composables/useRemoteThrow'
 import { useRadialMenu } from '@/composables/useRadialMenu'
 import { useAllEntityManagers } from '@/composables/useEntityManager'
+import { useSelectionBox } from '@/composables/useSelectionBox'
 import { useCardDisplayHelpers } from '@/composables/useCardDisplayHelpers'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useRadialMenuActions } from '@/composables/useRadialMenuActions'
@@ -223,6 +224,7 @@ const cursor = useCursor(playerColor)
 
 // Create refs for template binding
 const canvasRef = ref<HTMLElement | null>(null)
+const worldRef = ref<HTMLElement | null>(null)
 const handRef = ref<HTMLElement | null>(null)
 const handCompRef = ref<InstanceType<typeof HandComp> | null>(null)
 
@@ -238,6 +240,45 @@ const spaceHeld = ref(false)
 // Viewport (pan/zoom) management
 const viewport = useViewport(canvasRef)
 
+// Helpers for moving co-selected non-card entities during card selection drag
+const moveNonCardSelected = (deltaX: number, deltaY: number) => {
+  for (const id of cardStore.selectedCounterIds) {
+    const c = cardStore.getCounterById(id)
+    if (c) { c.x += deltaX; c.y += deltaY }
+  }
+  for (const id of cardStore.selectedTokenIds) {
+    const t = cardStore.getTokenById(id)
+    if (t) { t.x += deltaX; t.y += deltaY }
+  }
+  for (const id of cardStore.selectedDieIds) {
+    const d = cardStore.getDieById(id)
+    if (d) { d.x += deltaX; d.y += deltaY }
+  }
+  for (const id of cardStore.selectedTimerIds) {
+    const t = cardStore.getTimerById(id)
+    if (t) { t.x += deltaX; t.y += deltaY }
+  }
+}
+
+const sendNonCardSelectedPositions = () => {
+  for (const id of cardStore.selectedCounterIds) {
+    const c = cardStore.getCounterById(id)
+    if (c) ws.send({ type: 'counter:update', counterId: id, updates: { x: c.x, y: c.y } })
+  }
+  for (const id of cardStore.selectedTokenIds) {
+    const t = cardStore.getTokenById(id)
+    if (t) ws.send({ type: 'token:update', tokenId: id, updates: { x: t.x, y: t.y } })
+  }
+  for (const id of cardStore.selectedDieIds) {
+    const d = cardStore.getDieById(id)
+    if (d) ws.send({ type: 'die:update', dieId: id, updates: { x: d.x, y: d.y } })
+  }
+  for (const id of cardStore.selectedTimerIds) {
+    const t = cardStore.getTimerById(id)
+    if (t) ws.send({ type: 'timer:update', timerId: id, updates: { x: t.x, y: t.y } })
+  }
+}
+
 // Card interaction system
 const interaction = useCardInteraction({
   handRef,
@@ -247,6 +288,8 @@ const interaction = useCardInteraction({
   onCursorMove: (worldX, worldY) => {
     ws.send({ type: 'cursor:update', x: worldX, y: worldY, state: 'grabbing' })
   },
+  onSelectionDragMove: moveNonCardSelected,
+  onSelectionDragEnd: sendNonCardSelectedPositions,
 })
 
 // Remote throw physics
@@ -260,8 +303,7 @@ watch(
   (spectating) => {
     if (spectating) {
       radialMenu.close()
-      cardStore.clearSelection()
-      cardStore.clearDieSelection()
+      cardStore.clearAllSelections()
     } else {
       requestToPlaySent.value = false
     }
@@ -489,6 +531,13 @@ const entities = useAllEntityManagers({
     selectionCount: () => cardStore.dieSelectionCount,
     getSelectedIds: cardStore.getSelectedDieIds,
   },
+})
+
+// Selection box for marquee selection
+const selectionBox = useSelectionBox({
+  viewport,
+  cardStore,
+  sendMessage: ws.send,
 })
 
 // Ghost card for hand dragging
@@ -1222,10 +1271,13 @@ const onCanvasPointerDown = (event: PointerEvent) => {
     }
   }
 
-  // Clear all selections when clicking on empty canvas (left-click only)
-  if (event.button === 0 && !spaceHeld.value) {
-    cardStore.clearSelection()
-    cardStore.clearDieSelection()
+  // Left-click on empty canvas: start selection box tracking (non-touch only)
+  // Only start if clicking on the canvas or world div itself, not on entities/cards
+  const isEmptyCanvas =
+    event.target === canvasRef.value || event.target === worldRef.value
+  if (event.button === 0 && !spaceHeld.value && event.pointerType !== 'touch' && isEmptyCanvas) {
+    selectionBox.start(event)
+    ;(event.target as HTMLElement)?.setPointerCapture(event.pointerId)
   }
 
   // Middle mouse button or space+left click for panning
@@ -1299,6 +1351,11 @@ const onCanvasPointerMove = (event: PointerEvent) => {
     viewport.updatePan(event)
   }
 
+  // Update selection box if tracking
+  if (selectionBox.isTracking.value) {
+    selectionBox.update(event)
+  }
+
   // Track cursor position in world coordinates (always update for state change broadcasts)
   const worldPos = viewport.screenToWorld(event.clientX, event.clientY)
   lastCursorPosition = { x: worldPos.x, y: worldPos.y }
@@ -1315,6 +1372,16 @@ const onCanvasPointerUp = (event: PointerEvent) => {
   }
   if (viewport.isPanning.value) {
     viewport.endPan()
+    ;(event.target as HTMLElement)?.releasePointerCapture(event.pointerId)
+  }
+
+  // Finalize selection box
+  if (selectionBox.isTracking.value) {
+    if (!selectionBox.isActive.value && !event.shiftKey) {
+      // Was just a click (no drag) — clear all selections
+      cardStore.clearAllSelections()
+    }
+    selectionBox.end()
     ;(event.target as HTMLElement)?.releasePointerCapture(event.pointerId)
   }
 }
@@ -1676,7 +1743,31 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- World container (pan/zoom transform) -->
-      <div class="world" :style="{ transform: viewport.worldTransform.value }">
+      <div ref="worldRef" class="world" :style="{ transform: viewport.worldTransform.value }">
+        <!-- Selection boxes (local + remote) -->
+        <div
+          v-if="selectionBox.boxRect.value"
+          class="selection-box"
+          :style="{
+            left: `${selectionBox.boxRect.value.x}px`,
+            top: `${selectionBox.boxRect.value.y}px`,
+            width: `${selectionBox.boxRect.value.width}px`,
+            height: `${selectionBox.boxRect.value.height}px`,
+          }"
+        />
+        <div
+          v-for="[pid, data] in ws.selectionBoxes.value"
+          :key="pid"
+          class="selection-box selection-box--remote"
+          :style="{
+            left: `${data.box.x}px`,
+            top: `${data.box.y}px`,
+            width: `${data.box.width}px`,
+            height: `${data.box.height}px`,
+            '--box-color': data.color,
+          }"
+        />
+
         <!-- Zones (deck areas) -->
         <ZoneComp
           v-for="zone in cardStore.zones"
@@ -1702,6 +1793,7 @@ onBeforeUnmount(() => {
           :counter="counter"
           :is-dragging="entities.counter.isDragging(counter.id)"
           :is-locked-by-other="entities.counter.isLockedByOther(counter)"
+          :is-selected="cardStore.isCounterSelected(counter.id)"
           :lock-color="entities.counter.getLockColor(counter)"
           @pointerdown="entities.counter.onPointerDown($event, counter.id)"
           @pointermove="entities.counter.onPointerMove"
@@ -1720,6 +1812,7 @@ onBeforeUnmount(() => {
           :token="token"
           :is-dragging="entities.token.isDragging(token.id)"
           :is-locked-by-other="entities.token.isLockedByOther(token)"
+          :is-selected="cardStore.isTokenSelected(token.id)"
           :lock-color="entities.token.getLockColor(token)"
           @pointerdown="entities.token.onPointerDown($event, token.id)"
           @pointermove="entities.token.onPointerMove"
@@ -1756,6 +1849,7 @@ onBeforeUnmount(() => {
           :timer="timer"
           :is-dragging="entities.timer.isDragging(timer.id)"
           :is-locked-by-other="entities.timer.isLockedByOther(timer)"
+          :is-selected="cardStore.isTimerSelected(timer.id)"
           :lock-color="entities.timer.getLockColor(timer)"
           @pointerdown="entities.timer.onPointerDown($event, timer.id)"
           @pointermove="entities.timer.onPointerMove"
@@ -2490,5 +2584,20 @@ onBeforeUnmount(() => {
     bottom: 6.5rem;
     right: 0.75rem;
   }
+}
+
+/* Selection box */
+.selection-box {
+  position: absolute;
+  border: 2px solid rgba(59, 130, 246, 0.8);
+  background: rgba(59, 130, 246, 0.1);
+  pointer-events: none;
+  z-index: 1999;
+}
+
+.selection-box--remote {
+  border-color: var(--box-color);
+  background: color-mix(in srgb, var(--box-color) 10%, transparent);
+  border-style: dashed;
 }
 </style>
