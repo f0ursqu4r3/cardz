@@ -76,6 +76,7 @@ export function handleCardLock(
   clients: Map<string, GenericWebSocket>,
 ): void {
   const clientData = getClientData(ws)
+  const playerId = clientData.playerId
   const { locks, gameState } = room
 
   // Check if card exists and is not in hand
@@ -169,6 +170,7 @@ export function handleCardFlip(
   clients: Map<string, GenericWebSocket>,
 ): void {
   const clientData = getClientData(ws)
+  const playerId = clientData.playerId
   const { locks, gameState } = room
 
   // Check if card exists

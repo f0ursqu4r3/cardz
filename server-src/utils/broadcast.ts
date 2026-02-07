@@ -12,6 +12,7 @@ export interface ClientData {
 // The send signature is compatible with Bun's ServerWebSocket (returns number) and others (void)
 export interface GenericWebSocket {
   send(message: string, compress?: boolean): number | void
+  close?(code?: number, reason?: string): void
   readonly data?: ClientData
   getUserData?(): ClientData
 }

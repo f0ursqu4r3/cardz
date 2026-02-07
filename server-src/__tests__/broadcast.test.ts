@@ -27,15 +27,15 @@ describe('broadcastToRoom', () => {
   test('broadcasts to all clients in room', () => {
     const clients = new Map<string, GenericWebSocket>()
 
-    const ws1 = createMockWebSocket({ id: 'p1', roomCode: 'ROOM01', name: 'Alice' })
-    const ws2 = createMockWebSocket({ id: 'p2', roomCode: 'ROOM01', name: 'Bob' })
-    const ws3 = createMockWebSocket({ id: 'p3', roomCode: 'OTHER1', name: 'Carol' })
+    const ws1 = createMockWebSocket({ id: 'p1', playerId: null, roomCode: 'ROOM01', name: 'Alice' })
+    const ws2 = createMockWebSocket({ id: 'p2', playerId: null, roomCode: 'ROOM01', name: 'Bob' })
+    const ws3 = createMockWebSocket({ id: 'p3', playerId: null, roomCode: 'OTHER1', name: 'Carol' })
 
     clients.set('p1', ws1)
     clients.set('p2', ws2)
     clients.set('p3', ws3)
 
-    broadcastToRoom(clients, 'ROOM01', { type: 'chat:message', playerId: 'p1', playerName: 'Alice', message: 'Hi', timestamp: 123, playerColor: '#fff' })
+    broadcastToRoom(clients, 'ROOM01', { type: 'chat:message', id: 'msg1', playerId: 'p1', playerName: 'Alice', message: 'Hi', timestamp: 123, playerColor: '#fff' })
 
     expect(ws1.sentMessages).toHaveLength(1)
     expect(ws2.sentMessages).toHaveLength(1)
@@ -45,13 +45,13 @@ describe('broadcastToRoom', () => {
   test('excludes specified client', () => {
     const clients = new Map<string, GenericWebSocket>()
 
-    const ws1 = createMockWebSocket({ id: 'p1', roomCode: 'ROOM01', name: 'Alice' })
-    const ws2 = createMockWebSocket({ id: 'p2', roomCode: 'ROOM01', name: 'Bob' })
+    const ws1 = createMockWebSocket({ id: 'p1', playerId: null, roomCode: 'ROOM01', name: 'Alice' })
+    const ws2 = createMockWebSocket({ id: 'p2', playerId: null, roomCode: 'ROOM01', name: 'Bob' })
 
     clients.set('p1', ws1)
     clients.set('p2', ws2)
 
-    broadcastToRoom(clients, 'ROOM01', { type: 'chat:message', playerId: 'p1', playerName: 'Alice', message: 'Hi', timestamp: 123, playerColor: '#fff' }, 'p1')
+    broadcastToRoom(clients, 'ROOM01', { type: 'chat:message', id: 'msg1', playerId: 'p1', playerName: 'Alice', message: 'Hi', timestamp: 123, playerColor: '#fff' }, 'p1')
 
     expect(ws1.sentMessages).toHaveLength(0) // Excluded
     expect(ws2.sentMessages).toHaveLength(1)
@@ -65,6 +65,7 @@ describe('broadcastToViewport', () => {
     // Client 1: viewport covers 0-500, 0-500
     const ws1 = createMockWebSocket({
       id: 'p1',
+      playerId: null,
       roomCode: 'ROOM01',
       name: 'Alice',
       viewport: { x: 0, y: 0, width: 500, height: 500 },
@@ -73,6 +74,7 @@ describe('broadcastToViewport', () => {
     // Client 2: viewport covers 400-900, 400-900
     const ws2 = createMockWebSocket({
       id: 'p2',
+      playerId: null,
       roomCode: 'ROOM01',
       name: 'Bob',
       viewport: { x: 400, y: 400, width: 500, height: 500 },
@@ -81,6 +83,7 @@ describe('broadcastToViewport', () => {
     // Client 3: viewport covers 1000-1500, 1000-1500 (far away)
     const ws3 = createMockWebSocket({
       id: 'p3',
+      playerId: null,
       roomCode: 'ROOM01',
       name: 'Carol',
       viewport: { x: 1000, y: 1000, width: 500, height: 500 },
@@ -109,6 +112,7 @@ describe('broadcastToViewport', () => {
     // Client at 0-500 range
     const ws1 = createMockWebSocket({
       id: 'p1',
+      playerId: null,
       roomCode: 'ROOM01',
       name: 'Alice',
       viewport: { x: 0, y: 0, width: 500, height: 500 },
@@ -117,6 +121,7 @@ describe('broadcastToViewport', () => {
     // Client at 500-1000 range (just outside but within default 100px padding)
     const ws2 = createMockWebSocket({
       id: 'p2',
+      playerId: null,
       roomCode: 'ROOM01',
       name: 'Bob',
       viewport: { x: 550, y: 0, width: 500, height: 500 },
@@ -143,6 +148,7 @@ describe('broadcastToViewport', () => {
     // Client with viewport
     const ws1 = createMockWebSocket({
       id: 'p1',
+      playerId: null,
       roomCode: 'ROOM01',
       name: 'Alice',
       viewport: { x: 1000, y: 1000, width: 500, height: 500 }, // Far away
@@ -151,6 +157,7 @@ describe('broadcastToViewport', () => {
     // Client without viewport (new connection, hasn't reported yet)
     const ws2 = createMockWebSocket({
       id: 'p2',
+      playerId: null,
       roomCode: 'ROOM01',
       name: 'Bob',
       // No viewport
@@ -176,6 +183,7 @@ describe('broadcastToViewport', () => {
 
     const ws1 = createMockWebSocket({
       id: 'p1',
+      playerId: null,
       roomCode: 'ROOM01',
       name: 'Alice',
       viewport: { x: 0, y: 0, width: 500, height: 500 },
@@ -183,6 +191,7 @@ describe('broadcastToViewport', () => {
 
     const ws2 = createMockWebSocket({
       id: 'p2',
+      playerId: null,
       roomCode: 'ROOM01',
       name: 'Bob',
       viewport: { x: 0, y: 0, width: 500, height: 500 },
@@ -209,6 +218,7 @@ describe('broadcastToViewport', () => {
     // Client viewport: 0-500, 0-500
     const ws1 = createMockWebSocket({
       id: 'p1',
+      playerId: null,
       roomCode: 'ROOM01',
       name: 'Alice',
       viewport: { x: 0, y: 0, width: 500, height: 500 },
@@ -217,6 +227,7 @@ describe('broadcastToViewport', () => {
     // Client viewport: 600-1100, 600-1100 (far away)
     const ws2 = createMockWebSocket({
       id: 'p2',
+      playerId: null,
       roomCode: 'ROOM01',
       name: 'Bob',
       viewport: { x: 600, y: 600, width: 500, height: 500 },
@@ -240,7 +251,7 @@ describe('broadcastToViewport', () => {
 
 describe('updateClientViewport', () => {
   test('updates client viewport data', () => {
-    const ws = createMockWebSocket({ id: 'p1', roomCode: 'ROOM01', name: 'Alice' })
+    const ws = createMockWebSocket({ id: 'p1', playerId: null, roomCode: 'ROOM01', name: 'Alice' })
 
     updateClientViewport(ws, { x: 100, y: 200, width: 800, height: 600 })
 

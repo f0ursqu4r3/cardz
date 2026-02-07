@@ -107,15 +107,9 @@ export function getStats(): ServerStats {
   let activePlayers = 0
 
   if (roomManagerRef) {
-    // Count active tables (rooms with at least one connected player)
-    const rooms = (roomManagerRef as unknown as { rooms: Map<string, { players: Map<string, { connected: boolean }> }> }).rooms
-    for (const room of rooms.values()) {
-      const connectedPlayers = [...room.players.values()].filter((p) => p.connected).length
-      if (connectedPlayers > 0) {
-        activeTables++
-        activePlayers += connectedPlayers
-      }
-    }
+    const stats = roomManagerRef.getActiveStats()
+    activeTables = stats.activeTables
+    activePlayers = stats.activePlayers
   }
 
   return {

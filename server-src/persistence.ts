@@ -1,8 +1,10 @@
 import { Database } from 'bun:sqlite'
 import { existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
-import type { GameState } from '../shared/types'
+import type { GameState, TableSettings, TableBackground, TableJoinPolicy, TablePermissionsPreset, TableMusic } from '../shared/types'
 import { config } from './config'
+
+export type { TableSettings, TableBackground, TableJoinPolicy, TablePermissionsPreset, TableMusic }
 
 // Database file path
 const DB_PATH = join(config.dataDir, 'cardz.db')
@@ -20,32 +22,6 @@ export interface TableMetadata {
   moderatorPlayerIds: string[] // Player IDs with moderator role (persisted across sessions)
   inviteToken?: string
   settings: TableSettings
-}
-
-export interface TableSettings {
-  background: TableBackground
-  joinPolicy: TableJoinPolicy
-  permissionsPreset: TablePermissionsPreset
-  music: TableMusic | null
-}
-
-export type TableJoinPolicy = 'open' | 'spectators-only' | 'invite-only'
-
-export type TablePermissionsPreset = 'standard' | 'host-only'
-
-export type TableBackground =
-  | 'green-felt' // Default
-  | 'blue-felt'
-  | 'red-felt'
-  | 'wood-oak'
-  | 'wood-dark'
-  | 'slate'
-  | 'custom'
-
-export interface TableMusic {
-  enabled: boolean
-  volume: number // 0-100
-  track: 'jazz' | 'lofi' | 'classical' | 'none'
 }
 
 export interface PersistedTable {
@@ -531,7 +507,7 @@ export function getDefaultSettings(): TableSettings {
 export function normalizeSettings(settings?: Partial<TableSettings> | null): TableSettings {
   return {
     ...getDefaultSettings(),
-    ...(settings ?? {}),
+    ...settings,
   }
 }
 

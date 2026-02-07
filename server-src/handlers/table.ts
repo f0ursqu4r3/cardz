@@ -443,7 +443,7 @@ export function handleTableSnapshotCreate(
 export function handleTableSnapshotList(
   ws: GenericWebSocket,
   _msg: TableSnapshotListRequest,
-  roomManager: RoomManager,
+  _roomManager: RoomManager,
 ): void {
   const clientData = getClientData(ws)
   if (!clientData.roomCode) {

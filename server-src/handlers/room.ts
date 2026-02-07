@@ -127,13 +127,6 @@ export function handleRoomCreate(
     createdBy: room.createdBy,
   })
 
-  if (player.role === 'creator') {
-    send(ws, {
-      type: 'table:invite_token',
-      token: room.inviteToken,
-    })
-  }
-
   // Send invite token to creator
   send(ws, {
     type: 'table:invite_token',
@@ -484,7 +477,7 @@ export function handlePlayerKick(
       kickedBy: clientData.name || 'The host',
     })
     // Close their connection
-    targetWs.close(4001, 'You have been kicked from the room')
+    targetWs.close?.(4001, 'You have been kicked from the room')
   }
 
   // Broadcast to remaining players
@@ -574,7 +567,7 @@ export function handlePlayerBan(
       bannedBy: clientData.name || 'The host',
     })
     // Close their connection
-    targetWs.close(4002, 'You have been banned from the room')
+    targetWs.close?.(4002, 'You have been banned from the room')
   }
 
   // Broadcast to remaining players

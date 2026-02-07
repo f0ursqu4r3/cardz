@@ -271,7 +271,7 @@ describeSockets('WebSocket Integration Tests', () => {
       const port = 20000 + Math.floor(Math.random() * 20000)
       try {
         server = createTestServer(port)
-        testPort = server.port
+        testPort = server.port!
         break
       } catch (err) {
         lastError = err

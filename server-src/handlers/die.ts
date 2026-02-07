@@ -74,7 +74,7 @@ export function handleDieRoll(
   })
 
   // Log activity (sides defaults to 6 for standard dice)
-  logDieRolled(clients, room.code, clientData.playerId ?? clientData.id, clientData.name, die.sides ?? 6, result.value)
+  logDieRolled(clients, room.code, clientData.playerId ?? clientData.id, clientData.name, 6, result.value)
 }
 
 export function handleDieUpdate(

@@ -170,10 +170,18 @@ export interface GameState {
 }
 
 // ============================================================================
+// Base Client Message (all client → server messages can include requestId)
+// ============================================================================
+
+export interface BaseClientMessage {
+  requestId?: string
+}
+
+// ============================================================================
 // Room Messages (Client → Server)
 // ============================================================================
 
-export interface RoomCreate {
+export interface RoomCreate extends BaseClientMessage {
   type: 'room:create'
   playerName: string
   preferredColor?: string // Player's preferred color
@@ -183,7 +191,7 @@ export interface RoomCreate {
   deviceId?: string // Persistent device identifier
 }
 
-export interface RoomJoin {
+export interface RoomJoin extends BaseClientMessage {
   type: 'room:join'
   roomCode: string
   playerName: string
@@ -194,35 +202,35 @@ export interface RoomJoin {
   inviteToken?: string // Invite token for invite-only tables
 }
 
-export interface RoomLeave {
+export interface RoomLeave extends BaseClientMessage {
   type: 'room:leave'
 }
 
-export interface RoomListRequest {
+export interface RoomListRequest extends BaseClientMessage {
   type: 'room:list'
 }
 
-export interface PlayerKick {
+export interface PlayerKick extends BaseClientMessage {
   type: 'player:kick'
   targetPlayerId: string
 }
 
-export interface PlayerBan {
+export interface PlayerBan extends BaseClientMessage {
   type: 'player:ban'
   targetPlayerId: string
 }
 
-export interface PlayerPromote {
+export interface PlayerPromote extends BaseClientMessage {
   type: 'player:promote'
   targetPlayerId: string
 }
 
-export interface PlayerDemote {
+export interface PlayerDemote extends BaseClientMessage {
   type: 'player:demote'
   targetPlayerId: string
 }
 
-export interface PlayerUpdate {
+export interface PlayerUpdate extends BaseClientMessage {
   type: 'player:update'
   name?: string
   color?: string
@@ -331,63 +339,71 @@ export type TableBackground =
   | 'wood-oak'
   | 'wood-dark'
   | 'slate'
+  | 'custom'
 
 export type TableJoinPolicy = 'open' | 'spectators-only' | 'invite-only'
 
 export type TablePermissionsPreset = 'standard' | 'host-only'
 
+export interface TableMusic {
+  enabled: boolean
+  volume: number // 0-100
+  track: 'jazz' | 'lofi' | 'classical' | 'none'
+}
+
 export interface TableSettings {
   background: TableBackground
   joinPolicy: TableJoinPolicy
   permissionsPreset: TablePermissionsPreset
+  music?: TableMusic | null
 }
 
 // ============================================================================
 // Table Management Messages (Client → Server)
 // ============================================================================
 
-export interface TableReset {
+export interface TableReset extends BaseClientMessage {
   type: 'table:reset'
 }
 
-export interface TableUpdateSettings {
+export interface TableUpdateSettings extends BaseClientMessage {
   type: 'table:update_settings'
   settings: Partial<TableSettings>
 }
 
-export interface TableUpdateVisibility {
+export interface TableUpdateVisibility extends BaseClientMessage {
   type: 'table:update_visibility'
   isPublic: boolean
 }
 
-export interface TableUpdateName {
+export interface TableUpdateName extends BaseClientMessage {
   type: 'table:update_name'
   name: string
 }
 
-export interface TableSnapshotCreate {
+export interface TableSnapshotCreate extends BaseClientMessage {
   type: 'table:snapshot_create'
   name?: string
 }
 
-export interface TableSnapshotListRequest {
+export interface TableSnapshotListRequest extends BaseClientMessage {
   type: 'table:snapshot_list'
 }
 
-export interface TableSnapshotRestore {
+export interface TableSnapshotRestore extends BaseClientMessage {
   type: 'table:snapshot_restore'
   snapshotId: number
 }
 
-export interface TableUndo {
+export interface TableUndo extends BaseClientMessage {
   type: 'table:undo'
 }
 
-export interface TableRedo {
+export interface TableRedo extends BaseClientMessage {
   type: 'table:redo'
 }
 
-export interface TableInviteRegenerate {
+export interface TableInviteRegenerate extends BaseClientMessage {
   type: 'table:invite_regenerate'
 }
 
@@ -463,7 +479,7 @@ export interface TableAutosave {
 // Card Messages (Client → Server)
 // ============================================================================
 
-export interface CardMoveIntent {
+export interface CardMoveIntent extends BaseClientMessage {
   type: 'card:move'
   cardId: number
   x: number
@@ -472,17 +488,17 @@ export interface CardMoveIntent {
   vy?: number
 }
 
-export interface CardLock {
+export interface CardLock extends BaseClientMessage {
   type: 'card:lock'
   cardId: number
 }
 
-export interface CardUnlock {
+export interface CardUnlock extends BaseClientMessage {
   type: 'card:unlock'
   cardId: number
 }
 
-export interface CardFlip {
+export interface CardFlip extends BaseClientMessage {
   type: 'card:flip'
   cardId: number
 }
@@ -531,14 +547,14 @@ export interface CardFlipped {
 // Stack Messages (Client → Server)
 // ============================================================================
 
-export interface StackCreate {
+export interface StackCreate extends BaseClientMessage {
   type: 'stack:create'
   cardIds: number[]
   anchorX: number
   anchorY: number
 }
 
-export interface StackMove {
+export interface StackMove extends BaseClientMessage {
   type: 'stack:move'
   stackId: number
   anchorX: number
@@ -546,50 +562,50 @@ export interface StackMove {
   detachFromZone?: boolean // If true, detach the stack from its current zone
 }
 
-export interface StackLock {
+export interface StackLock extends BaseClientMessage {
   type: 'stack:lock'
   stackId: number
 }
 
-export interface StackUnlock {
+export interface StackUnlock extends BaseClientMessage {
   type: 'stack:unlock'
   stackId: number
 }
 
-export interface StackAddCard {
+export interface StackAddCard extends BaseClientMessage {
   type: 'stack:add_card'
   stackId: number
   cardId: number
 }
 
-export interface StackRemoveCard {
+export interface StackRemoveCard extends BaseClientMessage {
   type: 'stack:remove_card'
   cardId: number
 }
 
-export interface StackMerge {
+export interface StackMerge extends BaseClientMessage {
   type: 'stack:merge'
   sourceStackId: number
   targetStackId: number
 }
 
-export interface StackShuffle {
+export interface StackShuffle extends BaseClientMessage {
   type: 'stack:shuffle'
   stackId: number
 }
 
-export interface StackFlip {
+export interface StackFlip extends BaseClientMessage {
   type: 'stack:flip'
   stackId: number
 }
 
-export interface StackSetFaces {
+export interface StackSetFaces extends BaseClientMessage {
   type: 'stack:set_faces'
   stackId: number
   faceUp: boolean
 }
 
-export interface StackReorder {
+export interface StackReorder extends BaseClientMessage {
   type: 'stack:reorder'
   stackId: number
   fromIndex: number
@@ -688,7 +704,7 @@ export interface StackReordered {
 // Zone Messages (Client → Server)
 // ============================================================================
 
-export interface ZoneCreate {
+export interface ZoneCreate extends BaseClientMessage {
   type: 'zone:create'
   x: number
   y: number
@@ -702,7 +718,7 @@ export interface ZoneCreate {
   cardSettings?: ZoneCardSettings
 }
 
-export interface ZoneUpdate {
+export interface ZoneUpdate extends BaseClientMessage {
   type: 'zone:update'
   zoneId: number
   updates: {
@@ -720,18 +736,18 @@ export interface ZoneUpdate {
   }
 }
 
-export interface ZoneDelete {
+export interface ZoneDelete extends BaseClientMessage {
   type: 'zone:delete'
   zoneId: number
 }
 
-export interface ZoneAddCard {
+export interface ZoneAddCard extends BaseClientMessage {
   type: 'zone:add_card'
   zoneId: number
   cardId: number
 }
 
-export interface ZoneAddCards {
+export interface ZoneAddCards extends BaseClientMessage {
   type: 'zone:add_cards'
   zoneId: number
   cardIds: number[]
@@ -785,7 +801,7 @@ export interface ZoneCardsAdded {
 // Counter Messages (Client → Server)
 // ============================================================================
 
-export interface CounterCreate {
+export interface CounterCreate extends BaseClientMessage {
   type: 'counter:create'
   x: number
   y: number
@@ -797,7 +813,7 @@ export interface CounterCreate {
   color?: string
 }
 
-export interface CounterUpdate {
+export interface CounterUpdate extends BaseClientMessage {
   type: 'counter:update'
   counterId: number
   updates: {
@@ -812,23 +828,23 @@ export interface CounterUpdate {
   }
 }
 
-export interface CounterIncrement {
+export interface CounterIncrement extends BaseClientMessage {
   type: 'counter:increment'
   counterId: number
   delta: number // +step or -step typically
 }
 
-export interface CounterDelete {
+export interface CounterDelete extends BaseClientMessage {
   type: 'counter:delete'
   counterId: number
 }
 
-export interface CounterLock {
+export interface CounterLock extends BaseClientMessage {
   type: 'counter:lock'
   counterId: number
 }
 
-export interface CounterUnlock {
+export interface CounterUnlock extends BaseClientMessage {
   type: 'counter:unlock'
   counterId: number
 }
@@ -878,7 +894,7 @@ export interface CounterUnlocked {
 // Token Messages (Client → Server)
 // ============================================================================
 
-export interface TokenCreate {
+export interface TokenCreate extends BaseClientMessage {
   type: 'token:create'
   x: number
   y: number
@@ -890,7 +906,7 @@ export interface TokenCreate {
   size?: TokenSize
 }
 
-export interface TokenUpdate {
+export interface TokenUpdate extends BaseClientMessage {
   type: 'token:update'
   tokenId: number
   updates: {
@@ -904,17 +920,17 @@ export interface TokenUpdate {
   }
 }
 
-export interface TokenDelete {
+export interface TokenDelete extends BaseClientMessage {
   type: 'token:delete'
   tokenId: number
 }
 
-export interface TokenLock {
+export interface TokenLock extends BaseClientMessage {
   type: 'token:lock'
   tokenId: number
 }
 
-export interface TokenUnlock {
+export interface TokenUnlock extends BaseClientMessage {
   type: 'token:unlock'
   tokenId: number
 }
@@ -957,7 +973,7 @@ export interface TokenUnlocked {
 // Die Messages (Client → Server)
 // ============================================================================
 
-export interface DieCreate {
+export interface DieCreate extends BaseClientMessage {
   type: 'die:create'
   x: number
   y: number
@@ -965,12 +981,12 @@ export interface DieCreate {
   pipColor?: string
 }
 
-export interface DieRoll {
+export interface DieRoll extends BaseClientMessage {
   type: 'die:roll'
   dieId: number
 }
 
-export interface DieUpdate {
+export interface DieUpdate extends BaseClientMessage {
   type: 'die:update'
   dieId: number
   updates: {
@@ -981,17 +997,17 @@ export interface DieUpdate {
   }
 }
 
-export interface DieDelete {
+export interface DieDelete extends BaseClientMessage {
   type: 'die:delete'
   dieId: number
 }
 
-export interface DieLock {
+export interface DieLock extends BaseClientMessage {
   type: 'die:lock'
   dieId: number
 }
 
-export interface DieUnlock {
+export interface DieUnlock extends BaseClientMessage {
   type: 'die:unlock'
   dieId: number
 }
@@ -1041,7 +1057,7 @@ export interface DieUnlocked {
 // Timer Messages (Client → Server)
 // ============================================================================
 
-export interface TimerCreate {
+export interface TimerCreate extends BaseClientMessage {
   type: 'timer:create'
   x: number
   y: number
@@ -1050,22 +1066,22 @@ export interface TimerCreate {
   label?: string
 }
 
-export interface TimerStart {
+export interface TimerStart extends BaseClientMessage {
   type: 'timer:start'
   timerId: number
 }
 
-export interface TimerPause {
+export interface TimerPause extends BaseClientMessage {
   type: 'timer:pause'
   timerId: number
 }
 
-export interface TimerReset {
+export interface TimerReset extends BaseClientMessage {
   type: 'timer:reset'
   timerId: number
 }
 
-export interface TimerUpdate {
+export interface TimerUpdate extends BaseClientMessage {
   type: 'timer:update'
   timerId: number
   updates: {
@@ -1077,17 +1093,17 @@ export interface TimerUpdate {
   }
 }
 
-export interface TimerDelete {
+export interface TimerDelete extends BaseClientMessage {
   type: 'timer:delete'
   timerId: number
 }
 
-export interface TimerLock {
+export interface TimerLock extends BaseClientMessage {
   type: 'timer:lock'
   timerId: number
 }
 
-export interface TimerUnlock {
+export interface TimerUnlock extends BaseClientMessage {
   type: 'timer:unlock'
   timerId: number
 }
@@ -1155,12 +1171,12 @@ export interface TimerUnlocked {
 // Hand Messages (Client → Server)
 // ============================================================================
 
-export interface HandAdd {
+export interface HandAdd extends BaseClientMessage {
   type: 'hand:add'
   cardId: number
 }
 
-export interface HandRemove {
+export interface HandRemove extends BaseClientMessage {
   type: 'hand:remove'
   cardId: number
   x: number
@@ -1168,13 +1184,13 @@ export interface HandRemove {
   faceUp: boolean
 }
 
-export interface HandReorder {
+export interface HandReorder extends BaseClientMessage {
   type: 'hand:reorder'
   fromIndex: number
   toIndex: number
 }
 
-export interface HandAddStack {
+export interface HandAddStack extends BaseClientMessage {
   type: 'hand:add_stack'
   stackId: number
 }
@@ -1225,7 +1241,7 @@ export interface HandStackAddedOther {
 // Selection Messages
 // ============================================================================
 
-export interface SelectionStack {
+export interface SelectionStack extends BaseClientMessage {
   type: 'selection:stack'
   cardIds: number[]
   anchorX: number
@@ -1245,7 +1261,7 @@ export interface SelectionStacked {
 
 export type CursorState = 'default' | 'grab' | 'grabbing'
 
-export interface CursorUpdate {
+export interface CursorUpdate extends BaseClientMessage {
   type: 'cursor:update'
   x: number
   y: number
@@ -1271,7 +1287,7 @@ export interface Viewport {
   height: number
 }
 
-export interface ViewportUpdate {
+export interface ViewportUpdate extends BaseClientMessage {
   type: 'viewport:update'
   viewport: Viewport
 }
@@ -1280,7 +1296,7 @@ export interface ViewportUpdate {
 // Selection Messages (for showing other players' card selections)
 // ============================================================================
 
-export interface SelectionUpdate {
+export interface SelectionUpdate extends BaseClientMessage {
   type: 'selection:update'
   cardIds: number[] // List of selected card IDs (empty to clear)
 }
@@ -1296,7 +1312,7 @@ export interface SelectionUpdated {
 // State Sync Messages
 // ============================================================================
 
-export interface StateRequest {
+export interface StateRequest extends BaseClientMessage {
   type: 'state:request'
 }
 
@@ -1325,17 +1341,17 @@ export type StateChange =
 // Chat Messages (Client → Server)
 // ============================================================================
 
-export interface ChatSend {
+export interface ChatSend extends BaseClientMessage {
   type: 'chat:send'
   message: string
 }
 
-export interface ChatTyping {
+export interface ChatTyping extends BaseClientMessage {
   type: 'chat:typing'
   isTyping: boolean
 }
 
-export interface ChatDelete {
+export interface ChatDelete extends BaseClientMessage {
   type: 'chat:delete'
   messageId: string
 }
@@ -1431,7 +1447,7 @@ export interface Ping {
   timestamp: number
 }
 
-export interface Pong {
+export interface Pong extends BaseClientMessage {
   type: 'pong'
   timestamp: number
 }
@@ -1464,6 +1480,8 @@ export type ErrorCode =
   | 'NOTHING_TO_REDO'
   | 'KICKED'
   | 'BANNED'
+  | 'COLOR_TAKEN'
+  | 'INVALID_COLOR'
 
 // ============================================================================
 // Union Types for Message Handling
@@ -1549,8 +1567,8 @@ type ClientMessageBase =
   | ChatDelete
   | Pong
 
-// All client messages can optionally include a requestId for error correlation
-export type ClientMessage = ClientMessageBase & { requestId?: string }
+// All client messages include requestId via BaseClientMessage
+export type ClientMessage = ClientMessageBase
 
 // Base server message union (internal)
 type ServerMessageBase =

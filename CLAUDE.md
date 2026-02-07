@@ -15,7 +15,7 @@
 
 ## Project Structure
 
-```
+```text
 src/                  # Vue 3 frontend
   components/         # Vue components (PascalCase, *Comp.vue suffix)
   composables/        # use* composition functions

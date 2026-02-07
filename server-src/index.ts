@@ -951,6 +951,7 @@ const server = Bun.serve<ClientData>({
             if (!roomManager.isCreatorOrModerator(room.code, clientData.playerId)) {
               send(socket, {
                 type: 'error',
+                originalAction: 'chat:delete',
                 code: 'PERMISSION_DENIED',
                 message: 'Only the table creator or moderators can remove chat messages',
               })
@@ -964,6 +965,7 @@ const server = Bun.serve<ClientData>({
             if (!deleted) {
               send(socket, {
                 type: 'error',
+                originalAction: 'chat:delete',
                 code: 'NOT_FOUND',
                 message: 'Chat message not found',
               })

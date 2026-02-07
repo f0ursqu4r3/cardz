@@ -767,7 +767,7 @@ export class RoomManager {
     }
 
     if (joinPolicy === 'invite-only' && !isPrivileged) {
-      if (!inviteToken || inviteToken !== expectedInviteToken) {
+      if (!resolvedInviteToken || resolvedInviteToken !== expectedInviteToken) {
         return { asSpectator: nextAsSpectator, error: 'INVITE_REQUIRED' }
       }
     }
@@ -1136,6 +1136,22 @@ export class RoomManager {
    */
   getRoom(roomCode: string): Room | undefined {
     return this.rooms.get(roomCode)
+  }
+
+  /**
+   * Get real-time stats for active tables and players
+   */
+  getActiveStats(): { activeTables: number; activePlayers: number } {
+    let activeTables = 0
+    let activePlayers = 0
+    for (const room of this.rooms.values()) {
+      const connected = [...room.players.values()].filter((p) => p.connected).length
+      if (connected > 0) {
+        activeTables++
+        activePlayers += connected
+      }
+    }
+    return { activeTables, activePlayers }
   }
 
   /**
