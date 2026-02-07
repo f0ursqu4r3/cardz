@@ -43,6 +43,7 @@ export interface EntityDragConfig<T extends DraggableEntity> {
 const SHAKE_WINDOW_MS = 400 // Time window to detect shakes
 const SHAKE_MIN_REVERSALS = 2 // Minimum direction changes to trigger shake
 const SHAKE_MIN_DISTANCE = 20 // Minimum screen pixels per movement to count
+const SHAKE_COOLDOWN_MS = 500 // Cooldown between consecutive shake triggers
 
 /**
  * Generic composable for handling drag operations on game entities (counters, tokens, dice, timers).
@@ -77,7 +78,7 @@ export function useEntityDrag<T extends DraggableEntity>(config: EntityDragConfi
     time: number
   }
   let positionHistory: PositionSample[] = []
-  let hasShaken = false // Prevent multiple shakes per drag
+  let lastShakeTime = 0 // Cooldown between consecutive shake triggers
 
   /**
    * Get a player's color by their ID
@@ -93,9 +94,12 @@ export function useEntityDrag<T extends DraggableEntity>(config: EntityDragConfi
    * Returns true if rapid direction reversals are detected
    */
   const detectShake = (screenX: number, screenY: number): boolean => {
-    if (!onShake || hasShaken) return false
+    if (!onShake) return false
 
     const now = Date.now()
+
+    // Cooldown between consecutive shake triggers
+    if (now - lastShakeTime < SHAKE_COOLDOWN_MS) return false
 
     // Add new position sample (screen coordinates)
     positionHistory.push({ x: screenX, y: screenY, time: now })
@@ -166,7 +170,7 @@ export function useEntityDrag<T extends DraggableEntity>(config: EntityDragConfi
 
     // Reset shake detection state
     positionHistory = []
-    hasShaken = false
+    lastShakeTime = 0
 
     // Lock the entity
     trackActivity()
@@ -195,7 +199,8 @@ export function useEntityDrag<T extends DraggableEntity>(config: EntityDragConfi
 
     // Check for shake gesture (for dice rolling) - use screen coordinates
     if (onShake && detectShake(event.clientX, event.clientY)) {
-      hasShaken = true
+      lastShakeTime = Date.now()
+      positionHistory = [] // Reset history so next shake needs fresh reversals
       onShake(draggingId.value)
     }
 

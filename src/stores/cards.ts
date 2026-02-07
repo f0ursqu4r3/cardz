@@ -498,8 +498,10 @@ export const useCardStore = defineStore('cards', () => {
       lockedBy: null,
     }
     stacks.value.push(stack)
-    registerItem(stackById, stack)
-    return stack
+    // Register the reactive proxy from the array, not the raw object
+    const reactiveStack = stacks.value[stacks.value.length - 1]!
+    registerItem(stackById, reactiveStack)
+    return reactiveStack
   }
 
   // Zone operations
@@ -536,8 +538,10 @@ export const useCardStore = defineStore('cards', () => {
       cardSettings,
     }
     zones.value.push(zone)
-    registerItem(zoneById, zone)
-    return zone
+    // Register the reactive proxy from the array, not the raw object
+    const reactiveZone = zones.value[zones.value.length - 1]!
+    registerItem(zoneById, reactiveZone)
+    return reactiveZone
   }
 
   const deleteZone = (zoneId: number) => {
@@ -1146,7 +1150,8 @@ export const useCardStore = defineStore('cards', () => {
     } else {
       const stack = stackStateToStack(state)
       stacks.value.push(stack)
-      registerItem(stackById, stack)
+      // Register the reactive proxy from the array, not the raw object
+      registerItem(stackById, stacks.value[stacks.value.length - 1]!)
     }
   }
 
@@ -1182,7 +1187,8 @@ export const useCardStore = defineStore('cards', () => {
     } else {
       const zone = zoneStateToZone(state)
       zones.value.push(zone)
-      registerItem(zoneById, zone)
+      // Register the reactive proxy from the array, not the raw object
+      registerItem(zoneById, zones.value[zones.value.length - 1]!)
     }
   }
 
@@ -1231,7 +1237,8 @@ export const useCardStore = defineStore('cards', () => {
     } else {
       const counter = counterStateToCounter(state)
       counters.value.push(counter)
-      registerItem(counterById, counter)
+      // Register the reactive proxy from the array, not the raw object
+      registerItem(counterById, counters.value[counters.value.length - 1]!)
     }
   }
 
@@ -1278,7 +1285,8 @@ export const useCardStore = defineStore('cards', () => {
     } else {
       const token = tokenStateToToken(state)
       tokens.value.push(token)
-      registerItem(tokenById, token)
+      // Register the reactive proxy from the array, not the raw object
+      registerItem(tokenById, tokens.value[tokens.value.length - 1]!)
     }
   }
 
@@ -1322,7 +1330,8 @@ export const useCardStore = defineStore('cards', () => {
     } else {
       const die = dieStateToDie(state)
       dice.value.push(die)
-      registerItem(dieById, die)
+      // Register the reactive proxy from the array, not the raw object
+      registerItem(dieById, dice.value[dice.value.length - 1]!)
     }
   }
 
@@ -1378,7 +1387,8 @@ export const useCardStore = defineStore('cards', () => {
     } else {
       const timer = timerStateToTimer(state)
       timers.value.push(timer)
-      registerItem(timerById, timer)
+      // Register the reactive proxy from the array, not the raw object
+      registerItem(timerById, timers.value[timers.value.length - 1]!)
     }
   }
 
