@@ -2,6 +2,7 @@ import type { HandAdd, HandRemove, HandReorder, HandAddStack } from '../../share
 import type { Room } from '../room'
 import type { GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom, broadcastSplit, getClientData } from '../utils/broadcast'
+import { logCardsDrawn, logCardPlaced } from '../activity'
 
 export function handleHandAdd(
   ws: GenericWebSocket,
@@ -106,6 +107,8 @@ export function handleHandAdd(
       handCount,
     },
   )
+
+  logCardsDrawn(clients, room.code, playerId, clientData.name, 1)
 }
 
 export function handleHandRemove(
@@ -149,6 +152,8 @@ export function handleHandRemove(
     playerId,
     cardState: result,
   })
+
+  logCardPlaced(clients, room.code, playerId, clientData.name, 1)
 }
 
 export function handleHandReorder(ws: GenericWebSocket, msg: HandReorder, room: Room): void {
@@ -256,4 +261,6 @@ export function handleHandAddStack(
       handCount,
     },
   )
+
+  logCardsDrawn(clients, room.code, playerId, clientData.name, result.cardIds.length)
 }

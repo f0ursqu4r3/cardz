@@ -3,6 +3,7 @@ import type { Room } from '../room'
 import type { GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom, getClientData } from '../utils/broadcast'
 import { sanitizeZoneLabel } from '../utils/sanitize'
+import { logTokenCreated, logTokenDeleted } from '../activity'
 
 export function handleTokenCreate(
   ws: GenericWebSocket,
@@ -37,6 +38,8 @@ export function handleTokenCreate(
     token,
     playerId: clientData.playerId ?? clientData.id,
   })
+
+  logTokenCreated(clients, room.code, clientData.playerId ?? clientData.id, clientData.name, sanitizedLabel)
 }
 
 export function handleTokenUpdate(
@@ -154,6 +157,8 @@ export function handleTokenDelete(
     tokenId: msg.tokenId,
     playerId: clientData.playerId ?? clientData.id,
   })
+
+  logTokenDeleted(clients, room.code, clientData.playerId ?? clientData.id, clientData.name, token.label)
 }
 
 export function handleTokenLock(

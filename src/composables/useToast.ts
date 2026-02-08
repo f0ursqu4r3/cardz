@@ -11,6 +11,9 @@ let nextId = 0
 
 export function useToast() {
   const show = (message: string, type: Toast['type'] = 'info', duration = 4000) => {
+    const existing = toasts.value.find((t) => t.message === message && t.type === type)
+    if (existing) return existing.id
+
     const id = nextId++
     toasts.value.push({ id, message, type })
 

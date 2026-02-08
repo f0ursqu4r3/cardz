@@ -2,6 +2,7 @@ import type { CardMoveIntent, CardLock, CardUnlock, CardFlip } from '../../share
 import type { Room } from '../room'
 import type { GenericWebSocket } from '../utils/broadcast'
 import { send, broadcastToRoom, broadcastToViewport, getClientData } from '../utils/broadcast'
+import { logCardFlipped } from '../activity'
 
 export function handleCardMove(
   ws: GenericWebSocket,
@@ -226,4 +227,6 @@ export function handleCardFlip(
     },
     { x: card.x, y: card.y },
   )
+
+  logCardFlipped(clients, room.code, clientData.playerId ?? clientData.id, clientData.name)
 }

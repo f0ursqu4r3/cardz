@@ -17,7 +17,6 @@ const emit = defineEmits<{
 }>()
 
 const entriesRef = ref<HTMLDivElement | null>(null)
-const unreadCount = ref(0)
 const isAtBottom = ref(true)
 const showModerationOnly = ref(false)
 
@@ -34,26 +33,21 @@ const filteredEntries = computed(() => {
   return props.entries.filter((entry) => moderationTypes.has(entry.actionType))
 })
 
-// Track unread entries when panel is closed
+// Auto-scroll when new entries arrive
 watch(
   () => props.entries.length,
-  (newLen, oldLen) => {
-    if (!props.isOpen && newLen > oldLen) {
-      unreadCount.value += newLen - oldLen
-    }
-    // Auto-scroll if at bottom
+  () => {
     if (props.isOpen && isAtBottom.value) {
       nextTick(scrollToBottom)
     }
   },
 )
 
-// Clear unread count when opening
+// Scroll to bottom when opening
 watch(
   () => props.isOpen,
   (isOpen) => {
     if (isOpen) {
-      unreadCount.value = 0
       nextTick(scrollToBottom)
     }
   },
@@ -92,9 +86,16 @@ const formatActivity = (entry: ActivityLogEntry): string => {
       return `${name} left the table`
     case 'player_spectating':
       return `${name} is now spectating`
-    case 'card_placed':
-      const cardCount = (data.count as number) || 1
-      return `${name} placed ${cardCount} card${cardCount > 1 ? 's' : ''}`
+    case 'card_placed': {
+      const placedCount = (data.count as number) || 1
+      return `${name} played ${placedCount} card${placedCount > 1 ? 's' : ''} from hand`
+    }
+    case 'card_flipped':
+      return `${name} flipped a card`
+    case 'cards_drawn': {
+      const drawnCount = (data.count as number) || 1
+      return `${name} drew ${drawnCount} card${drawnCount > 1 ? 's' : ''}`
+    }
     case 'stack_created':
       return `${name} created a stack of ${data.cardCount || '?'} cards`
     case 'stack_shuffled':
@@ -105,6 +106,10 @@ const formatActivity = (entry: ActivityLogEntry): string => {
       return `${name} created zone "${data.name || 'Untitled'}"`
     case 'zone_deleted':
       return `${name} deleted zone "${data.name || 'Untitled'}"`
+    case 'token_created':
+      return `${name} placed a ${data.label || 'token'}`
+    case 'token_deleted':
+      return `${name} removed a ${data.label || 'token'}`
     case 'die_rolled':
       return `${name} rolled a d${data.sides || 6} and got ${data.value}`
     case 'counter_changed':
@@ -151,6 +156,13 @@ const getActivityColor = (actionType: string): string => {
     case 'player_promoted':
     case 'player_demoted':
       return '#ef4444' // bright red for moderation actions
+    case 'card_placed':
+    case 'card_flipped':
+    case 'cards_drawn':
+      return '#c084fc' // light purple
+    case 'token_created':
+    case 'token_deleted':
+      return '#f472b6' // pink
     case 'die_rolled':
       return '#fbbf24' // yellow
     case 'stack_shuffled':
@@ -192,14 +204,10 @@ onUnmounted(() => {
     <!-- Toggle Button -->
     <button
       class="activity__toggle"
-      :class="{ 'activity__toggle--has-unread': unreadCount > 0 }"
       @click="togglePanel"
       :title="isOpen ? 'Close activity log' : 'Open activity log'"
     >
       <Activity :size="20" />
-      <span v-if="unreadCount > 0" class="activity__badge">{{
-        unreadCount > 9 ? '9+' : unreadCount
-      }}</span>
     </button>
 
     <!-- Activity Panel -->
@@ -283,27 +291,6 @@ onUnmounted(() => {
   background: rgba(40, 40, 55, 0.95);
   color: #fff;
   transform: scale(1.05);
-}
-
-.activity__toggle--has-unread {
-  color: #60a5fa;
-}
-
-.activity__badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  background: #60a5fa;
-  border-radius: 9px;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .activity--open .activity__toggle {

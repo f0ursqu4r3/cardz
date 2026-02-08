@@ -284,6 +284,70 @@ export function logSettingsChanged(
 }
 
 /**
+ * Helper to log card flipped
+ */
+export function logCardFlipped(
+  clients: Map<string, GenericWebSocket>,
+  roomCode: string,
+  playerId: string,
+  playerName: string,
+): void {
+  logActivity(clients, roomCode, playerId, playerName, 'card_flipped')
+}
+
+/**
+ * Helper to log card placed (played from hand)
+ */
+export function logCardPlaced(
+  clients: Map<string, GenericWebSocket>,
+  roomCode: string,
+  playerId: string,
+  playerName: string,
+  count: number,
+): void {
+  logActivity(clients, roomCode, playerId, playerName, 'card_placed', { count })
+}
+
+/**
+ * Helper to log cards drawn to hand
+ */
+export function logCardsDrawn(
+  clients: Map<string, GenericWebSocket>,
+  roomCode: string,
+  playerId: string,
+  playerName: string,
+  count: number,
+): void {
+  logActivity(clients, roomCode, playerId, playerName, 'cards_drawn', { count })
+}
+
+/**
+ * Helper to log token created
+ */
+export function logTokenCreated(
+  clients: Map<string, GenericWebSocket>,
+  roomCode: string,
+  playerId: string,
+  playerName: string,
+  label?: string,
+): void {
+  logActivity(clients, roomCode, playerId, playerName, 'token_created', { label })
+}
+
+/**
+ * Helper to log token deleted
+ */
+export function logTokenDeleted(
+  clients: Map<string, GenericWebSocket>,
+  roomCode: string,
+  playerId: string,
+  playerName: string,
+  label?: string,
+): void {
+  logActivity(clients, roomCode, playerId, playerName, 'token_deleted', { label })
+}
+
+/**
  * Helper to log player kicked
  */
 export function logPlayerKicked(
